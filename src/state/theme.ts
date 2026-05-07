@@ -1,5 +1,6 @@
 import { ref, watch } from 'vue'
 import type { ThemeId } from '../types'
+import { categories } from '../catalog/categories'
 
 const STORAGE_KEY = 'mse.theme'
 const URL_PARAM = 't'
@@ -75,8 +76,12 @@ function applyTheme(t: ThemeId, opts: { animate: boolean }): void {
   const reduce =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  if (!opts.animate || reduce) {
+  const swap = (): void => {
     html.setAttribute('data-theme', t)
+    applyCategoryTokens(t)
+  }
+  if (!opts.animate || reduce) {
+    swap()
     return
   }
   // The View Transitions API cross-fades the entire page including discrete
@@ -87,14 +92,20 @@ function applyTheme(t: ThemeId, opts: { animate: boolean }): void {
     startViewTransition?: (cb: () => void) => unknown
   }).startViewTransition
   if (typeof startVT === 'function') {
-    startVT.call(document, () => {
-      html.setAttribute('data-theme', t)
-    })
+    startVT.call(document, swap)
     return
   }
   html.classList.add(TRANSITION_CLASS)
   window.setTimeout(() => html.classList.remove(TRANSITION_CLASS), TRANSITION_MS)
-  html.setAttribute('data-theme', t)
+  swap()
+}
+
+function applyCategoryTokens(t: ThemeId): void {
+  const root = document.documentElement
+  for (const c of categories) {
+    const color = c.themeColors[t] ?? c.themeColors.normal
+    root.style.setProperty(`--cat-${c.id}`, color)
+  }
 }
 
 export function setTheme(t: ThemeId): void {

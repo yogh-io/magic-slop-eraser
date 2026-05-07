@@ -41,36 +41,6 @@ The model reaches for them not because they describe anything but because they w
       '"Delve" is fine in a sentence about excavation. "Landscape" is fine when it means actual landscape. The flag is metaphorical use in abstract domains.',
   },
   {
-    id: 'tier2-lexicon',
-    category: 'lexical',
-    name: 'Tier 2 lexicon',
-    shortName: 'Tier 2',
-    severity: 'medium',
-    scope: 'word',
-    mechanical: true,
-    rung: 1,
-    blurb:
-      'Defensible in context, suspect in clusters. Two or more per 1000 words is a reliable cluster signal.',
-    essay: `A robust, nuanced, multifaceted vocabulary - intricate in scope, remarkably comprehensive in cluster - which is the diagnosis: each word is fine on its own, the set as a whole always arrives together. "Robust" can describe a real bridge. "Nuanced" can describe an actual position. "Multifaceted" was almost a compliment once.
-
-The trouble is that the model does not pick one - it picks all of them, in clusters, the way a teenager learning to dress reaches for whatever looks expensive. A piece in which "robust," "nuanced," and "intricate" all show up before paragraph three is a piece in which the vocabulary is doing the work the argument was supposed to do. The reader registers the gesture. They do not register the argument. There was no argument; there was only the silhouette of one, draped in adjectives.`,
-    whyItsSlop:
-      'Each of these words has legitimate uses, but the model reaches for the same set so reflexively that clusters of three or four in a single piece are diagnostic on their own.',
-    fix: 'Pick the one most load-bearing instance and let it stand. Replace the rest with concrete description. If "robust framework" means anything specific, name what makes it robust; if it does not, drop the adjective.',
-    examples: [
-      {
-        sloppy:
-          'A nuanced and multifaceted analysis of the intricate landscape.',
-        better: 'A close look at what is actually going on.',
-      },
-      {
-        sloppy:
-          'The robust framework underscores the profound and remarkable journey ahead.',
-        better: 'The framework can absorb three known kinds of failure.',
-      },
-    ],
-  },
-  {
     id: 'throat-clearing',
     category: 'lexical',
     name: 'Throat-clearing openers',
@@ -352,64 +322,6 @@ The result reads like an argument because the rhythm of the line resembles the r
       'Legitimate when the X position is a real, named position the piece is rebutting and the antithesis lands the rebuttal. "Management called this a quarterly miss. It was a strategic defeat." That is contrast doing argumentative work.',
   },
   {
-    id: 'staccato',
-    category: 'structural',
-    name: 'Staccato slop',
-    severity: 'high',
-    scope: 'paragraph',
-    mechanical: false,
-    rung: 2,
-    blurb:
-      'Two or more consecutive short sentences (under ~8 words) creating false gravity.',
-    essay: `It is short. It is clipped. It pretends to add weight. The trick is rhythm - three quick beats simulate the cadence of a building argument, and the reader, scanning, registers that something serious has just been said.
-
-Strip the line breaks and the content collapses into a single sentence about something growing, which we already knew growing things tend to do. The model loves staccato because the loss function rewards punchiness; punchiness is producible by chopping; chopping is cheap. A run of fragments after a long sentence is fine - that is a deliberate punch. A run of fragments after another run of fragments is the model doing aerobics.`,
-    whyItsSlop:
-      'The rhythm simulates gravity. A reader feels they are being walked through something profound. Strip the rhythm and the content is usually thin. Agents consistently fail to catch it.',
-    fix: 'Combine into one sentence with conjunctions or a semicolon. Vary the lengths. One short sentence after a long one is fine - that is a deliberate punch. Two or three in a row is a tell.',
-    examples: [
-      {
-        sloppy: 'It started small. It grew. It became unstoppable.',
-        better:
-          'What started as a protest in two universities had spread to twelve cities by the end of the month.',
-      },
-      {
-        sloppy: 'The deal collapsed. Markets reacted. Trust eroded.',
-        better: 'When the deal collapsed in March, three indices dropped within an hour and the embassy stopped returning calls.',
-      },
-      {
-        sloppy: 'Eighty thousand layoffs. Zero retraining offers. The cuts arrive ahead of the negotiations, not in their wake.',
-        better: 'The cuts landed three weeks before the negotiations opened, with no retraining programme attached.',
-      },
-    ],
-  },
-  {
-    id: 'em-dash-density',
-    category: 'structural',
-    name: 'Em-dash sandwich',
-    severity: 'medium',
-    scope: 'piece',
-    mechanical: true,
-    rung: 1,
-    blurb: 'Em-dashes used to insert meta-commentary mid-sentence.',
-    essay: `The em-dash - and this is the slop variety - hosts a meta-clause the writer never quite committed to grammatically, dropped in mid-sentence to comment on the sentence the comment is interrupting. Used right, em-dashes are knives. The slop variety is more like an uncle's kitchen drawer - full of dashes, none of them sharp.
-
-"The result - and this is the crucial part - was unexpected" is the writer handing themselves a place to comment on their own sentence mid-sentence, because the sentence on its own was not doing it for them. Density is the tell. One em-dash per page can be devastating. Six is the writer hedging the same hedge twice.`,
-    whyItsSlop:
-      'Real em-dash use is for sharp interruption or amplification. Slop em-dash use is cushioning - giving the model a place to insert hedging meta-commentary without committing to a grammatical structure. Density above one per 200 words is a yellow flag.',
-    fix: 'Delete the inserted clause if it is meta-commentary. If the inserted clause is real content, restructure into two sentences or a parenthetical. Reserve em-dashes for sharp interruptions.',
-    examples: [
-      {
-        sloppy: 'The result - and this is the crucial part - was unexpected.',
-        better: 'The crucial part was that the result was unexpected.',
-      },
-      {
-        sloppy: 'The deal - which is to say, the absence of one - shaped everything.',
-        better: 'The absence of a deal shaped everything.',
-      },
-    ],
-  },
-  {
     id: 'frame-stacking',
     category: 'structural',
     name: 'Frame stacking',
@@ -435,35 +347,6 @@ The form announces "I have considered every relevant party" while delivering the
       {
         sloppy: 'The CFO faces a dilemma. The COO faces a dilemma. The CTO faces a dilemma.',
         better: '',
-      },
-    ],
-  },
-  {
-    id: 'bidirectional-summary',
-    category: 'structural',
-    name: 'Bidirectional summary',
-    severity: 'medium',
-    scope: 'sentence',
-    mechanical: false,
-    rung: 2,
-    blurb:
-      '"While X has its merits, it also has drawbacks." Symmetrically balanced because the model is averaging perspectives.',
-    essay: `On one hand the form looks balanced; on the other hand, balance was never the point - both sides collect a clause, neither collects a verdict, and the writer leaves with the appearance of fairness without paying the cost of judgement. A shrug delivered by a lawyer.
-
-The model is, by training, allergic to commitment - any side it picks could be the side the user wanted to lose, and the cheapest way to avoid that is to pick neither. The writer who imitates this voice is doing it for safety too, but the safety is less visible to them: it looks, from the inside, like fairness. From outside, the form announces "I will not be the one who decides." The reader has come for someone who will.`,
-    whyItsSlop:
-      'Performative balance. Both-sides-ism dressed as analysis. The model has been trained to never leave a take un-cushioned.',
-    fix: 'Commit to a position. If both sides genuinely have merit, name what is at stake in choosing - do not just list both sides and call it analysis.',
-    examples: [
-      {
-        sloppy:
-          'While the policy has produced gains in some areas, it has also created challenges in others.',
-        better: 'The policy worked in housing and failed in healthcare.',
-      },
-      {
-        sloppy:
-          'On one hand, the deal stabilises the region. On the other hand, it concentrates risk.',
-        better: 'The deal trades short-term stability for long-term concentration risk. That is probably the right trade for now.',
       },
     ],
   },
@@ -505,93 +388,6 @@ Read it twice. There is no claim. There is the shape of a claim, the register of
     ],
   },
   {
-    id: 'false-precision',
-    category: 'argumentative',
-    name: 'False-precision authority',
-    severity: 'high',
-    scope: 'phrase',
-    mechanical: true,
-    rung: 1,
-    blurb:
-      'Authority claims without sources. The model cannot cite and will not admit it.',
-    essay: `Studies have shown that experts widely agree this pattern manufactures authority by sound, betting that the reader will not ask which studies or which experts. "Research indicates." Whose research?
-
-The form invokes authority the writer cannot actually produce, betting that the reader will not ask. The model is especially prone because the model knows it cannot cite - it does not have working URLs to gesture at - and the closest move available is to imply citation by sound. A sentence beginning "studies have shown" is, statistically, a sentence that has never been followed by a study. If a study had been there, the study would be in the line.`,
-    whyItsSlop:
-      '"Studies have shown..." (which studies?), "Experts agree..." (which experts?), "It is widely accepted that..." The appeal manufactures authority that does not exist.',
-    fix: 'Name the source, or drop the appeal to authority. If the claim can stand on its own merits, let it. If it cannot, the source matters - find it.',
-    examples: [
-      {
-        sloppy: 'Studies have shown that this approach yields better outcomes.',
-        better: 'A 2023 paper by the Karolinska group found a 12 percent improvement on the same metric.',
-      },
-      {
-        sloppy: 'Experts agree that the framework is fundamentally sound.',
-        better: 'Three of the four economists who reviewed the framework called it sound; the fourth called it premature.',
-      },
-      {
-        sloppy: 'It is widely accepted that the policy was a mistake.',
-        better: 'Both the OECD and the Treasury have since called the policy a mistake.',
-      },
-    ],
-  },
-  {
-    id: 'pivot-to-balance',
-    category: 'argumentative',
-    name: 'Pivot to balance',
-    severity: 'medium',
-    scope: 'paragraph',
-    mechanical: false,
-    rung: 2,
-    blurb:
-      'Any spicy claim immediately followed by "However, it\'s important to consider..." that defangs it.',
-    essay: `This pattern is a reflexive form of slop - though, of course, it is important to consider that the model has been trained to cushion every take with exactly this kind of clause, added religiously after anything that risked sounding like a position.
-
-The cushion is not balance - it is the absence of nerve. Real qualification sharpens; it tells you which version of the claim survives and what would falsify the rest. Slop qualification softens, indiscriminately, until the original claim has been embalmed and laid out for visitation. By the time the next paragraph begins, the writer has said two things that mostly cancel and gestured at having considered both.`,
-    whyItsSlop:
-      'The model has been trained never to leave a take un-cushioned. The cushion is the slop.',
-    fix: 'Delete the cushion. If the claim genuinely needs qualification, the qualification should sharpen, not soften.',
-    examples: [
-      {
-        sloppy:
-          'The deal was a strategic disaster - though, of course, there were also genuine benefits to consider.',
-        better: 'The deal was a strategic disaster. The benefits were procedural and have already been absorbed.',
-      },
-      {
-        sloppy:
-          'The decision was reckless. However, it is important to consider the constraints the administration faced.',
-        better: 'The decision was reckless under the constraints, not despite them.',
-      },
-    ],
-  },
-  {
-    id: 'restating-question',
-    category: 'argumentative',
-    name: 'Restating the question',
-    severity: 'medium',
-    scope: 'paragraph',
-    mechanical: false,
-    rung: 2,
-    blurb: 'Spending a paragraph re-articulating what was asked.',
-    essay: `The question of whether this pattern matters is itself a complex one, requiring us to first define what we even mean by the question - which is the move: the model buying time by reflecting the question back instead of answering it. The chatbot equivalent of a politician saying "I am glad you asked."
-
-Real conversation answers; this performs the receipt of the question first, as if the question itself needed a small monument before being processed. In prose it survives as paragraph-long restatements of the thesis at the start of a section that was supposed to argue for it. The reader did not need their question reflected back. They needed an answer.`,
-    whyItsSlop:
-      '"That\'s a great question. The question of whether X is one that..." The model is buying time and signalling effort. Neither is helpful.',
-    fix: 'Answer.',
-    examples: [
-      {
-        sloppy:
-          'The question of whether the policy succeeded is itself a complex one, requiring us to define our terms carefully.',
-        better: 'It did not succeed.',
-      },
-      {
-        sloppy: 'When we ask whether AI will transform medicine, we are really asking a much deeper question.',
-        better: 'AI is already transforming radiology and is two years away from primary care.',
-      },
-    ],
-  },
-  {
     id: 'synthesis-of-nothing',
     category: 'argumentative',
     name: 'Synthesis of nothing',
@@ -620,142 +416,43 @@ Cut the line and the piece loses nothing because the line carried nothing. The m
     ],
   },
 
-  // ---- TONAL ----
   {
     id: 'performative-balance',
-    category: 'tonal',
+    category: 'argumentative',
     name: 'Performative balance',
-    severity: 'medium',
-    scope: 'piece',
-    mechanical: false,
-    rung: 3,
-    blurb:
-      'Two sides presented as equally weighted because "both perspectives have merit" is a safer output than commitment.',
-    essay: `There are good-faith arguments on both sides of this pattern, and reasonable writers may disagree - which is the diplomatic non-answer dressed as judiciousness, the both-sides register applied to a piece that never structurally promised to give two sides equal weight. The writer simply talks like someone who would, no matter what they are talking about.
-
-The result is the diplomatic non-answer dressed as judiciousness. The model defaults to it because every commitment is a risk and every risk has been punished by some training signal somewhere. The writer who imitates this voice has confused fair-mindedness with non-commitment. They are different things. One is a virtue. The other is the absence of one.`,
-    whyItsSlop:
-      'Distinct from the bidirectional summary structure - the performative version is about register (the both-sides voice) even when the structure is not visibly symmetric.',
-    fix: 'Commit. If the piece is genuinely undecided, say so explicitly and explain what would tip it.',
-    examples: [
-      {
-        sloppy: 'There are good-faith arguments on both sides of this debate.',
-        better: 'The good-faith argument is on one side. The other side is mostly post-hoc.',
-      },
-      {
-        sloppy: 'Reasonable people disagree about the wisdom of the policy.',
-        better: 'The Treasury thinks the policy is wise. The Bundesbank does not. I am with the Bundesbank.',
-      },
-    ],
-  },
-  {
-    id: 'performative-humility',
-    category: 'tonal',
-    name: 'Performative humility',
-    severity: 'medium',
-    scope: 'phrase',
-    mechanical: false,
-    rung: 2,
-    blurb:
-      '"While I\'m not an expert..." followed by confident expert-style analysis.',
-    essay: `Now, I am not a stylist by training, but it does seem clear that this preamble is humility theatre - a small badge worn on the lapel of a sentence that was always going to deliver a confident analysis the moment the badge was finished being adjusted. "There are many ways to think about this..." followed by exactly one.
-
-The form is the writer wearing a small badge that says HUMBLE before delivering a confident claim, in case the claim turns out badly and someone needs to point at the badge. The model loves this because deference is rewarded and confidence is punished separately, and the cheapest way to satisfy both gradients is to deliver the confidence and the deference together, in that order, with the deference up front for plausible deniability.`,
-    whyItsSlop:
-      'The humility is theatre; the analysis it precedes is the actual stance. Drop the theatre.',
-    fix: 'Drop the humility throat-clearer. If the piece is genuinely uncertain, the uncertainty should be in the substance, not in the preamble.',
-    examples: [
-      {
-        sloppy: "Now, I'm not an economist, but it seems clear that the policy is broken.",
-        better: 'The policy is broken.',
-      },
-      {
-        sloppy: 'There are many ways to look at this question, and reasonable people will disagree, but I think the deal will fail.',
-        better: 'The deal will fail.',
-      },
-    ],
-  },
-  {
-    id: 'approval-seeking',
-    category: 'tonal',
-    name: 'Approval-seeking close',
-    severity: 'medium',
-    scope: 'phrase',
-    mechanical: true,
-    rung: 1,
-    blurb:
-      '"I hope this helps!" / "Let me know if you\'d like to explore further."',
-    essay: `Hopefully this entry has been useful - and if readers take one thing from it, it should be that this is the chatbot's signature surviving in prose, the writer asking the reader to confirm the visit was alright on the way out the door.
-
-The piece either helps or it does not. Asking the reader to confirm that it helped is the writer asking permission to have written the piece, retroactively. In essays it shows up as a wistful little final line in which the writer expresses a wish about how the reader will receive what they have just read. The literary equivalent of waving at someone as they leave the room and asking, softly, whether the visit was alright.`,
-    whyItsSlop:
-      'Survives in prose as "If readers take one thing away..." or "The hope is that..." The piece either helps or it does not. Asking the reader to confirm is for chatbots.',
-    fix: 'Delete.',
-    examples: [
-      {
-        sloppy: 'I hope this helps clarify the situation.',
-        better: '',
-      },
-      {
-        sloppy: 'If readers take one thing away from this piece, it should be that the alliance is brittle.',
-        better: 'The alliance is brittle.',
-      },
-      {
-        sloppy: 'Hopefully this gives you a useful framework for thinking about the issue.',
-        better: '',
-      },
-    ],
-  },
-
-  // ---- FORMAT ----
-  {
-    id: 'bullets-where-prose',
-    category: 'format',
-    name: 'Bullets where prose would serve',
-    severity: 'medium',
+    severity: 'high',
     scope: 'paragraph',
     mechanical: false,
     rung: 2,
     blurb:
-      'Two-point bullet lists for content that is genuinely a paragraph. Bolding the first three words of every bullet.',
-    essay: `First, sentences become items. Second, bolded leads do the rest of the lifting. Third, the reader skims past the prose this paragraph would otherwise have been - which is the move: the bullet list converting paragraphs of thought into tidy little items the reader can scan past without doing the work of integrating.
+      'Symmetrical balance - at the sentence, paragraph, or whole-piece scale - used as a cushion against committing to a position.',
+    essay: `On one hand the form looks balanced; on the other hand, balance was never the point - both sides collect a clause, neither collects a verdict, and the writer leaves with the appearance of fairness without paying the cost of judgement. A shrug delivered by a lawyer.
 
-Genuine list content - parallel items, scannable reference material - benefits from bullets. Most prose does not. Two-bullet "lists" are the worst offenders: a writer who needed to write a paragraph and decided, instead, to write a paragraph in two pieces with bullets in front of them. Bolding the first three words of each bullet is the same writer adding sequins. The reader's eye sliding down a bullet list is doing less work than reading prose - which means the writer did less work too, and the reader can feel it.`,
+The pattern shows up at three scales. As a sentence: "while the policy has merits, it also has drawbacks." As a paragraph: a spicy claim followed immediately by "however, it is important to consider..." that defangs it. And as a register that shapes the whole piece: "there are good-faith arguments on both sides," "reasonable people disagree," the diplomatic non-answer dressed as judiciousness. Same move, different scope.
+
+The model is, by training, allergic to commitment - any side it picks could be the side the user wanted to lose, and the cheapest way to avoid that is to pick neither. The writer who imitates this voice is doing it for safety too, but the safety is less visible to them: it looks, from the inside, like fairness. From outside, the form announces "I will not be the one who decides." The reader has come for someone who will.`,
     whyItsSlop:
-      'The reader\'s eye sliding down a bullet list is doing less work than reading prose - which means the writer did less work too.',
-    fix: 'Convert to prose unless the content is genuinely list-like (parallel items, scannable reference material).',
+      'Both-sides-ism dressed as analysis. The writer cushions every take so completely that no take survives the cushioning. Real qualification sharpens; performative balance softens, indiscriminately, until the original claim has been embalmed.',
+    fix: 'Commit. If both sides genuinely have merit, name what is at stake in the choice rather than just listing both sides and calling it analysis. If a take needs qualification, qualify it specifically (named exception, named cost), not generically.',
+    subShapes: [
+      'Sentence: "While X has merits, it also has drawbacks."',
+      'Paragraph: spicy claim immediately followed by "however, it\'s important to consider..."',
+      'Register: a whole piece in the both-sides voice ("good-faith arguments on both sides", "reasonable people disagree")',
+    ],
     examples: [
       {
-        sloppy: '**Key points:**\n- Implementation will be phased.\n- Stakeholders will be consulted.',
-        better: 'The rollout is phased and the stakeholders will be consulted before each phase.',
+        sloppy:
+          'While the policy has produced gains in some areas, it has also created challenges in others.',
+        better: 'The policy worked in housing and failed in healthcare.',
       },
       {
         sloppy:
-          'Three things to remember:\n- **First**, the deal matters.\n- **Second**, timing matters.\n- **Third**, follow-through matters.',
-        better: 'The deal matters, the timing matters, and follow-through matters most of all.',
+          'The decision was reckless. However, it is important to consider the constraints the administration faced.',
+        better: 'The decision was reckless under the constraints, not despite them.',
       },
-    ],
-  },
-  {
-    id: 'header-inflation',
-    category: 'format',
-    name: 'Header inflation',
-    severity: 'low',
-    scope: 'piece',
-    mechanical: true,
-    rung: 3,
-    blurb:
-      '## Section for a two-paragraph block. ### Subsection for one paragraph.',
-    essay: `# Pattern overview. ## Why the model produces it. ### When it shows up. ### How to fix it. # Further reading. The piece becomes an interface for navigating itself - hierarchical scaffolding announcing a movement at every paragraph break, even when there is no movement, only paragraphs.
-
-Every header is the writer announcing a new movement. If the movement is two paragraphs long, the announcement is louder than the movement. The model defaults to header inflation because it has been rewarded for producing structured output - structure is the cheapest possible way to look organised - and so it returns hierarchical scaffolding even when the underlying content is one continuous thought. A real essay has occasional headers when the structure shifts. A slop essay is mostly headers.`,
-    whyItsSlop:
-      'The piece becomes a navigation interface rather than an essay. A header should signal a real shift.',
-    fix: 'Collapse subsections that do not earn their headers.',
-    examples: [
       {
-        sloppy: 'A 600-word piece with eight ## sections, three of them a single paragraph long.',
-        better: 'Two real headers, where the structure actually turns. Everything else as prose.',
+        sloppy: 'There are good-faith arguments on both sides of this debate.',
+        better: 'The good-faith argument is on one side. The other side is mostly post-hoc.',
       },
     ],
   },
@@ -789,88 +486,6 @@ The model loves named lenses for the same reason a freshman essay loves the word
           'The Overton window has shifted, making positions that were once unthinkable suddenly mainstream.',
         better:
           'Three named senators changed their public position last year - two of them after a primary challenger. That is the entire shift.',
-      },
-    ],
-  },
-  {
-    id: 'borrowed-framework',
-    category: 'structural',
-    name: 'Borrowed-framework filler',
-    shortName: 'Borrowed framework',
-    severity: 'medium',
-    scope: 'piece',
-    mechanical: false,
-    rung: 3,
-    blurb:
-      "Structuring the piece around someone else's named framework (2x2 matrix, three pillars, five forces, OODA loop) when the actual subject does not naturally take that shape.",
-    essay: `Three pillars support this analysis - which is the move: a borrowed scaffold (two-by-two matrix, four-stage funnel, five forces, three pillars, OODA loop) imported wholesale and used as the table of contents for a topic whose natural shape is something else. The framework is doing the structural work the writer never did, and the writer is hoping the reader will register the structural work as an argument.
-
-Borrowed frameworks are the IKEA furniture of essays. They assemble cleanly. They produce something that looks like an analysis the moment the last bullet is bolted on. They also make every piece look the same, because the framework is the piece - the actual subject is just what got slotted into quadrant two. The model defaults to them because borrowed structure is free and original structure is hard. The fix is to ask whether the subject wants the framework, or whether the framework just got there first.`,
-    whyItsSlop:
-      'The framework is the analysis. Swap in a different subject and the same scaffold still fits, which means the scaffold is not actually about this subject.',
-    fix: 'Throw out the borrowed structure. Find the shape the subject already has - usually a sequence, a single decision, a tension, or a reversal - and let the piece take that shape instead.',
-    examples: [
-      {
-        sloppy:
-          'There are four quadrants here: high cost / high impact, high cost / low impact, low cost / high impact, low cost / low impact.',
-        better: 'Two of the choices are cheap and obviously worth doing; one is expensive and worth doing anyway; the rest is noise.',
-      },
-      {
-        sloppy:
-          'Applying the OODA loop to the negotiation: observe the counterparty, orient on their interests, decide on a position, act.',
-        better: 'The counterparty needs the deal more than we do, and the deadline is theirs. That changes the order of every move.',
-      },
-    ],
-  },
-  {
-    id: 'reductive-reframe',
-    category: 'argumentative',
-    name: 'Reductive reframe',
-    severity: 'high',
-    scope: 'piece',
-    mechanical: false,
-    rung: 3,
-    blurb:
-      'A single declarative line ("what this is really about is X" / "fundamentally, this is a story of Y") that flattens a piece full of texture into one principle.',
-    essay: `What this pattern is fundamentally about is the urge to deliver a thesis-shaped sentence late in the piece - the kind that begins with "what this is really about" or "underneath it all, the question is" or "the deep story here is one of" - and then names a single principle large enough to absorb every detail in the preceding paragraphs into its gravity.
-
-The move converts texture into principle. Texture is what made the piece worth reading; principle is what is left when the texture has been crushed. The model produces these because they sound like insight - they have the cadence of a writer who has thought hard and arrived somewhere - and because they retroactively organise messy material the model could not actually organise on the way through. The reader who agrees with the principle did not need it. The reader who disagrees has just been told that all the texture in the piece was secretly about something they do not care about.`,
-    whyItsSlop:
-      'The reductive line is the model performing synthesis it did not do. The piece either earned the synthesis through the substance, in which case the line is redundant, or it did not, in which case the line is a lie.',
-    fix: 'Cut the line. If the piece needs a closer, write one that points at a specific consequence, not a general principle.',
-    examples: [
-      {
-        sloppy: 'Underneath the policy debate, what this is really about is who gets to define modernity.',
-        better: '',
-      },
-      {
-        sloppy: 'Fundamentally, the standoff is a story of trust eroded over decades.',
-        better: 'The 2014 talks failed for one specific reason; everything since has compounded that failure.',
-      },
-    ],
-  },
-  {
-    id: 'phantom-periodisation',
-    category: 'structural',
-    name: 'Phantom periodisation',
-    severity: 'medium',
-    scope: 'piece',
-    mechanical: false,
-    rung: 3,
-    blurb:
-      'Splitting a continuous topic into named eras / phases / waves to lend a sense of trajectory the substance does not earn.',
-    essay: `In the first wave, observers focused on capability. In the second wave, attention shifted to safety. In the third wave - which is the structure: a continuous topic chopped into discrete acts, given headers, and presented as if a clean inflection separated each from the next, when in fact the same arguments have been recycling on a rolling basis the whole time.
-
-Periodisation is a borrowed historian's move. Real historiography earns its periods by showing the discontinuity that justifies the break. The slop version produces the breaks for free, because dividing a thing into three labelled phases is the cheapest way to make a topic look like it has been thought about over time. The model loves it for the same reason it loves header inflation: imposed structure looks like analysis. The reader gets the impression that the topic has a story arc when really it has the same five questions answered five different times by different people.`,
-    whyItsSlop:
-      'The periods are imposed, not earned. Erase the labels and the substance does not change, which means the labels were doing decorative work, not analytical.',
-    fix: 'Either earn the period boundaries with a specific discontinuity at each one, or drop the periodisation and write the topic as it actually moved.',
-    examples: [
-      {
-        sloppy:
-          'The first generation of tools focused on detection. The second generation prioritised prevention. The third generation, currently emerging, emphasises orchestration.',
-        better:
-          'The earliest tools detected; the same vendors then bolted on prevention; orchestration is what the marketing pivoted to once detection and prevention stopped selling on their own.',
       },
     ],
   },

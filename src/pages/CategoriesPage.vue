@@ -4,7 +4,7 @@ import { categories, getCategory } from '../catalog/categories'
 import { patterns } from '../catalog/patterns'
 import type { CategoryId, PatternMeta, Scope, Rung } from '../types'
 
-const categoryOrder: CategoryId[] = ['lexical', 'structural', 'argumentative', 'tonal', 'format']
+const categoryOrder: CategoryId[] = categories.map((c) => c.id)
 
 type DetectionMode = 'mechanical' | 'judgment'
 const ALL_DETECTIONS: DetectionMode[] = ['mechanical', 'judgment']
@@ -151,12 +151,8 @@ function resetFilters(): void {
   filters.rungs = new Set(ALL_RUNGS)
 }
 
-const placeholderGlyph: Record<CategoryId, string> = {
-  lexical: '◆',        // ◆ BLACK DIAMOND
-  structural: '▦',     // ▦ SQUARE WITH ORTHOGONAL CROSSHATCH FILL
-  argumentative: '▲',  // ▲ BLACK UP-POINTING TRIANGLE
-  tonal: '●',          // ● BLACK CIRCLE
-  format: '▤',         // ▤ SQUARE WITH HORIZONTAL FILL
+function glyphFor(id: CategoryId): string {
+  return getCategory(id)?.glyph ?? '●'
 }
 
 function descriptionFor(p: PatternMeta): string {
@@ -256,7 +252,7 @@ function categoryName(id: CategoryId): string {
             :class="['chip', 'cat-chip', { active: filters.categories.has(c.id) }]"
             @click="toggleCategory(c.id)"
           >
-            <span class="chip-icon" :style="{ background: `var(--cat-${c.id})` }">{{ placeholderGlyph[c.id] }}</span>
+            <span class="chip-icon" :style="{ background: `var(--cat-${c.id})` }">{{ c.glyph }}</span>
             {{ c.name }}
           </button>
         </div>
@@ -293,14 +289,14 @@ function categoryName(id: CategoryId): string {
         :key="p.id"
         :to="`/patterns/${p.id}`"
         class="pane"
-        :class="`cat-${p.category}`"
+        :style="{ '--cat-color': `var(--cat-${p.category})` }"
       >
         <header class="pane-head">
           <span
             class="icon-slot"
             :style="{ background: `var(--cat-${p.category})` }"
             aria-hidden="true"
-          >{{ placeholderGlyph[p.category] }}</span>
+          >{{ glyphFor(p.category) }}</span>
           <div class="head-text">
             <h3>{{ p.name }}</h3>
             <span class="cat-tag">{{ categoryName(p.category) }}</span>
@@ -524,12 +520,6 @@ h1 {
   transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
   position: relative;
 }
-.pane.cat-lexical        { --cat-color: var(--cat-lexical); }
-.pane.cat-structural     { --cat-color: var(--cat-structural); }
-.pane.cat-argumentative  { --cat-color: var(--cat-argumentative); }
-.pane.cat-tonal          { --cat-color: var(--cat-tonal); }
-.pane.cat-format         { --cat-color: var(--cat-format); }
-
 .pane:hover {
   border-color: var(--cat-color);
   transform: translateY(-1px);

@@ -70,10 +70,12 @@ function wrapRange(segments: Segment[], start: number, end: number, flag: Flag):
       target.splitText(innerLen)
     }
     const mark = document.createElement('mark')
-    mark.className = `slop-flag flag-cat-${flag.category} flag-pat-${flag.patternId}`
+    mark.className = `slop-flag flag-pat-${flag.patternId}`
     mark.dataset.flagId = flag.id
     mark.dataset.patternId = flag.patternId
+    mark.dataset.category = flag.category
     mark.dataset.severity = String(flag.severity)
+    mark.style.setProperty('--flag-color', `var(--cat-${flag.category})`)
     target.parentNode?.insertBefore(mark, target)
     mark.appendChild(target)
   }

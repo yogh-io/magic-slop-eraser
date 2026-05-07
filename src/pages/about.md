@@ -2,6 +2,12 @@
 
 Magic Slop Eraser identifies AI-slop patterns in prose and walks the writer through fixing each instance one at a time. The catalogue is a generalisation of in-house deslop infrastructure built for a long-form analytical-prose project, itself derived from the patterns one notices when one has read enough LLM output to recognise the institutional voice underneath - the HR-memo, the brand statement, the consultancy deck, the wire-service preamble - all laundered through a model and emerging as your draft.
 
+## What counts as slop
+
+The bar is *actually annoying*, not *AI-fingerprint*. The catalogue is curated against the test "would a careful reader find this painful or empty to read?", not "would a hostile reader clock this as a chatbot?". Many AI tells overlap with the painful-to-read set (delve, throat-clearing, the mirror construct, suffocation by stacked hedges, the synthesis-of-nothing closer); plenty of AI tells do not (em-dashes, the bullet list, the staccato run, the periodisation move). The latter are things skilled human writers do for effect. We do not flag them.
+
+What survives in the catalogue is the set of moves the model reaches for reflexively *and* that read as braindead LLM garbage to a careful reader. When in doubt, the test is whether removing the pattern's instances from a piece would make the piece read more like it was written by someone with a position and a pulse. If yes, the pattern is in. If the answer is "it would just look less AI-shaped, but no better," the pattern stays out.
+
 ## The framework
 
 The catalogue organises patterns by *depth* into three [Rungs](/rungs) - mechanical, passage-level judgment, and presentation / editorial. The Rungs page has the long version. In short: lighter, regex-friendly slop sits at the bottom; structural editorial moves sit at the top; an agent or author picks the entry rung based on the draft's stage.

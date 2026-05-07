@@ -22,13 +22,11 @@ type Detector = (ctx: DetectorContext) => void
 
 const TIER1 = /\b(delve|delves|delved|delving|tapestry|tapestries|navigate|navigates|navigated|navigating|navigation|realm|realms|embark|embarks|embarked|embarking|leverage|leverages|leveraged|leveraging|foster|fosters|fostered|fostering|cultivate|cultivates|cultivated|cultivating|harness|harnesses|harnessed|harnessing)\b/gi
 
-const TIER2 = /\b(landscape|journey|robust|nuanced|multifaceted|intricate|vibrant|bustling|testament|underscore|underscores|underpin|underpins|ecosystem|profound|remarkable|fascinating|compelling|intriguing|striking|hallmark)\b/gi
-
 const ENTHUSIASM = /\b(fascinating|remarkable|profound|striking|compelling|intriguing|illuminating)\b/gi
 
 const THROAT_CLEARING = /(?:^|(?<=[.!?]\s))(It'?s important to note|It'?s worth (?:noting|mentioning)|It'?s interesting that|Importantly|Notably|Crucially|Indeed|Of course|Naturally|Interestingly|Significantly|Ultimately|Fundamentally|Essentially|Basically|Simply put|In essence|At its core|To be clear|To be sure)\b/g
 
-const CLOSERS = /\b(In conclusion|In summary|To summarize|To summarise|All in all|At the end of the day|When all is said and done|All things considered|Taken together|I hope this helps)\b/gi
+const CLOSERS = /\b(In conclusion|In summary|To summarize|To summarise|All in all|At the end of the day|When all is said and done|All things considered|Taken together)\b/gi
 
 const ANTITHESIS_PATTERNS: RegExp[] = [
   /\b(?:isn'?t|is not)\s+(?:just|merely|only|simply)\s+[^.\n]{1,80}?[-\-]\s*it'?s\b/gi,
@@ -38,11 +36,7 @@ const ANTITHESIS_PATTERNS: RegExp[] = [
   /\bWhat looks like\s+[^.\n]{1,80}\s+is\s+(?:actually|really)\s+/gi,
 ]
 
-const FALSE_PRECISION = /\b(Studies have shown|Experts agree|Research indicates|Research has shown|It is widely accepted|Most scholars believe|Studies suggest|Experts say)\b/gi
-
 const VAGUE_GRAVITAS = /\b(raises important questions|has profound implications|speaks to deeper truths|points to a larger trend|reflects broader dynamics|underscores the complexity|highlights the tensions|captures the essence|gets at something fundamental)\b/gi
-
-const APPROVAL_SEEKING = /\b(I hope this helps|let me know if you'?d like|hopefully this gives you|hope this is useful|If readers take one thing away|The hope is that)\b/gi
 
 const HEDGE_WORDS = /\b(generally|typically|often|somewhat|relatively|arguably|potentially|possibly|perhaps|fairly|mostly|largely|broadly speaking)\b/gi
 
@@ -68,27 +62,6 @@ function emitMatches(
 
 const detectTier1: Detector = (ctx) =>
   emitMatches(ctx, TIER1, 'tier1-lexicon', 'lexical', (m) => `"${m[0]}" - canonical AI lexicon. Substitute or cut.`)
-
-const detectTier2: Detector = (ctx) => {
-  const hits: { idx: number; word: string }[] = []
-  for (const m of ctx.source.matchAll(TIER2)) {
-    if (m.index === undefined) continue
-    if (isInSkipZone(m.index, ctx.zones)) continue
-    hits.push({ idx: m.index, word: m[0] })
-  }
-  const allowed = Math.max(2, Math.floor((ctx.proseWordCount / 1000) * 2))
-  if (hits.length > allowed) {
-    for (const h of hits) {
-      ctx.emit({
-        patternId: 'tier2-lexicon',
-        category: 'lexical',
-        start: h.idx,
-        end: h.idx + h.word.length,
-        rationale: `"${h.word}" - Tier 2 cluster (${hits.length} hits in ~${ctx.proseWordCount} words; threshold ${allowed}).`,
-      })
-    }
-  }
-}
 
 const detectEnthusiasm: Detector = (ctx) => {
   const hits: { idx: number; word: string }[] = []
@@ -122,36 +95,8 @@ const detectAntithesis: Detector = (ctx) => {
   }
 }
 
-const detectFalsePrecision: Detector = (ctx) =>
-  emitMatches(ctx, FALSE_PRECISION, 'false-precision', 'argumentative', (m) => `"${m[0]}" - manufactured authority. Name a source or drop it.`)
-
 const detectVagueGravitas: Detector = (ctx) =>
   emitMatches(ctx, VAGUE_GRAVITAS, 'vague-gravitas', 'lexical', (m) => `"${m[0]}" - simulates insight without delivering it.`)
-
-const detectApprovalSeeking: Detector = (ctx) =>
-  emitMatches(ctx, APPROVAL_SEEKING, 'approval-seeking', 'tonal', (m) => `"${m[0]}" - chatbot register; the piece either helps or it does not.`)
-
-const detectEmDashDensity: Detector = (ctx) => {
-  const re = / [-\-] /g
-  const hits: number[] = []
-  for (const m of ctx.source.matchAll(re)) {
-    if (m.index === undefined) continue
-    if (isInSkipZone(m.index, ctx.zones)) continue
-    hits.push(m.index)
-  }
-  const threshold = Math.max(1, Math.floor(ctx.proseWordCount / 200))
-  if (hits.length > threshold) {
-    for (const idx of hits) {
-      ctx.emit({
-        patternId: 'em-dash-density',
-        category: 'structural',
-        start: idx + 1,
-        end: idx + 2,
-        rationale: `Em-dash density ${hits.length} in ~${ctx.proseWordCount} words (threshold ${threshold}).`,
-      })
-    }
-  }
-}
 
 const detectHedgeCluster: Detector = (ctx) => {
   const sentences = splitSentences(ctx.source)
@@ -166,68 +111,6 @@ const detectHedgeCluster: Detector = (ctx) => {
         start: sent.start,
         end: sent.end,
         rationale: `${matches.length} hedges in one sentence (${matches.map((m) => m[0]).join(', ')}). The claim is suffocating - sharpen or cut.`,
-      })
-    }
-  }
-}
-
-const detectStaccato: Detector = (ctx) => {
-  const sentences = splitSentences(ctx.source)
-  let runStart = -1
-  let runIndices: { start: number; end: number }[] = []
-  const flush = () => {
-    if (runIndices.length >= 3) {
-      const start = runIndices[0].start
-      const end = runIndices[runIndices.length - 1].end
-      ctx.emit({
-        patternId: 'staccato',
-        category: 'structural',
-        start,
-        end,
-        rationale: `${runIndices.length} consecutive short sentences (under ~8 words each). Combine or vary.`,
-      })
-    }
-    runStart = -1
-    runIndices = []
-  }
-  for (const sent of sentences) {
-    if (isInSkipZone(sent.start, ctx.zones)) {
-      flush()
-      continue
-    }
-    const text = ctx.source.slice(sent.start, sent.end).trim()
-    const wc = (text.match(/\b[\p{L}\p{N}']+\b/gu) ?? []).length
-    if (wc > 0 && wc <= 8) {
-      if (runStart < 0) runStart = sent.start
-      runIndices.push(sent)
-    } else {
-      flush()
-    }
-  }
-  flush()
-}
-
-const detectHeaderInflation: Detector = (ctx) => {
-  const headerRe = /^(#{2,6})\s+([^\n]+)$/gm
-  const headers: { level: number; idx: number; end: number }[] = []
-  for (const m of ctx.source.matchAll(headerRe)) {
-    if (m.index === undefined) continue
-    headers.push({ level: m[1].length, idx: m.index, end: m.index + m[0].length })
-  }
-  for (let i = 0; i < headers.length; i++) {
-    const h = headers[i]
-    const next = headers[i + 1]
-    const sectionEnd = next ? next.idx : ctx.source.length
-    const body = ctx.source.slice(h.end, sectionEnd).trim()
-    const paragraphs = body.split(/\n{2,}/).filter((p) => p.trim().length > 0)
-    const wc = (body.match(/\b[\p{L}\p{N}']+\b/gu) ?? []).length
-    if (paragraphs.length <= 1 && wc < 80 && h.level >= 3) {
-      ctx.emit({
-        patternId: 'header-inflation',
-        category: 'format',
-        start: h.idx,
-        end: h.end,
-        rationale: `Header for ${wc} words / ${paragraphs.length} paragraph. Collapse or merge upstream.`,
       })
     }
   }
@@ -250,18 +133,12 @@ function splitSentences(source: string): SentenceSpan[] {
 
 const ALL_DETECTORS: Detector[] = [
   detectTier1,
-  detectTier2,
   detectEnthusiasm,
   detectThroatClearing,
   detectClosers,
   detectAntithesis,
-  detectFalsePrecision,
   detectVagueGravitas,
-  detectApprovalSeeking,
-  detectEmDashDensity,
   detectHedgeCluster,
-  detectStaccato,
-  detectHeaderInflation,
 ]
 
 let flagCounter = 0
@@ -309,16 +186,9 @@ function severityFor(patternId: string): number {
     case 'closers':
     case 'throat-clearing':
     case 'vague-gravitas':
-    case 'staccato':
-    case 'false-precision':
       return 0.8
-    case 'tier2-lexicon':
     case 'enthusiasm-inflation':
-    case 'em-dash-density':
-    case 'approval-seeking':
       return 0.6
-    case 'header-inflation':
-      return 0.4
     default:
       return 0.6
   }
@@ -341,7 +211,6 @@ export function scoreFromFlags(flags: Flag[], proseWordCount: number): ScoreResu
   let raw = 10 - density * 1.6
   const ceilings: { id: string; cap: number }[] = []
   if (counts.has('antithesis')) ceilings.push({ id: 'antithesis', cap: 7 })
-  if ((counts.get('staccato') ?? 0) >= 1) ceilings.push({ id: 'staccato', cap: 7 })
   if ((counts.get('vague-gravitas') ?? 0) >= 1) ceilings.push({ id: 'vague-gravitas', cap: 7 })
   if ((counts.get('tier1-lexicon') ?? 0) >= 1) ceilings.push({ id: 'tier1-lexicon', cap: 7 })
   if (ceilings.length >= 2) raw = Math.min(raw, 6)

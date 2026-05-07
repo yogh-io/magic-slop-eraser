@@ -15,7 +15,8 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-const category = ref<CategoryId>('structural')
+const defaultCategory: CategoryId = categories[0]?.id ?? 'lexical'
+const category = ref<CategoryId>(defaultCategory)
 const patternId = ref<string>('')
 const note = ref<string>('')
 
@@ -27,7 +28,7 @@ watch(
   () => props.open,
   (v) => {
     if (v) {
-      category.value = 'structural'
+      category.value = defaultCategory
       patternId.value = patternsForCategory.value[0]?.id ?? ''
       note.value = ''
     }

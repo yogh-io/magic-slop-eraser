@@ -143,9 +143,4 @@ function onMouseUp(): void {
 .article-view :deep(mark.slop-flag.is-selected) {
   background: color-mix(in srgb, var(--flag-color, var(--accent)) 18%, transparent);
 }
-.article-view :deep(mark.flag-cat-lexical)        { --flag-color: var(--cat-lexical); }
-.article-view :deep(mark.flag-cat-structural)     { --flag-color: var(--cat-structural); }
-.article-view :deep(mark.flag-cat-argumentative)  { --flag-color: var(--cat-argumentative); }
-.article-view :deep(mark.flag-cat-tonal)          { --flag-color: var(--cat-tonal); }
-.article-view :deep(mark.flag-cat-format)         { --flag-color: var(--cat-format); }
 </style>

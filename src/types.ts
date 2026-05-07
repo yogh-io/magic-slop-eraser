@@ -2,8 +2,6 @@ export type CategoryId =
   | 'lexical'
   | 'structural'
   | 'argumentative'
-  | 'tonal'
-  | 'format'
 
 export interface CategoryMeta {
   id: CategoryId
@@ -11,7 +9,12 @@ export interface CategoryMeta {
   tagline: string
   blurb: string
   essay?: string
-  toneColor: string
+  /** Single character or short string used as the category's badge / glyph. */
+  glyph: string
+  /** Per-theme accent colour. Drives the `--cat-<id>` CSS variable applied at
+   *  runtime by state/theme.ts. Add a key per ThemeId; missing keys fall back
+   *  to the value for `normal`. */
+  themeColors: Record<ThemeId, string>
 }
 
 export type Scope = 'word' | 'phrase' | 'sentence' | 'paragraph' | 'piece'

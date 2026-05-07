@@ -23,12 +23,9 @@
   --accent: #b8472d;
   --accent-fg: #ffffff;
 
-  /* Slop category palette - referenced by detector highlights and catalogue */
-  --cat-lexical:        #d97757;
-  --cat-structural:     #7a55b8;
-  --cat-argumentative:  #3a86c4;
-  --cat-tonal:          #2f8f6a;
-  --cat-format:         #b88f3e;
+  /* Slop category palette is set on :root by state/theme.ts at runtime
+   * from catalog/categories.ts (one --cat-<id> per category, swapped per
+   * theme). Keep no hard-coded category vars here. */
 
   /* Type */
   --font-prose: 'Charter', 'Iowan Old Style', 'Source Serif Pro', Georgia, serif;

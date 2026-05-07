@@ -16,12 +16,6 @@
   --accent: #b8472d;
   --accent-fg: #ffffff;
 
-  --cat-lexical:       #d97757;
-  --cat-structural:    #7a55b8;
-  --cat-argumentative: #3a86c4;
-  --cat-tonal:         #2f8f6a;
-  --cat-format:        #b88f3e;
-
   --font-prose: Charter, 'Iowan Old Style', 'Source Serif Pro', Georgia, serif;
   --font-display: Inter, system-ui, -apple-system, sans-serif;
   --font-ui: Inter, system-ui, -apple-system, sans-serif;

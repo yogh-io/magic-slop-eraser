@@ -20,12 +20,6 @@
   --accent: #ec4f96;
   --accent-fg: #ffffff;
 
-  --cat-lexical:       #ff7eb6;
-  --cat-structural:    #b878d4;
-  --cat-argumentative: #6cc7e8;
-  --cat-tonal:         #6dd9b3;
-  --cat-format:        #ffc857;
-
   --font-prose: 'Cormorant Garamond', 'EB Garamond', Charter, Georgia, serif;
   --font-display: 'Cormorant Garamond', 'EB Garamond', Charter, serif;
   --font-ui: 'Inter', system-ui, sans-serif;

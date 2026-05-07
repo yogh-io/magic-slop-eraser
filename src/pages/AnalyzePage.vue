@@ -4,7 +4,11 @@ import { useDocStore } from '../state/doc'
 import ArticleView from '../components/ArticleView.vue'
 import FlagsPanel from '../components/FlagsPanel.vue'
 import UserHighlightDialog from '../components/UserHighlightDialog.vue'
+import LockedNotice from '../components/LockedNotice.vue'
+import { isUnlocked } from '../state/guard'
 import type { CategoryId } from '../types'
+
+const unlocked = isUnlocked()
 
 const store = useDocStore()
 const showEditor = ref(false)
@@ -77,7 +81,8 @@ In conclusion, the situation reflects broader dynamics at play. I hope this help
 </script>
 
 <template>
-  <div class="analyze">
+  <LockedNotice v-if="!unlocked" what="The analyse view" />
+  <div v-else class="analyze">
     <div class="layout">
       <main class="article-pane">
         <div class="toolbar">

@@ -8,6 +8,9 @@ import './styles/themes/normal.css'
 import './styles/themes/magic.css'
 import './styles/themes/scholar.css'
 import { initTheme } from './state/theme'
+import { bootstrapGuard } from './state/guard'
+
+bootstrapGuard()
 
 const app = createApp(App)
 app.use(createPinia())

@@ -2,8 +2,11 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { createOnlineSession, type OnlineSession } from '../state/online'
+import LockedNotice from '../components/LockedNotice.vue'
+import { isUnlocked } from '../state/guard'
 import type { Flag } from '../types'
 
+const unlocked = isUnlocked()
 const route = useRoute()
 const session = ref<OnlineSession | null>(null)
 const tokenError = ref<string | null>(null)
@@ -15,6 +18,7 @@ function tokenFromHash(): string | null {
 }
 
 function start(): void {
+  if (!unlocked) return
   const id = String(route.params.id ?? '')
   const token = tokenFromHash()
   if (!id) {
@@ -50,7 +54,8 @@ function flagLine(source: string, flag: Flag): { before: string; mark: string; a
 </script>
 
 <template>
-  <article class="prose">
+  <LockedNotice v-if="!unlocked" what="The document viewer" />
+  <article v-else class="prose">
     <div v-if="tokenError" class="err">
       <h1>Cannot open document</h1>
       <p>{{ tokenError }}</p>

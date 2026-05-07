@@ -73,31 +73,12 @@ function syncUrl(t: ThemeId): void {
 
 function applyTheme(t: ThemeId, opts: { animate: boolean }): void {
   const html = document.documentElement
-  const reduce =
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  const swap = (): void => {
-    html.setAttribute('data-theme', t)
-    applyCategoryTokens(t)
+  if (opts.animate) {
+    html.classList.add(TRANSITION_CLASS)
+    window.setTimeout(() => html.classList.remove(TRANSITION_CLASS), TRANSITION_MS)
   }
-  if (!opts.animate || reduce) {
-    swap()
-    return
-  }
-  // The View Transitions API cross-fades the entire page including discrete
-  // properties CSS transitions can't animate (font-family, gradients,
-  // background-image stacks). Where supported, prefer it. Otherwise fall back
-  // to the class-based color-token transitions.
-  const startVT = (document as Document & {
-    startViewTransition?: (cb: () => void) => unknown
-  }).startViewTransition
-  if (typeof startVT === 'function') {
-    startVT.call(document, swap)
-    return
-  }
-  html.classList.add(TRANSITION_CLASS)
-  window.setTimeout(() => html.classList.remove(TRANSITION_CLASS), TRANSITION_MS)
-  swap()
+  html.setAttribute('data-theme', t)
+  applyCategoryTokens(t)
 }
 
 function applyCategoryTokens(t: ThemeId): void {

@@ -5,9 +5,9 @@ allowed-tools: Bash, Read, Edit, Monitor
 
 # eraser
 
-A workshop-shaped loop for fixing AI-slop in prose. The author is in the loop for every change. The agent (you) presents one flag at a time, proposes fixes, and advances when the author says so.
+A *steering loop* for fixing AI-slop in prose. The author defines shape, you draft the prose, the author re-directs until the sentence lands. The pairing is batched: surface many flags at once, let the author sweep them with shape directives, process the directives in the background, present the candidates back when ready, take the next round of nudges. The work is the author's; you are the keyboard.
 
-The eraser site is the source of truth. You push prose, pull flags, post suggestions, and react to the author's verdicts (which can come from your terminal *or* from the eraser browser UI). The browser is a viewer onto the same state.
+The eraser site is the source of truth and the steering surface. You push prose, pull flags, post candidates, and react to the author's directives (which can come from your terminal *or* from the eraser browser UI). The browser is the same state, viewed differently.
 
 ## inputs
 
@@ -98,28 +98,40 @@ If an SSE event arrives saying *the same flag* was resolved/skipped from the bro
 
 ### 4. Walk Rung 2 (passage-level judgment)
 
-Same loop shape, but:
-- Generate 2-3 candidate rewrites yourself. You are an LLM. The pattern catalogue at `GET /catalogue` tells you what good rewrites of this pattern look like.
-- POST each candidate as a Suggestion: `POST /flags/{fid}/suggestions` `{text, prompt, modelTag: "<your-model>"}`
-- Present them side by side. Mark one as the current best (you can iterate).
-- The author proposes alternatives; evaluate each against the running best:
+Rung 2 is a *steering loop*: the flag rarely resolves in one turn. You post one candidate, take the author's shape directive, post another, until the sentence lands. Many short turns per flag.
 
-| Verdict | Meaning |
+Per flag, on first encounter:
+
+1. Read the flag, the pattern catalogue (`GET /catalogue`), and the surrounding paragraph.
+2. Draft **one** candidate rewrite. Not three. The pattern catalogue tells you what good rewrites of this pattern look like.
+3. POST it: `POST /flags/{fid}/suggestions` `{text, prompt, modelTag: "<your-model>"}`. It becomes the running best by default.
+4. Present it. Wait for the author.
+
+The author's input is *shape*, not a verdict on a portfolio. Vocabulary:
+
+| Author says | What you do |
 |---|---|
-| `BETTER (S/M/L)` | Proposal improves on best. `(L)` auto-resolves. |
-| `WORSE (S/M)` | Proposal degrades. Keep best. |
-| `CLOSE` | Neutral trade. Keep best. |
+| `more committal` / `drop the qualifier` / `punchline first` / `their voice not yours` / `cut to the verb` / etc. | Draft ONE new candidate that takes the direction. POST it. POST a `BETTER` (or `WORSE` / `CLOSE`) verdict on the new one against the previous best. The new one becomes the running best when BETTER. |
+| `warmer` / `colder` | Last attempt was on the right track / drifting. Use that to bias the next candidate. |
+| `yes` / `that's the one` | `POST /flags/{fid}/resolve` `{suggestionId: <best.id>}`. Move on. |
+| `let me try: <text>` | The author has handed you a candidate. POST it as a Suggestion (`modelTag: "human"`). It is now the running best. |
+| `skip` | `POST /flags/{fid}/skip`. |
 
-POST `/flags/{fid}/suggestions/{sid}/verdict` for each. When the author says "that's the one", POST `/flags/{fid}/resolve` with `suggestionId: <best.id>`.
+This is a steering loop, not an evaluation loop. Do not present three options and ask the author to pick. Present one, take the author's shape directive, re-attempt. The suggestion log on the flag is the trail of attempts, with the running best held up. BETTER / WORSE / CLOSE is fuel for the next nudge, not a final ranking.
+
+When the work is batched (many flags surfaced at once, author sweeps them with directives, you process in the background), each flag's loop runs independently. Process directives sequentially per flag, push candidates back as they're ready, the SSE stream surfaces them at their anchors. The author re-engages at their cadence and re-directs the ones that did not land.
 
 ### 5. Walk Rung 3 (presentation / editorial)
 
-No autonomous rewrite. For each flag:
-- Print the position and the pattern (`frame-stacking`, `performative-balance`, `header-inflation`).
-- Open a comment thread: `POST /flags/{fid}/comments` `{body: "<your read>", author: "agent"}`.
-- Discuss with the author in chat. When they decide, the source edits go via `PUT /docs/$ID/source` (whole-source replacement; the server relocates remaining open anchors).
+The same steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - you read the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, you draft the prose, the author re-directs.
 
-The work at Rung 3 is collaborative, not mechanical. The eraser flags positions; the rewrite happens between you and the author.
+For each flag:
+- Print the position and the pattern (`frame-stacking`, `performative-balance`, `header-inflation`).
+- Open a comment thread: `POST /flags/{fid}/comments` `{body: "<your read>", author: "agent"}`. Articulate what the section is currently doing and ask what the author wants it to do.
+- Take the author's intent. Draft a rewrite. Post it via `PUT /docs/$ID/source` (whole-source replacement; the server relocates remaining open anchors), or as a comment on the flag if it is too tentative to edit yet.
+- Take the next directive. Re-draft. Loop until the section lands.
+
+No autonomous rewrite. The eraser flags positions; the rewrite happens between you and the author, in the same paired-writing loop as Rung 2.
 
 ### 6. Wrap up
 
@@ -147,20 +159,20 @@ proposed:  work through  /  read  /  cut
 verdict?
 ```
 
-For Rung 2, lay out the candidates:
+For Rung 2, present one candidate (the running best) and the trail of attempts so far:
 
 ```
 [R2 · 1/3] absent-actor
   > The decision was made to revise the policy.
                        ^^^^^^^^^^
 
-current best: (none yet - proposals follow)
+current:  "The committee revised the policy."        [agent · v3]
+trail:
+  v1  "It was decided to revise the policy."         worse
+  v2  "We revised the policy."                       close
+  v3  "The committee revised the policy."            better  ← running best
 
-  (a) "The committee revised the policy."        [agent]
-  (b) "Maria's team revised the policy."         [agent]
-  (c) "We revised the policy."                   [agent]
-
-verdict? (a/b/c, or propose your own)
+direction?  (more committal / drop the qualifier / their voice / let me try: <text> / yes / skip)
 ```
 
 ## API quick reference
@@ -187,8 +199,10 @@ All authenticated calls require `Authorization: Bearer <token>` from the documen
 
 ## constraints
 
-- One flag at a time. Never batch.
+- Per-flag work is sequential: one candidate, take the directive, re-attempt. Never present three candidates and ask the author to pick - that is evaluation, not steering.
+- Across flags, work batched: surface many at once, let the author sweep with directives, process in the background, push candidates back via the SSE stream.
 - Never apply an edit without an explicit author verdict (or a browser-side resolution event for the same flag).
 - Never auto-rewrite a Rung 3 flag.
-- The author's word in the terminal and in the browser are equivalent - if the SSE stream tells you a flag was resolved, advance, don't re-prompt.
+- Granularity is the feature. Sentence and clause level for Rung 2; section / transition level for Rung 3. Never rewrite a paragraph in one turn.
+- The author's word in the terminal and in the browser are equivalent - if the SSE stream tells you a flag was resolved or re-directed from the browser, advance accordingly, don't re-prompt.
 - The score is Rung 1 only. Rung 2 / Rung 3 are reported as counts.

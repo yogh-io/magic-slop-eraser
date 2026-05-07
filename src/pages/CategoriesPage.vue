@@ -10,7 +10,9 @@ type DetectionMode = 'mechanical' | 'judgment'
 const ALL_DETECTIONS: DetectionMode[] = ['mechanical', 'judgment']
 type Severity = PatternMeta['severity']
 const ALL_SEVERITIES: Severity[] = ['primary', 'high', 'medium', 'low']
-const ALL_SCOPES: Scope[] = ['word', 'phrase', 'sentence', 'paragraph', 'piece']
+// word/phrase scopes are hidden from the filter UI for now; patterns with those
+// scopes bypass the scope predicate so they remain visible in the catalogue.
+const ALL_SCOPES: Scope[] = ['sentence', 'paragraph', 'piece']
 const ALL_RUNGS: Rung[] = [1, 2, 3]
 
 interface Filters {
@@ -43,7 +45,7 @@ const visiblePatterns = computed(() =>
     if (!filters.detections.has(mode)) return false
     if (!filters.severities.has(p.severity)) return false
     if (!filters.categories.has(p.category)) return false
-    if (!filters.scopes.has(p.scope)) return false
+    if (ALL_SCOPES.includes(p.scope) && !filters.scopes.has(p.scope)) return false
     if (!filters.rungs.has(p.rung)) return false
     return true
   }),

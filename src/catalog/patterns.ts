@@ -290,10 +290,10 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
     mechanical: true,
     rung: 1,
     blurb:
-      '"Not X - it\'s Y." The Y half mirrors the X half across a hinge - hence the name. The most reflexive structural shape in LLM output.',
-    essay: `What looks like an argument is actually a stunt - the model mechanically pairing a setup with a stake-raise to manufacture the rhythm of a position before any position has been built. The first half sets up something the second half will exceed, even when the first half is a strawman the model invented for the purpose of being exceeded.
+      '"Not X - it\'s Y." The shape isn\'t making an argument; it\'s borrowing the cadence of one. The most reflexive structural move in LLM output.',
+    essay: `What looks like an argument is actually a stunt. The model is not making a case - it is performing the rhythm of one, pairing a setup with a stake-raise so the line *sounds* like a position before any position has been built. The first half exists to be exceeded by the second; the second half exists because the first half is there to be exceeded. The shape feeds itself.
 
-The result reads like an argument because the rhythm of the line resembles the rhythm of an argument. It is not an argument. The shape is good enough to fool the model into producing it and good enough to fool a tired reader into clapping. The writer's tell, when caught at this, is the look of someone who realises the audience laughed at their joke for the wrong reason.`,
+This isn't subtle craft - it's a reflex. The cadence is unmistakable: a beat, a pivot, a louder beat. That cadence is good enough to fool the model into producing it and good enough to fool a tired reader into clapping. The writer's tell, when caught at this, isn't embarrassment about the line - it's the look of someone who realises the audience laughed for the wrong reason.`,
     whyItsSlop:
       'The model uses it to manufacture stakes. The shape says "I am about to elevate this from mundane to profound" without doing the work that elevates it. When the X side is a strawman, the move is even cheaper.',
     fix: 'Drop the X side. State Y directly. "It\'s not just a chatbot - it\'s a paradigm shift" becomes "It\'s a paradigm shift" (which now has to defend itself, as it should).',

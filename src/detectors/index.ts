@@ -207,38 +207,6 @@ const detectStaccato: Detector = (ctx) => {
   flush()
 }
 
-const detectAnaphoricCascade: Detector = (ctx) => {
-  const sentences = splitSentences(ctx.source).filter((s) => !isInSkipZone(s.start, ctx.zones))
-  let run: { start: number; end: number; opener: string }[] = []
-  const flush = () => {
-    if (run.length >= 3) {
-      ctx.emit({
-        patternId: 'anaphoric-cascade',
-        category: 'structural',
-        start: run[0].start,
-        end: run[run.length - 1].end,
-        rationale: `${run.length} consecutive sentences open with "${run[0].opener}...".`,
-      })
-    }
-    run = []
-  }
-  for (const s of sentences) {
-    const text = ctx.source.slice(s.start, s.end).trim()
-    const opener = firstTwoWords(text).toLowerCase()
-    if (!opener) {
-      flush()
-      continue
-    }
-    if (run.length === 0 || run[run.length - 1].opener === opener) {
-      run.push({ start: s.start, end: s.end, opener })
-    } else {
-      flush()
-      run.push({ start: s.start, end: s.end, opener })
-    }
-  }
-  flush()
-}
-
 const detectHeaderInflation: Detector = (ctx) => {
   const headerRe = /^(#{2,6})\s+([^\n]+)$/gm
   const headers: { level: number; idx: number; end: number }[] = []
@@ -280,11 +248,6 @@ function splitSentences(source: string): SentenceSpan[] {
   return out
 }
 
-function firstTwoWords(text: string): string {
-  const m = text.match(/^[\s>*\-_#]*([\p{L}']+(?:\s+[\p{L}']+)?)/u)
-  return m ? m[1] : ''
-}
-
 const ALL_DETECTORS: Detector[] = [
   detectTier1,
   detectTier2,
@@ -298,7 +261,6 @@ const ALL_DETECTORS: Detector[] = [
   detectEmDashDensity,
   detectHedgeCluster,
   detectStaccato,
-  detectAnaphoricCascade,
   detectHeaderInflation,
 ]
 
@@ -347,7 +309,6 @@ function severityFor(patternId: string): number {
     case 'throat-clearing':
     case 'vague-gravitas':
     case 'staccato':
-    case 'anaphoric-cascade':
     case 'false-precision':
       return 0.8
     case 'tier2-lexicon':
@@ -381,7 +342,6 @@ export function scoreFromFlags(flags: Flag[], proseWordCount: number): ScoreResu
   const ceilings: { id: string; cap: number }[] = []
   if (counts.has('antithesis')) ceilings.push({ id: 'antithesis', cap: 7 })
   if ((counts.get('staccato') ?? 0) >= 1) ceilings.push({ id: 'staccato', cap: 7 })
-  if ((counts.get('anaphoric-cascade') ?? 0) >= 1) ceilings.push({ id: 'anaphoric-cascade', cap: 7 })
   if ((counts.get('vague-gravitas') ?? 0) >= 1) ceilings.push({ id: 'vague-gravitas', cap: 7 })
   if ((counts.get('tier1-lexicon') ?? 0) >= 1) ceilings.push({ id: 'tier1-lexicon', cap: 7 })
   if (ceilings.length >= 2) raw = Math.min(raw, 6)

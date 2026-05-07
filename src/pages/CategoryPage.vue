@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { getCategory } from '../catalog/categories'
 import { patternsByCategory } from '../catalog/patterns'
 
-const route = useRoute()
-const id = computed(() => String(route.params.id))
-const category = computed(() => getCategory(id.value))
-const patterns = computed(() => patternsByCategory(id.value))
+const props = defineProps<{ id: string }>()
+
+const category = computed(() => getCategory(props.id))
+const patterns = computed(() => patternsByCategory(props.id))
 
 function paragraphs(text: string | undefined): string[] {
   if (!text) return []

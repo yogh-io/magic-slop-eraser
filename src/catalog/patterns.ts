@@ -8,7 +8,9 @@ export const patterns: PatternMeta[] = [
     name: 'Tier 1 lexicon',
     shortName: 'Tier 1',
     severity: 'primary',
+    scope: 'word',
     mechanical: true,
+    rung: 1,
     blurb:
       'The canonical AI vocabulary. Almost no human writer reaches for these; LLMs love them.',
     essay: `These words are dead. They got used up. "Delve" used to mean a careful working-through; now it appears almost exclusively in sentences whose function is to perform thoughtfulness. "Tapestry" lost its threads sometime around 2018. "Navigate" was eaten by management consultants and never came back. "Leverage" tried to escape and got captured by finance, where it still has a valid technical use; everywhere else it is filler.
@@ -44,7 +46,9 @@ The model reaches for them not because they describe anything but because they w
     name: 'Tier 2 lexicon',
     shortName: 'Tier 2',
     severity: 'medium',
+    scope: 'word',
     mechanical: true,
+    rung: 1,
     blurb:
       'Defensible in context, suspect in clusters. Two or more per 1000 words is a reliable cluster signal.',
     essay: `Each of these words is fine on its own. "Robust" can describe a real bridge. "Nuanced" can describe an actual position. "Multifaceted" was almost a compliment once.
@@ -71,7 +75,9 @@ The trouble is that the model does not pick one - it picks all of them, in clust
     category: 'lexical',
     name: 'Throat-clearing openers',
     severity: 'high',
+    scope: 'phrase',
     mechanical: true,
+    rung: 1,
     blurb:
       'Sentence-opening phrases that announce "I am about to say something" instead of just saying it.',
     essay: `"It's important to note" is the writer asking themselves for permission before saying the thing. Permission is then granted, weakly, and the thing follows in the diminished form that survives the asking.
@@ -103,7 +109,9 @@ A real writer does not say "importantly." The word "importantly" is the writer a
     category: 'lexical',
     name: 'Closer phrases',
     severity: 'high',
+    scope: 'phrase',
     mechanical: true,
+    rung: 1,
     blurb: 'Phrases that announce the end and add nothing.',
     essay: `"In conclusion" is the writer raising a hand to be excused. "All in all" is the writer who did not earn the conclusion drafting a small ceremony in lieu of one.
 
@@ -132,7 +140,9 @@ A kicker is the moment a piece's argument lands and the line lands with it. The 
     category: 'lexical',
     name: 'Hedge clusters',
     severity: 'medium',
+    scope: 'sentence',
     mechanical: true,
+    rung: 1,
     blurb:
       'Three or more hedges (generally, typically, often, somewhat, perhaps, possibly...) in a single sentence.',
     essay: `One hedge is honesty about the limits of a claim. Three hedges in one sentence is a writer who has averaged across all possible claims and produced the shape of a claim with the conviction of a weather forecast read by a dying man.
@@ -159,7 +169,9 @@ The model does this because the gradient that produced it punishes wrongness mor
     category: 'lexical',
     name: 'Enthusiasm inflation',
     severity: 'medium',
+    scope: 'word',
     mechanical: true,
+    rung: 1,
     blurb: 'When everything is fascinating, nothing is.',
     essay: `When everything is fascinating, nothing is. The model has been trained that "fascinating" pairs with "development" and "remarkable" pairs with "shift," and so it pairs them, on autopilot, in the absence of any actual fascination on its part - it is, after all, a function.
 
@@ -183,7 +195,9 @@ The reader's enthusiasm budget runs out around the second "remarkable." After th
     category: 'lexical',
     name: 'Vague gravitas',
     severity: 'high',
+    scope: 'phrase',
     mechanical: true,
+    rung: 1,
     blurb: 'Phrases that simulate insight without delivering it.',
     essay: `"Raises important questions" is what a sentence says when it has decided not to ask one. "Has profound implications" is what a sentence says about itself when it has nothing implied.
 
@@ -201,6 +215,10 @@ The trick of the form is that it gestures at meaning without committing any. The
         sloppy: 'This trend speaks to deeper truths about institutional decay.',
         better: 'The agency has lost three of its four senior auditors since January.',
       },
+      {
+        sloppy: 'The pattern cannot fail to repeat because the coalition falls the day the project ends.',
+        better: 'The CEO\'s job depends on the project continuing. He is not going to end it.',
+      },
     ],
   },
 
@@ -211,7 +229,9 @@ The trick of the form is that it gestures at meaning without committing any. The
     name: 'Absent-actor construct',
     shortName: 'Absent actor',
     severity: 'primary',
+    scope: 'sentence',
     mechanical: false,
+    rung: 2,
     blurb:
       'Load-bearing claims that turn on what no one is doing, has done, can do, or will say. PRIMARY TARGET.',
     essay: `The writer closes a paragraph by gesturing at a thing nobody is doing. "The deal no mediator can broker." "The framework no administration has built." "A war whose aims have never been declared."
@@ -240,6 +260,10 @@ It feels devastating because it sounds like the writer has gone past the availab
         sloppy: 'A campaign whose aims have never been written down.',
         better: 'The aims were set in Jerusalem in February and have not been revised since.',
       },
+      {
+        sloppy: 'There is no central authority distinct from the network it claims to manage.',
+        better: 'The board answers to its members; it has no override.',
+      },
     ],
     skipRule:
       'Enumerated-against-template absences are legitimate ("Eagle Claw produced the Holloway Commission. This operation: no investigation, no one relieved, no review board") - the rhetorical weight comes from the gap against a known expected sequence, and each clause is independently testable. Specific factual absences about named instruments ("no snap-back mechanism in the current agreement") are also legitimate.',
@@ -249,7 +273,9 @@ It feels devastating because it sounds like the writer has gone past the availab
     category: 'structural',
     name: 'Allusive construct',
     severity: 'primary',
+    scope: 'sentence',
     mechanical: false,
+    rung: 2,
     blurb:
       'The shape is "[unspecific] [relates to] [unspecific]." Both ends abstract or back-referring; the verb does the work. PRIMARY TARGET.',
     essay: `The sentence that announces "I am the kicker" by being indirect about its own claim. Both ends abstract; a verb in the middle doing all the work. "The cheque is written on the appearance of dominance the underlying reality no longer supports."
@@ -276,6 +302,10 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
         sloppy: 'The substrate gives out, and the appearance follows it.',
         better: 'Dollar invoicing is dropping in the Gulf, and the dollar follows.',
       },
+      {
+        sloppy: 'The arrangement does not collapse, and each cycle produces a fresh round of commitments.',
+        better: 'The contract auto-renews every quarter, with new commitments stacking each time.',
+      },
     ],
     skipRule:
       'Survives only if the body literally and consistently uses the same vocabulary as a structural through-line, AND both ends point at specific recently-named referents. Both conditions must hold. Almost never do.',
@@ -283,12 +313,14 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
   {
     id: 'antithesis',
     category: 'structural',
-    name: '"Not X - it\'s Y" antithesis',
-    shortName: 'Antithesis',
+    name: 'Mirror construct',
+    shortName: 'Mirror',
     severity: 'primary',
+    scope: 'sentence',
     mechanical: true,
+    rung: 1,
     blurb:
-      'The most reflexive structural shape after the tricolon. Also called the mirror construct.',
+      '"Not X - it\'s Y." The Y half mirrors the X half across a hinge - hence the name. The most reflexive structural shape in LLM output.',
     essay: `"Not X - Y" is the model's favourite stunt because it mechanically produces the shape of stake-raising. The first half sets up something the second half will exceed - even when the first half is a strawman the model invented for the purpose of being exceeded.
 
 The result reads like an argument because the rhythm of the line resembles the rhythm of an argument. It is not an argument. The shape is good enough to fool the model into producing it and good enough to fool a tired reader into clapping. The writer's tell, when caught at this, is the look of someone who realises the audience laughed at their joke for the wrong reason.`,
@@ -320,36 +352,13 @@ The result reads like an argument because the rhythm of the line resembles the r
       'Legitimate when the X position is a real, named position the piece is rebutting and the antithesis lands the rebuttal. "The Pentagon called this a tactical setback. It was a strategic defeat." That is contrast doing argumentative work.',
   },
   {
-    id: 'tricolon',
-    category: 'structural',
-    name: 'Tricolon reflex',
-    severity: 'high',
-    mechanical: false,
-    blurb:
-      'Three-item lists everywhere, especially escalating ones ("not just X, but Y, and even Z").',
-    essay: `Three-item lists are real. Caesar, Lincoln, every great speech. "I came, I saw, I conquered" works because the three things actually happened, in that order, each adding a beat.
-
-The slop tricolon is when the writer needed two things and the model gave three, padding with whatever sounded vaguely parallel. The third item is usually the most suspect - a near-synonym dragged in because three felt right. The model prefers three the way a child counting things prefers to land on round numbers. The reader, four tricolons in, has stopped reading the items.`,
-    whyItsSlop:
-      'Humans use tricolons (Caesar, Lincoln, every great speech). The slop version is reflexive: the model picked three because three feels rhythmic, not because there are three things. The clue is that the items are often near-synonyms or arbitrary points on a continuum.',
-    fix: 'If the three items are genuinely distinct and structurally parallel, keep. If two are near-synonyms, cut to two or one. If the items are arbitrary, restructure as prose.',
-    examples: [
-      {
-        sloppy: 'The platform empowers users, streamlines workflows, and transforms experiences.',
-        better: 'The platform cuts the time to file a claim from forty minutes to four.',
-      },
-      {
-        sloppy: 'Not just a tool, but a system, and indeed a movement.',
-        better: 'A system. Not yet a movement.',
-      },
-    ],
-  },
-  {
     id: 'staccato',
     category: 'structural',
     name: 'Staccato slop',
     severity: 'high',
+    scope: 'paragraph',
     mechanical: false,
+    rung: 2,
     blurb:
       'Two or more consecutive short sentences (under ~8 words) creating false gravity.',
     essay: `"It started small. It grew. It became unstoppable." Each sentence pretends to add weight. None of them does. The trick is rhythm - three quick beats simulate the cadence of a building argument, and the reader, scanning, registers that something serious has just been said.
@@ -368,6 +377,10 @@ Strip the line breaks and the content collapses into a single sentence about som
         sloppy: 'The deal collapsed. Markets reacted. Trust eroded.',
         better: 'When the deal collapsed in March, three indices dropped within an hour and the embassy stopped returning calls.',
       },
+      {
+        sloppy: 'Eighty thousand layoffs. Zero retraining offers. The cuts arrive ahead of the negotiations, not in their wake.',
+        better: 'The cuts landed three weeks before the negotiations opened, with no retraining programme attached.',
+      },
     ],
   },
   {
@@ -375,7 +388,9 @@ Strip the line breaks and the content collapses into a single sentence about som
     category: 'structural',
     name: 'Em-dash sandwich',
     severity: 'medium',
+    scope: 'piece',
     mechanical: true,
+    rung: 1,
     blurb: 'Em-dashes used to insert meta-commentary mid-sentence.',
     essay: `Em-dashes used right are knives. The slop variety is more like an uncle's kitchen drawer - full of dashes, none of them sharp, deployed mostly to insert little meta-clauses the writer has not quite committed to grammatically.
 
@@ -395,36 +410,13 @@ Strip the line breaks and the content collapses into a single sentence about som
     ],
   },
   {
-    id: 'anaphoric-cascade',
-    category: 'structural',
-    name: 'Anaphoric cascade',
-    severity: 'high',
-    mechanical: false,
-    blurb:
-      'Three or more consecutive sentences or paragraphs sharing the same grammatical opening.',
-    essay: `"It empowers users. It streamlines workflows. It transforms experiences." The shape is parallelism. The substance is filler.
-
-Genuine anaphora works because the grammatical repetition collides with semantic acceleration - each clause says something more or sharper than the one before. Slop anaphora is the same opening, three times, with three near-identical claims behind it. The reader hears a metronome and assumes there is music. The writer who reaches for this reflexively is, on some level, just looking for a rhythm to fill until the actual idea arrives. The idea does not always arrive.`,
-    whyItsSlop:
-      'Parallel structure to the point of metronome reads as confident; is actually filler. "It empowers users. It streamlines workflows. It transforms experiences."',
-    fix: 'Vary sentence openings. Keep at most one repetition. If the parallelism is doing real argumentative work, break it after two and recap differently the third time.',
-    examples: [
-      {
-        sloppy: 'It empowers users. It streamlines workflows. It transforms experiences.',
-        better: 'It cuts a forty-minute task to four.',
-      },
-      {
-        sloppy: 'And so the alliance held. And so the deal closed. And so the war ended.',
-        better: 'The alliance held - barely. The deal closed by accident. The war ended for unrelated reasons.',
-      },
-    ],
-  },
-  {
     id: 'frame-stacking',
     category: 'structural',
     name: 'Frame stacking',
     severity: 'high',
+    scope: 'piece',
     mechanical: false,
+    rung: 3,
     blurb:
       'Same evaluative template applied to multiple subjects in sequence (US: ... / Iran: ... / Israel: ...).',
     essay: `"The US faces a dilemma. China faces a dilemma. Russia faces a dilemma." Per-actor analysis by template-fill. Each entry feels uniform because each entry was generated by the same prompt to itself.
@@ -451,7 +443,9 @@ The form announces "I have considered every relevant party" while delivering the
     category: 'structural',
     name: 'Bidirectional summary',
     severity: 'medium',
+    scope: 'sentence',
     mechanical: false,
+    rung: 2,
     blurb:
       '"While X has its merits, it also has drawbacks." Symmetrically balanced because the model is averaging perspectives.',
     essay: `"While X has its merits, it also has drawbacks." A shrug delivered by a lawyer. Both sides get a clause; neither gets a verdict.
@@ -473,58 +467,6 @@ The model is, by training, allergic to commitment - any side it picks could be t
       },
     ],
   },
-  {
-    id: 'colon-pivot',
-    category: 'structural',
-    name: 'Colon-as-pivot',
-    severity: 'low',
-    mechanical: false,
-    blurb:
-      '"The answer is clear: more research is needed." The colon promises a payoff that turns out to be a platitude.',
-    essay: `The colon promises that what follows is the payoff. The slop colon-pivot is the writer banking the promise then producing a platitude. "The answer is clear: more research is needed." "The implication is profound: nothing will be the same."
-
-The first half builds a tiny stage. The second half walks onto the stage and bows without performing. The model loves this because the form is reliably present in the prose it was trained on - confident punctuation, declarative payoff - even when the payoff itself is a vague gesture toward payoffs that have actually occurred elsewhere in the canon.`,
-    whyItsSlop:
-      'LLMs love a colon followed by a punchy declaration. The colon promises that what follows is the payoff; usually what follows is a platitude or an empty gravitas line.',
-    fix: 'Check what follows the colon. If it is substantive and specific, keep. If it is vague gravitas or restated thesis, cut everything after the colon and restructure.',
-    examples: [
-      {
-        sloppy: 'The answer is clear: more research is needed.',
-        better: 'We do not know yet. The next data drop is in October.',
-      },
-      {
-        sloppy: 'The lesson is unmistakable: institutions matter.',
-        better: 'The lesson is that the EPA was the only thing keeping rivers cleanable.',
-      },
-    ],
-  },
-  {
-    id: 'orphan-punchline',
-    category: 'structural',
-    name: 'Orphan punchline',
-    severity: 'high',
-    mechanical: false,
-    blurb:
-      'Short declaratives standing alone for dramatic weight rather than structural necessity.',
-    essay: `Short declarative sentence on its own line, conveying weight via whitespace.
-
-Like that.
-
-Sometimes earned. Often borrowed. The model produces these on cue when prose feels saggy, because vertical space is the cheapest possible way to make a line look heavy. The reader who has read enough of these starts to feel the borrowed weight as a small irritation - a sentence asking to be admired without doing the work that admiration is the response to.`,
-    whyItsSlop:
-      'The model is signalling importance through whitespace. Sometimes the line is genuinely punchy; often it is a banal claim borrowing weight from formatting.',
-    fix: 'If the line has earned the weight, keep. If the weight is borrowed from the line break, fold the line back into the previous paragraph.',
-    examples: [
-      {
-        sloppy: 'And nobody noticed.',
-        better: '',
-      },
-      {
-        sloppy: 'The deal was already dead.',
-        better: '',
-      },
-    ],
-  },
 
   // ---- ARGUMENTATIVE ----
   {
@@ -532,7 +474,9 @@ Sometimes earned. Often borrowed. The model produces these on cue when prose fee
     category: 'argumentative',
     name: 'Hedged confidence',
     severity: 'high',
+    scope: 'sentence',
     mechanical: false,
+    rung: 2,
     blurb:
       'Statements emphatic in tone but vague in claim. Sounds like an argument; commits to nothing.',
     essay: `What a sentence sounds like when it wants to be both right and unaccountable. "This represents a significant development that could reshape how we think about the field."
@@ -550,6 +494,14 @@ Read it twice. There is no claim. There is the shape of a claim, the register of
         sloppy: 'It represents a meaningful shift in how analysts are thinking about the question.',
         better: 'Three of the five major banks now expect a recession by Q3.',
       },
+      {
+        sloppy: 'The strategy does not have to win in any single round; it grinds through enough years.',
+        better: 'The strategy bets on outlasting the opposition\'s funding cycle. The funding cycle has eight months left.',
+      },
+      {
+        sloppy: 'The framework is working as intended.',
+        better: 'The framework was designed to delay enforcement, and is succeeding on that metric.',
+      },
     ],
   },
   {
@@ -557,7 +509,9 @@ Read it twice. There is no claim. There is the shape of a claim, the register of
     category: 'argumentative',
     name: 'False-precision authority',
     severity: 'high',
+    scope: 'phrase',
     mechanical: true,
+    rung: 1,
     blurb:
       'Authority claims without sources. The model cannot cite and will not admit it.',
     essay: `"Studies have shown." Which studies? "Experts agree." Which experts? "Research indicates." Whose research?
@@ -586,7 +540,9 @@ The form invokes authority the writer cannot actually produce, betting that the 
     category: 'argumentative',
     name: 'Pivot to balance',
     severity: 'medium',
+    scope: 'paragraph',
     mechanical: false,
+    rung: 2,
     blurb:
       'Any spicy claim immediately followed by "However, it\'s important to consider..." that defangs it.',
     essay: `The model has been trained that any spicy claim should be followed by "however, it is important to consider..." and so the cushioning that defangs them gets added religiously.
@@ -613,7 +569,9 @@ The cushion is not balance - it is the absence of nerve. Real qualification shar
     category: 'argumentative',
     name: 'Restating the question',
     severity: 'medium',
+    scope: 'paragraph',
     mechanical: false,
+    rung: 2,
     blurb: 'Spending a paragraph re-articulating what was asked.',
     essay: `"That is a great question. The question of whether X is one that..." The model buying time. The chatbot equivalent of a politician saying "I am glad you asked."
 
@@ -638,7 +596,9 @@ Real conversation answers; this performs the receipt of the question first, as i
     category: 'argumentative',
     name: 'Synthesis of nothing',
     severity: 'high',
+    scope: 'sentence',
     mechanical: false,
+    rung: 2,
     blurb:
       'Closing sentence that synthesises nothing. "Ultimately the relationship is complex and reflects broader dynamics."',
     essay: `"Ultimately, the relationship between X and Y is complex and reflects broader dynamics in the field." Appears in every LLM essay. Contains zero information. The model's default exit when it has nothing to add - the prose equivalent of a smooth jazz outro that signals the end of the segment without saying what the segment was about.
@@ -659,34 +619,6 @@ Cut the line and the piece loses nothing because the line carried nothing. The m
       },
     ],
   },
-  {
-    id: 'recap-paragraph',
-    category: 'argumentative',
-    name: 'Recap paragraph',
-    severity: 'high',
-    mechanical: false,
-    blurb: 'Closing paragraph that restates the essay just read.',
-    essay: `Born of the school assignment in which "tell them what you told them" was a real instruction. Born again in the LLM whose loss function rewarded summarisation.
-
-The reader has just read the piece. They do not need a summary. The summary, when it appears, signals to the reader that the writer did not trust them to remember and did not have anything else to say. A real closer advances the argument one step further than the body did - lands a thought that depended on the body but is not in it. A recap is the writer ending the lecture with another lecture about the lecture.`,
-    whyItsSlop:
-      'The model has been trained to summarise. The reader does not need a summary - they just read the piece.',
-    fix: 'Delete the recap. If the piece needs a final paragraph, it should advance the argument one step further, not summarise what came before.',
-    examples: [
-      {
-        sloppy:
-          "We've explored three scenarios above: A, B, and C. Each has merits and drawbacks, and the future depends on which path is chosen.",
-        better: 'Of the three, B is the only one where the alliance survives. That is what is on the table.',
-      },
-      {
-        sloppy:
-          'In summary, this piece has argued that the alliance is fragile, the deal is dead, and the timeline is short.',
-        better: '',
-      },
-    ],
-    skipRule:
-      'Legitimate in pieces with explicit framing ("we have covered three scenarios; here is how to weigh them"). The slop version is reflexive.',
-  },
 
   // ---- TONAL ----
   {
@@ -694,7 +626,9 @@ The reader has just read the piece. They do not need a summary. The summary, whe
     category: 'tonal',
     name: 'Performative balance',
     severity: 'medium',
+    scope: 'piece',
     mechanical: false,
+    rung: 3,
     blurb:
       'Two sides presented as equally weighted because "both perspectives have merit" is a safer output than commitment.',
     essay: `Distinct from bidirectional summary because the issue is voice rather than structure. Performative balance is the both-sides register applied to a piece that did not structurally promise to give two sides equal weight - the writer simply talks like someone who would, no matter what they are talking about.
@@ -719,7 +653,9 @@ The result is the diplomatic non-answer dressed as judiciousness. The model defa
     category: 'tonal',
     name: 'Performative humility',
     severity: 'medium',
+    scope: 'phrase',
     mechanical: false,
+    rung: 2,
     blurb:
       '"While I\'m not an expert..." followed by confident expert-style analysis.',
     essay: `"While I am not an expert..." followed by paragraph-long expert analysis. "There are many ways to think about this..." followed by exactly one.
@@ -744,7 +680,9 @@ The form is the writer wearing a small badge that says HUMBLE before delivering 
     category: 'tonal',
     name: 'Approval-seeking close',
     severity: 'medium',
+    scope: 'phrase',
     mechanical: true,
+    rung: 1,
     blurb:
       '"I hope this helps!" / "Let me know if you\'d like to explore further."',
     essay: `"I hope this helps!" The chatbot's signature, surviving in prose as "if readers take one thing away..." or "the hope is that...".
@@ -768,31 +706,6 @@ The piece either helps or it does not. Asking the reader to confirm that it help
       },
     ],
   },
-  {
-    id: 'editorial-we',
-    category: 'tonal',
-    name: 'Editorial we / one',
-    severity: 'low',
-    mechanical: false,
-    blurb:
-      'Reflexive "we" or "one" when the actual subject is the model or the writer.',
-    essay: `"We can see that..." "One might wonder..." The we is fictional; the one is hypothetical; both are stand-ins for the writer who did not want to commit to a subject.
-
-In the LLM the we and the one are doing real work - the model has no actual we to refer to and no first-person standpoint to assert from, and so it conjures a chorus instead. In prose it survives as the writer borrowing the model's habit, signing the sentence with a pronoun that names no one. Sometimes that is correct. Often it is a hedge.`,
-    whyItsSlop:
-      '"One might wonder...", "We can see that...", "We must remember..." The pronoun is doing the work of pretending there is a subject.',
-    fix: 'Name the subject. If "we" means the analytical project, say so. If "we" means the reader, address them. If "we" means no one in particular, the sentence is filler.',
-    examples: [
-      {
-        sloppy: 'One might wonder whether the timing was deliberate.',
-        better: 'It looks deliberately timed.',
-      },
-      {
-        sloppy: 'We can see, from this distance, that the project was always doomed.',
-        better: 'The project was always doomed.',
-      },
-    ],
-  },
 
   // ---- FORMAT ----
   {
@@ -800,7 +713,9 @@ In the LLM the we and the one are doing real work - the model has no actual we t
     category: 'format',
     name: 'Bullets where prose would serve',
     severity: 'medium',
+    scope: 'paragraph',
     mechanical: false,
+    rung: 2,
     blurb:
       'Two-point bullet lists for content that is genuinely a paragraph. Bolding the first three words of every bullet.',
     essay: `The bullet list is the model's favourite shape because it converts paragraphs of thought into tidy little items the reader can scan past without doing the work of integrating.
@@ -822,36 +737,13 @@ Genuine list content - parallel items, scannable reference material - benefits f
     ],
   },
   {
-    id: 'arbitrary-numbered-list',
-    category: 'format',
-    name: 'Arbitrary numbered list',
-    severity: 'low',
-    mechanical: false,
-    blurb:
-      '"Here are 5 reasons..." when 4 or 7 would have been just as natural.',
-    essay: `"Here are 5 reasons..." when 4 or 7 would have been just as natural. The model picked 5 because round.
-
-The number is doing no informational work; it is there because the model has been trained that listicles begin with a small round number, and so when asked for an analytical observation it returns one in the form of a small round number's worth of bullets. The reader, having been promised five things, expects five distinct things. Three are usually the same thing said three different ways.`,
-    whyItsSlop:
-      'The model picked 5 because round. The number is doing no informational work.',
-    fix: 'Unless the count is meaningful, drop the number and convert to prose.',
-    examples: [
-      {
-        sloppy: '5 reasons the deal will fail (and one reason it might not).',
-        better: 'The deal will fail for two reasons. The third, fourth, and fifth in any "five reasons" list are the same as the second.',
-      },
-      {
-        sloppy: 'Here are the 7 most important takeaways from the announcement.',
-        better: 'Two things matter in the announcement, and they are easy to miss.',
-      },
-    ],
-  },
-  {
     id: 'header-inflation',
     category: 'format',
     name: 'Header inflation',
     severity: 'low',
+    scope: 'piece',
     mechanical: true,
+    rung: 3,
     blurb:
       '## Section for a two-paragraph block. ### Subsection for one paragraph.',
     essay: `## Section. ### Subsection. #### Sub-subsection. The piece becomes an interface for navigating itself rather than a piece.

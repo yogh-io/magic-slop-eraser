@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { getPattern } from '../catalog/patterns'
 import { getCategory } from '../catalog/categories'
 
-const route = useRoute()
-const id = computed(() => String(route.params.id))
-const pattern = computed(() => getPattern(id.value))
+const props = defineProps<{ id: string }>()
+
+const pattern = computed(() => getPattern(props.id))
 const category = computed(() => (pattern.value ? getCategory(pattern.value.category) : null))
 
 function paragraphs(text: string | undefined): string[] {
@@ -28,8 +27,10 @@ function paragraphs(text: string | undefined): string[] {
     <header class="hd">
       <h1>{{ pattern.name }}</h1>
       <div class="badges">
+        <router-link :to="`/rungs`" :class="['rung', `rung-${pattern.rung}`]" :title="`Rung ${pattern.rung}`">R{{ pattern.rung }} · {{ pattern.rung === 1 ? 'mechanical' : pattern.rung === 2 ? 'passage judgment' : 'presentation' }}</router-link>
         <span :class="['sev', `sev-${pattern.severity}`]">{{ pattern.severity }}</span>
-        <span class="mech">{{ pattern.mechanical ? 'mechanical' : 'judgment' }}</span>
+        <span class="mech">{{ pattern.mechanical ? 'mechanical detector' : 'judgment detector' }}</span>
+        <span class="scope">{{ pattern.scope }}-scope</span>
         <router-link :to="`/categories/${category.id}`" class="cat-tag">
           <span class="dot" :style="{ background: `var(--cat-${category.id})` }" />
           {{ category.name }}
@@ -114,6 +115,10 @@ function paragraphs(text: string | undefined): string[] {
   gap: 0.3rem;
 }
 .badges .sev-primary { color: var(--accent); border-color: var(--accent); }
+.badges .rung { color: #fff; }
+.badges .rung-1 { background: #2f8f6a; border-color: #2f8f6a; }
+.badges .rung-2 { background: #b88f3e; border-color: #b88f3e; }
+.badges .rung-3 { background: #b8472d; border-color: #b8472d; }
 .cat-tag .dot { width: 7px; height: 7px; border-radius: 50%; }
 
 .lede {

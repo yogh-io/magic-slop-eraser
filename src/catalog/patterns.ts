@@ -13,7 +13,7 @@ export const patterns: PatternMeta[] = [
     rung: 1,
     blurb:
       'The canonical AI vocabulary. Almost no human writer reaches for these; LLMs love them.',
-    essay: `These words are dead. They got used up. "Delve" used to mean a careful working-through; now it appears almost exclusively in sentences whose function is to perform thoughtfulness. "Tapestry" lost its threads sometime around 2018. "Navigate" was eaten by management consultants and never came back. "Leverage" tried to escape and got captured by finance, where it still has a valid technical use; everywhere else it is filler.
+    essay: `These dead words delve into the rich tapestry of LLM output, embarking on the same journey every time, because they were rewarded for sounding literary without committing to a specific image. "Delve" used to mean a careful working-through; now it appears almost exclusively in sentences whose function is to perform thoughtfulness. "Tapestry" lost its threads sometime around 2018. "Navigate" was eaten by management consultants and never came back. "Leverage" tried to escape and got captured by finance, where it still has a valid technical use; everywhere else it is filler.
 
 The model reaches for them not because they describe anything but because they were reliably present in the prose it was trained on. If one is in your draft, the sentence wasn't written by you - something else wrote it on your behalf while you were thinking about something else. That's not an accusation, it happens to anyone with enough exposure to corporate writing. The fix is to find the concrete thing the dead word was standing in for, and put that there instead.`,
     whyItsSlop:
@@ -51,7 +51,7 @@ The model reaches for them not because they describe anything but because they w
     rung: 1,
     blurb:
       'Defensible in context, suspect in clusters. Two or more per 1000 words is a reliable cluster signal.',
-    essay: `Each of these words is fine on its own. "Robust" can describe a real bridge. "Nuanced" can describe an actual position. "Multifaceted" was almost a compliment once.
+    essay: `A robust, nuanced, multifaceted vocabulary - intricate in scope, remarkably comprehensive in cluster - which is the diagnosis: each word is fine on its own, the set as a whole always arrives together. "Robust" can describe a real bridge. "Nuanced" can describe an actual position. "Multifaceted" was almost a compliment once.
 
 The trouble is that the model does not pick one - it picks all of them, in clusters, the way a teenager learning to dress reaches for whatever looks expensive. A piece in which "robust," "nuanced," and "intricate" all show up before paragraph three is a piece in which the vocabulary is doing the work the argument was supposed to do. The reader registers the gesture. They do not register the argument. There was no argument; there was only the silhouette of one, draped in adjectives.`,
     whyItsSlop:
@@ -80,7 +80,7 @@ The trouble is that the model does not pick one - it picks all of them, in clust
     rung: 1,
     blurb:
       'Sentence-opening phrases that announce "I am about to say something" instead of just saying it.',
-    essay: `"It's important to note" is the writer asking themselves for permission before saying the thing. Permission is then granted, weakly, and the thing follows in the diminished form that survives the asking.
+    essay: `It is important to note that, crucially, this is the writer asking themselves for permission before saying the thing. Permission is then granted, weakly, and the thing follows in the diminished form that survives the asking.
 
 A real writer does not say "importantly." The word "importantly" is the writer admitting they could not make the substance feel important on its own merits. One throat-clearer in a piece is fine - everyone clears their throat once, especially before the first sentence. Three is the same person blinking before three different sentences they were not sure about. The reader hears the blinking.`,
     whyItsSlop:
@@ -113,7 +113,7 @@ A real writer does not say "importantly." The word "importantly" is the writer a
     mechanical: true,
     rung: 1,
     blurb: 'Phrases that announce the end and add nothing.',
-    essay: `"In conclusion" is the writer raising a hand to be excused. "All in all" is the writer who did not earn the conclusion drafting a small ceremony in lieu of one.
+    essay: `In conclusion, ultimately, all in all, this is the writer raising a hand to be excused before saying the line that was supposed to land on its own. "All in all" is the writer who did not earn the conclusion drafting a small ceremony in lieu of one.
 
 A kicker is the moment a piece's argument lands and the line lands with it. The reader knows because the line is a kicker. If a sentence has to begin with "ultimately" to be the kicker, it is performing kicker-ness the way a kid in a school play performs old age. There are exceptions. They are rare. Yours probably is not one.`,
     whyItsSlop:
@@ -145,7 +145,7 @@ A kicker is the moment a piece's argument lands and the line lands with it. The 
     rung: 1,
     blurb:
       'Three or more hedges (generally, typically, often, somewhat, perhaps, possibly...) in a single sentence.',
-    essay: `One hedge is honesty about the limits of a claim. Three hedges in one sentence is a writer who has averaged across all possible claims and produced the shape of a claim with the conviction of a weather forecast read by a dying man.
+    essay: `Generally, this tends to be somewhat more common in cases that, perhaps, arguably resemble the writer averaging across every possible claim until the shape of a claim emerges with none of its weight. One hedge is honesty about the limits. Three hedges in one sentence is a writer producing the conviction of a weather forecast read by a dying man.
 
 The model does this because the gradient that produced it punishes wrongness more than it punishes mush. Mush is safe. Mush plus more mush is even safer. By the third hedge the writer has reached the position from which no possible reader could disagree, because no possible reader could tell what they had said. The position is calm. It is also empty.`,
     whyItsSlop:
@@ -173,7 +173,7 @@ The model does this because the gradient that produced it punishes wrongness mor
     mechanical: true,
     rung: 1,
     blurb: 'When everything is fascinating, nothing is.',
-    essay: `When everything is fascinating, nothing is. The model has been trained that "fascinating" pairs with "development" and "remarkable" pairs with "shift," and so it pairs them, on autopilot, in the absence of any actual fascination on its part - it is, after all, a function.
+    essay: `A fascinating pattern with profound implications - remarkable in scope, striking in frequency, compelling enough that the model has to rate its own observations to get them across to a reader who would otherwise not be impressed. The model has been trained that "fascinating" pairs with "development" and "remarkable" pairs with "shift," and so it pairs them, on autopilot, in the absence of any actual fascination on its part - it is, after all, a function.
 
 The reader's enthusiasm budget runs out around the second "remarkable." After that, every adjective is the writer telling the reader what to feel, which is the writer admitting they have not produced the feeling on the page. Real writing trusts the reader to find what is striking. Sloppy writing labels it. The labels are louder than the thing being labelled.`,
     whyItsSlop:
@@ -199,7 +199,7 @@ The reader's enthusiasm budget runs out around the second "remarkable." After th
     mechanical: true,
     rung: 1,
     blurb: 'Phrases that simulate insight without delivering it.',
-    essay: `"Raises important questions" is what a sentence says when it has decided not to ask one. "Has profound implications" is what a sentence says about itself when it has nothing implied.
+    essay: `This pattern raises important questions about how prose simulates insight without delivering any, with profound implications for the reader who keeps waiting for the implications to arrive. "Has profound implications" is what a sentence says about itself when it has nothing implied.
 
 The trick of the form is that it gestures at meaning without committing any. The reader, scanning, registers "this is significant" without registering what is significant about it - and the writer, having gestured, can move on without producing the answer. The literary equivalent of a politician saying "we need to have a conversation" about a thing they will never speak of again.`,
     whyItsSlop:
@@ -234,7 +234,7 @@ The trick of the form is that it gestures at meaning without committing any. The
     rung: 2,
     blurb:
       'Load-bearing claims that turn on what no one is doing, has done, can do, or will say. PRIMARY TARGET.',
-    essay: `The writer closes a paragraph by gesturing at a thing nobody is doing. "The deal no mediator can broker." "The framework no administration has built." "A war whose aims have never been declared."
+    essay: `The kicker no agent catches, no editor quite flags, and no detector ever knows how to name - a load-bearing claim that turns on what nobody is doing. "The deal no mediator can broker." "The framework no administration has built." "A war whose aims have never been declared."
 
 It feels devastating because it sounds like the writer has gone past the available evidence to a conclusion so universal that no mere person could carry it. In fact the writer has named no mediators, listed no administrations, declined to specify any aims. The line is loadbearing on a population the line itself has refused to enumerate. Works as mood. Collapses if you ask, gently, "which mediators?" The reader who knows the trick reads the line the way a mechanic listens to a misfire.`,
     whyItsSlop:
@@ -278,7 +278,7 @@ It feels devastating because it sounds like the writer has gone past the availab
     rung: 2,
     blurb:
       'The shape is "[unspecific] [relates to] [unspecific]." Both ends abstract or back-referring; the verb does the work. PRIMARY TARGET.',
-    essay: `The sentence that announces "I am the kicker" by being indirect about its own claim. Both ends abstract; a verb in the middle doing all the work. "The cheque is written on the appearance of dominance the underlying reality no longer supports."
+    essay: `The shape that means something only because the sentence before it did - both ends abstract, the verb in the middle doing all the work. "The cheque is written on the appearance of dominance the underlying reality no longer supports."
 
 Read it twice and you cannot tell who wrote it. It does not mean nothing - but it means whatever the previous paragraph just meant, in slightly different drag. A reader still holding the prior paragraph in working memory feels the warmth and reads the sentence as deep. Pull it out and read it cold and it reads like a fortune cookie that lost its ticker. The cleverness is borrowed, then collected as if earned.`,
     whyItsSlop:
@@ -321,7 +321,7 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
     rung: 1,
     blurb:
       '"Not X - it\'s Y." The Y half mirrors the X half across a hinge - hence the name. The most reflexive structural shape in LLM output.',
-    essay: `"Not X - Y" is the model's favourite stunt because it mechanically produces the shape of stake-raising. The first half sets up something the second half will exceed - even when the first half is a strawman the model invented for the purpose of being exceeded.
+    essay: `It is not just a tic - it is a mechanically-produced stake-raise, because the form of the line ("Not X - it's Y") is what makes it feel like an argument before any argument has been built. The first half sets up something the second half will exceed - even when the first half is a strawman the model invented for the purpose of being exceeded.
 
 The result reads like an argument because the rhythm of the line resembles the rhythm of an argument. It is not an argument. The shape is good enough to fool the model into producing it and good enough to fool a tired reader into clapping. The writer's tell, when caught at this, is the look of someone who realises the audience laughed at their joke for the wrong reason.`,
     whyItsSlop:
@@ -361,7 +361,7 @@ The result reads like an argument because the rhythm of the line resembles the r
     rung: 2,
     blurb:
       'Two or more consecutive short sentences (under ~8 words) creating false gravity.',
-    essay: `"It started small. It grew. It became unstoppable." Each sentence pretends to add weight. None of them does. The trick is rhythm - three quick beats simulate the cadence of a building argument, and the reader, scanning, registers that something serious has just been said.
+    essay: `It is short. It is clipped. It pretends to add weight. The trick is rhythm - three quick beats simulate the cadence of a building argument, and the reader, scanning, registers that something serious has just been said.
 
 Strip the line breaks and the content collapses into a single sentence about something growing, which we already knew growing things tend to do. The model loves staccato because the loss function rewards punchiness; punchiness is producible by chopping; chopping is cheap. A run of fragments after a long sentence is fine - that is a deliberate punch. A run of fragments after another run of fragments is the model doing aerobics.`,
     whyItsSlop:
@@ -392,7 +392,7 @@ Strip the line breaks and the content collapses into a single sentence about som
     mechanical: true,
     rung: 1,
     blurb: 'Em-dashes used to insert meta-commentary mid-sentence.',
-    essay: `Em-dashes used right are knives. The slop variety is more like an uncle's kitchen drawer - full of dashes, none of them sharp, deployed mostly to insert little meta-clauses the writer has not quite committed to grammatically.
+    essay: `The em-dash - and this is the slop variety - hosts a meta-clause the writer never quite committed to grammatically, dropped in mid-sentence to comment on the sentence the comment is interrupting. Used right, em-dashes are knives. The slop variety is more like an uncle's kitchen drawer - full of dashes, none of them sharp.
 
 "The result - and this is the crucial part - was unexpected" is the writer handing themselves a place to comment on their own sentence mid-sentence, because the sentence on its own was not doing it for them. Density is the tell. One em-dash per page can be devastating. Six is the writer hedging the same hedge twice.`,
     whyItsSlop:

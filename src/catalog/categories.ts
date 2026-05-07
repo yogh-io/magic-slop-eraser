@@ -6,7 +6,7 @@ export const categories: CategoryMeta[] = [
     name: 'Lexical tics',
     tagline: 'The vocabulary the model reaches for and you would not.',
     blurb:
-      'Let us delve into the rich tapestry of words the model embarks upon as it navigates the realm of corporate prose. In this ever-evolving landscape, these dead lexical tells serve as the most reliable single-token markers in the entire catalogue.',
+      'Specific words and phrases that LLMs love and human writers rarely touch. Easy to catch mechanically; the fix is usually substitution or a clean cut. The hall-of-fame words (delve, tapestry, navigate, realm, embark) are the most reliable single-token tells in the entire catalogue.',
     essay: `Some words are dead. They got used up. The lexical tics are the words and phrases that survive in LLM output not because they describe anything but because they were reliably present in the prose the model trained on - corporate decks, HR town-hall slide-text, NGO mission statements, the middle paragraphs of Atlantic essays. None of those genres prize being read. They prize sounding like they were written by a person who would be safe to give an award to.
 
 The fix is the easiest in the catalogue: notice them, pick the concrete thing they were standing in for, replace. The reason most writers do not is that one or two of these words always feel innocent in isolation. They are. The accumulation is not. Once you have seen "delve into the rich tapestry" three times in a week, you can no longer un-see it.`,

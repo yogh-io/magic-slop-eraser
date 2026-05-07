@@ -66,21 +66,42 @@ Source-of-truth entities the API exposes:
 - **Resolution event**: append-only log of state transitions on flags. The companion document at the end of a session is rendered from this log.
 - **User flag**: human-contributed flag with category, pattern, and rationale. Lives alongside mechanical flags. Improves the catalogue over time.
 
-The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor scheme are the prototypes for the document/flag/anchor parts of this model.
+The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor scheme are the prototypes for the document/flag/anchor parts of this model. The server reuses `src/anchoring/textAnchor.ts` and `src/detectors/index.ts` directly so client and server share the same anchor relocation and detection logic.
 
-## API surface (planned)
+## API surface
 
-The API is what makes the agent loop work. Sketch:
+Bun-based HTTP server in `server/`. File-based persistence via `DiskStore` (per-doc `state.json` + `events.ndjson`). Per-document share token via `Authorization: Bearer <token>`. SSE primary listen channel; long-poll fallback.
 
-- `GET /docs/:id` - document with current flags and resolution states.
-- `POST /docs` - create document from markdown.
-- `POST /docs/:id/run-detectors` - run mechanical detectors server-side, return new flags.
-- `GET /docs/:id/flags?rung=1&status=open` - paginated flag walk.
-- `POST /flags/:id/suggestions` - agent posts a suggestion (text + prompt + model identity).
-- `POST /suggestions/:id/verdict` - human marks BETTER / WORSE / CLOSE.
-- `POST /flags/:id/resolve` - apply an accepted edit; the patch is recorded against the document.
-- `POST /flags/:id/skip`, `POST /flags/:id/keep-deliberate`, `POST /flags/:id/comment`.
-- `GET /docs/:id/companion` - the resolution-log document (every flag + verdict + final text).
+```
+# document lifecycle
+POST   /docs                          { source, title? } -> { id, token, eventsUrl }
+GET    /docs/:id                      -> { doc, counts, score, flags }
+PUT    /docs/:id/source               { source } -> relocates open anchors, emits source-edited
+DELETE /docs/:id
+
+# mechanical detection
+POST   /docs/:id/run-detectors        -> emits flag-added events; returns flag list
+
+# flag walking
+GET    /docs/:id/flags?rung=N&status=open
+POST   /docs/:id/flags/:fid/suggestions          { text, prompt?, modelTag } -> Suggestion
+POST   /docs/:id/flags/:fid/suggestions/:sid/verdict { verdict: better|worse|close }
+POST   /docs/:id/flags/:fid/resolve              { suggestionId? | patch }
+POST   /docs/:id/flags/:fid/skip
+POST   /docs/:id/flags/:fid/keep-deliberate
+POST   /docs/:id/flags/:fid/comments             { body, author? }
+
+# event stream
+GET    /docs/:id/events               # SSE primary; supports Last-Event-ID / ?since=N
+GET    /docs/:id/events/poll?since=N&timeout=30000   # long-poll fallback
+
+# read-only
+GET    /docs/:id/companion            # resolution log + final source
+GET    /catalogue                     # patterns + categories (no auth; read-only)
+GET    /health
+```
+
+Every state-changing endpoint appends a `ResolutionEvent` to the doc's events log and bumps `doc.version`. Subscribers on the SSE stream get the event in <100ms (in-memory pub/sub via `server/bus.ts`). Anchor relocation runs on every source mutation; flags whose anchors fail to relocate flip to `status: 'stale'` and emit a `flag-stale` event.
 
 The API is the contract; the browser UI and any agent skill (Claude Code, Codex, opencode, custom scripts) are all clients of it. Anything one can do, the other can do.
 
@@ -157,8 +178,30 @@ src/
       magic.css         # fairyland: pastel sunshine, sky-castles, sparkles
       scholar.css       # antique monograph: parchment, Fraktur drop cap
   router.ts
-  types.ts              # PatternMeta, CategoryMeta, Rung, Scope, etc.
+  types.ts              # PatternMeta, CategoryMeta, Rung, Scope, Flag, Suggestion, etc.
   main.ts
+
+server/                 # Bun-based API. Imports src/anchoring + src/detectors directly.
+  main.ts               # Bun.serve entry, route dispatch, static file serving
+  shared.ts             # json/notFound helpers
+  auth.ts               # Bearer-token check
+  bus.ts                # in-memory per-doc pub/sub for SSE
+  types.ts              # DocState, DocRecord, NewDocInput
+  store/
+    index.ts            # DocStore interface + factory
+    disk.ts             # DiskStore: state.json + events.ndjson
+  routes/
+    docs.ts             # /docs, /docs/:id, source, run-detectors, companion
+    flags.ts            # /docs/:id/flags + per-flag actions
+    events.ts           # SSE + long-poll
+    catalogue.ts        # read-only catalogue dump
+
+.claude/skills/eraser/  # the workshop loop as an agent skill
+  SKILL.md              # protocol document
+  README.md             # install/use
+
+.do/app.yaml            # DigitalOcean App Platform spec (basic-xxs)
+Dockerfile              # multi-stage: Node frontend build + Bun runtime
 ```
 
 ## Adding a pattern

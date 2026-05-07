@@ -42,6 +42,12 @@ export const router = createRouter({
       meta: { title: 'About' },
     },
     {
+      path: '/d/:id',
+      name: 'online-doc',
+      component: () => import('./pages/OnlineDocPage.vue'),
+      meta: { title: 'Document' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('./pages/NotFoundPage.vue'),

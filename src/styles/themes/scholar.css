@@ -1,0 +1,127 @@
+/* scholar theme - antique monograph / late-19c reference work.
+ * Parchment background with paper grain, iron-red accent, small-caps headings.
+ * A decorative period typeface lives in the brand mark only; body remains a clean serif. */
+
+[data-theme='scholar'] {
+  --bg: #f1e6cc;
+  --header-bg: rgba(241, 230, 204, 0.92);
+  --panel-bg: #e8dab8;
+  --card-bg: #f5ecd6;
+  --code-bg: #e6d8b3;
+
+  --text: #1a130b;
+  --muted: #5e4a2e;
+  --heading: #0e0a05;
+  --link: #6f1d1b;
+
+  --rule: #b59b6a;
+  --accent: #8a1a1a;
+  --accent-fg: #f1e6cc;
+
+  --cat-lexical:       #8a1a1a;
+  --cat-structural:    #2e2a72;
+  --cat-argumentative: #1f5d52;
+  --cat-tonal:         #6f4f1a;
+  --cat-format:        #6f5d1a;
+
+  --font-prose: 'Iowan Old Style', 'Charter', 'Source Serif Pro', Georgia, serif;
+  --font-display: 'UnifrakturMaguntia', 'Cormorant SC', 'EB Garamond', Georgia, serif;
+  --font-ui: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  --prose-size: 1.06rem;
+  --prose-leading: 1.7;
+  --heading-tracking: 0.01em;
+}
+
+[data-theme='scholar'] body {
+  background:
+    /* faint paper grain */
+    repeating-linear-gradient(0deg, rgba(110,80,40,0.03) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(110,80,40,0.025) 0 1px, transparent 1px 4px),
+    /* foxing/aging blotches */
+    radial-gradient(380px 220px at 10% 20%, rgba(126,90,40,0.06), transparent 70%),
+    radial-gradient(420px 260px at 92% 78%, rgba(126,90,40,0.07), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+[data-theme='scholar'] .topbar {
+  border-bottom: 2px double var(--rule);
+  background: rgba(241, 230, 204, 0.88);
+}
+[data-theme='scholar'] .brand {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 400;
+  color: var(--heading);
+}
+[data-theme='scholar'] .brand .mark { color: var(--accent); font-size: 1em; }
+
+[data-theme='scholar'] .nav a {
+  font-family: 'Cormorant SC', var(--font-ui);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+[data-theme='scholar'] .article-view h1,
+[data-theme='scholar'] .article-view h2,
+[data-theme='scholar'] .article-view h3,
+[data-theme='scholar'] .prose h1,
+[data-theme='scholar'] .prose h2,
+[data-theme='scholar'] .prose h3 {
+  font-family: 'Cormorant SC', 'EB Garamond', Georgia, serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.25rem;
+}
+
+[data-theme='scholar'] .article-view h1:first-letter,
+[data-theme='scholar'] .prose h1:first-letter {
+  font-family: 'UnifrakturMaguntia', 'Cormorant SC', serif;
+  color: var(--accent);
+  font-size: 1.4em;
+  line-height: 0.9;
+  margin-right: 0.05em;
+}
+
+[data-theme='scholar'] .card {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(245, 236, 214, 0.7), 0 1px 0 rgba(110,80,40,0.08);
+}
+[data-theme='scholar'] .card:hover { border-color: var(--accent); }
+
+[data-theme='scholar'] button,
+[data-theme='scholar'] .toolbar button,
+[data-theme='scholar'] .editor footer button {
+  border-radius: 2px;
+  border: 1px solid var(--rule);
+  font-family: 'Cormorant SC', var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.78rem;
+}
+[data-theme='scholar'] button.primary,
+[data-theme='scholar'] .toolbar button.primary,
+[data-theme='scholar'] .editor footer button.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+[data-theme='scholar'] .article-view mark.slop-flag {
+  border-bottom: 1.5px double var(--flag-color, var(--accent));
+  background: color-mix(in srgb, var(--flag-color, var(--accent)) 8%, transparent);
+}
+
+[data-theme='scholar'] .article-view blockquote {
+  border-left: 3px double var(--rule);
+  font-style: italic;
+}
+
+[data-theme='scholar'] .crumbs a,
+[data-theme='scholar'] .nav a.router-link-active {
+  border-bottom-color: var(--accent);
+}

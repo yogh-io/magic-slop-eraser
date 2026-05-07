@@ -1,0 +1,29 @@
+/* normal theme - the defaults from tokens.css with light/dark adaptive */
+
+[data-theme='normal'] {
+  --bg: #fbfbf8;
+  --header-bg: rgba(251, 251, 248, 0.88);
+  --panel-bg: #f3f2ec;
+  --card-bg: #ffffff;
+  --code-bg: #efece4;
+
+  --text: #1d1d1b;
+  --muted: #6a6a66;
+  --heading: #14130f;
+  --link: #6e4f1c;
+
+  --rule: #d8d5cb;
+  --accent: #b8472d;
+  --accent-fg: #ffffff;
+
+  --cat-lexical:       #d97757;
+  --cat-structural:    #7a55b8;
+  --cat-argumentative: #3a86c4;
+  --cat-tonal:         #2f8f6a;
+  --cat-format:        #b88f3e;
+
+  --font-prose: Charter, 'Iowan Old Style', 'Source Serif Pro', Georgia, serif;
+  --font-display: Inter, system-ui, -apple-system, sans-serif;
+  --font-ui: Inter, system-ui, -apple-system, sans-serif;
+  --heading-tracking: -0.005em;
+}

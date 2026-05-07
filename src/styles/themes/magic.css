@@ -1,0 +1,285 @@
+/* magic theme - fairyland. Sunshine, ice cream, castles, unicorns, sparkles.
+ * Pastel sky-pink-cream palette. Rainbow gradients on headings.
+ * All decorative layers (sky bloom, clouds, distant castles, sparkles) painted into the body bg
+ * so they sit naturally behind app content without z-index gymnastics.
+ */
+
+[data-theme='magic'] {
+  --bg: #fff5f9;
+  --header-bg: rgba(255, 245, 249, 0.78);
+  --panel-bg: rgba(254, 240, 247, 0.72);
+  --card-bg: #ffffff;
+  --code-bg: #fde7f0;
+
+  --text: #4a2058;
+  --muted: #8e6aa4;
+  --heading: #2d0e3f;
+  --link: #c43c80;
+
+  --rule: #f4cce1;
+  --accent: #ec4f96;
+  --accent-fg: #ffffff;
+
+  --cat-lexical:       #ff7eb6;
+  --cat-structural:    #b878d4;
+  --cat-argumentative: #6cc7e8;
+  --cat-tonal:         #6dd9b3;
+  --cat-format:        #ffc857;
+
+  --font-prose: 'Cormorant Garamond', 'EB Garamond', Charter, Georgia, serif;
+  --font-display: 'Cormorant Garamond', 'EB Garamond', Charter, serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --prose-size: 1.12rem;
+  --prose-leading: 1.78;
+  --heading-tracking: 0.005em;
+}
+
+/* let the body's painted sky show through every layer of the app shell */
+[data-theme='magic'] html,
+[data-theme='magic'] #app,
+[data-theme='magic'] .shell,
+[data-theme='magic'] .main,
+[data-theme='magic'] .article-pane {
+  background: transparent !important;
+}
+
+[data-theme='magic'] body {
+  background:
+    /* === SPARKLES (top layer, painted on top of clouds/sun) === */
+    radial-gradient(2.4px 2.4px at 6% 9%,   #ffffff 60%, transparent 62%),
+    radial-gradient(1.8px 1.8px at 13% 22%, #ffd7ec 60%, transparent 62%),
+    radial-gradient(2.0px 2.0px at 21% 6%,  #fff3a8 60%, transparent 62%),
+    radial-gradient(1.6px 1.6px at 28% 17%, #ffffff 60%, transparent 62%),
+    radial-gradient(2.2px 2.2px at 35% 32%, #d8b9ff 60%, transparent 62%),
+    radial-gradient(1.8px 1.8px at 47% 8%,  #ffffff 60%, transparent 62%),
+    radial-gradient(2.0px 2.0px at 55% 24%, #b3eccf 60%, transparent 62%),
+    radial-gradient(2.4px 2.4px at 63% 12%, #ffffff 60%, transparent 62%),
+    radial-gradient(1.6px 1.6px at 71% 30%, #ffd7ec 60%, transparent 62%),
+    radial-gradient(1.8px 1.8px at 79% 17%, #fff3a8 60%, transparent 62%),
+    radial-gradient(2.0px 2.0px at 86% 28%, #ffffff 60%, transparent 62%),
+    radial-gradient(1.6px 1.6px at 94% 14%, #d8b9ff 60%, transparent 62%),
+    radial-gradient(1.8px 1.8px at 4% 44%,  #ffffff 60%, transparent 62%),
+    radial-gradient(2.2px 2.2px at 12% 56%, #ffd7ec 60%, transparent 62%),
+    radial-gradient(1.6px 1.6px at 24% 72%, #fff3a8 60%, transparent 62%),
+    radial-gradient(2.0px 2.0px at 33% 60%, #b3eccf 60%, transparent 62%),
+    radial-gradient(1.8px 1.8px at 41% 78%, #ffffff 60%, transparent 62%),
+    radial-gradient(2.2px 2.2px at 50% 50%, #d8b9ff 60%, transparent 62%),
+    radial-gradient(1.6px 1.6px at 58% 68%, #ffd7ec 60%, transparent 62%),
+    radial-gradient(2.0px 2.0px at 66% 82%, #ffffff 60%, transparent 62%),
+    radial-gradient(1.8px 1.8px at 74% 60%, #fff3a8 60%, transparent 62%),
+    radial-gradient(2.4px 2.4px at 82% 75%, #b3eccf 60%, transparent 62%),
+    radial-gradient(1.6px 1.6px at 90% 52%, #ffffff 60%, transparent 62%),
+    radial-gradient(2.0px 2.0px at 96% 86%, #d8b9ff 60%, transparent 62%),
+    radial-gradient(1.6px 1.6px at 16% 90%, #ffffff 60%, transparent 62%),
+    radial-gradient(2.0px 2.0px at 38% 95%, #ffd7ec 60%, transparent 62%),
+    radial-gradient(1.8px 1.8px at 60% 92%, #fff3a8 60%, transparent 62%),
+
+    /* === CASTLE SILHOUETTE (distant, low-opacity, on the horizon) === */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200' preserveAspectRatio='xMidYEnd meet'><g fill='%23b878d4' opacity='0.18'><polygon points='80,200 80,140 92,140 92,128 104,128 104,140 116,140 116,128 128,128 128,140 140,140 140,200'/><polygon points='86,128 92,114 98,128'/><polygon points='110,128 116,112 122,128'/><polygon points='134,128 140,114 146,128'/><polygon points='820,200 820,118 844,118 850,98 856,118 880,118 880,108 900,108 900,128 920,128 920,200'/><polygon points='838,98 850,80 862,98'/><polygon points='894,108 900,90 906,108'/><polygon points='420,200 420,160 432,160 432,150 444,150 444,160 456,160 456,200'/><polygon points='426,150 432,138 438,150'/><polygon points='450,150 456,138 462,150'/><polygon points='1040,200 1040,150 1056,150 1060,138 1064,150 1080,150 1080,200'/><polygon points='1054,138 1060,124 1066,138'/></g></svg>"),
+
+    /* === FLUFFY CLOUDS === */
+    radial-gradient(70px 30px at 14% 16%, rgba(255,255,255,0.85), transparent 70%),
+    radial-gradient(85px 32px at 18% 13%, rgba(255,255,255,0.82), transparent 70%),
+    radial-gradient(60px 24px at 78% 22%, rgba(255,255,255,0.78), transparent 70%),
+    radial-gradient(90px 32px at 64% 9%,  rgba(255,255,255,0.80), transparent 70%),
+    radial-gradient(55px 22px at 30% 78%, rgba(255,255,255,0.55), transparent 70%),
+    radial-gradient(80px 28px at 88% 70%, rgba(255,255,255,0.55), transparent 70%),
+    radial-gradient(70px 26px at 50% 38%, rgba(255,255,255,0.55), transparent 70%),
+
+    /* === SUN BLOOM upper-right === */
+    radial-gradient(620px 440px at 92% -8%, rgba(255, 222, 110, 0.55), rgba(255, 222, 110, 0) 65%),
+    /* === peach blush === */
+    radial-gradient(700px 520px at 88% 18%, rgba(255, 184, 156, 0.32), rgba(255, 184, 156, 0) 70%),
+    /* === lavender bloom upper-left === */
+    radial-gradient(560px 480px at 8% 6%, rgba(192, 156, 232, 0.32), rgba(192, 156, 232, 0) 70%),
+    /* === mint glow lower-left === */
+    radial-gradient(640px 540px at -4% 80%, rgba(170, 232, 198, 0.35), rgba(170, 232, 198, 0) 70%),
+    /* === pink hill on the bottom horizon === */
+    radial-gradient(1400px 380px at 50% 130%, rgba(255, 180, 215, 0.55), rgba(255, 180, 215, 0) 70%),
+    /* === cream sky base === */
+    linear-gradient(180deg, #fff8e8 0%, #fff2f6 45%, #ffe7f0 100%);
+
+  background-attachment: fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed, fixed;
+  background-repeat:
+    no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+    no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+    no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+    repeat-x,
+    no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+    no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-position-y: auto;
+  /* castle anchored at bottom */
+  background-size:
+    auto, auto, auto, auto, auto, auto, auto, auto, auto, auto,
+    auto, auto, auto, auto, auto, auto, auto, auto, auto, auto,
+    auto, auto, auto, auto, auto, auto, auto,
+    1200px 200px,
+    auto, auto, auto, auto, auto, auto, auto,
+    auto, auto, auto, auto, auto;
+}
+
+/* topbar - frosted candy-floss */
+[data-theme='magic'] .topbar {
+  background: linear-gradient(90deg, rgba(255, 245, 249, 0.78), rgba(255, 232, 244, 0.78));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 22%, var(--rule));
+  box-shadow: 0 1px 0 rgba(236, 79, 150, 0.10), 0 6px 18px rgba(192, 156, 232, 0.10);
+}
+
+/* brand mark - pastel rainbow gem with a soft halo */
+[data-theme='magic'] .brand .mark {
+  color: transparent;
+  background: linear-gradient(135deg, #ff8fb8 0%, #ffc857 25%, #6dd9b3 50%, #6cc7e8 75%, #b878d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(236, 79, 150, 0.45)) drop-shadow(0 0 14px rgba(255, 200, 87, 0.25));
+  font-size: 1.35em;
+  transition: transform 300ms ease;
+}
+[data-theme='magic'] .brand:hover .mark {
+  transform: rotate(72deg) scale(1.08);
+}
+
+[data-theme='magic'] .brand .title {
+  background: linear-gradient(90deg, #c43c80 0%, #b878d4 60%, #6cc7e8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-style: italic;
+  font-weight: 600;
+}
+
+[data-theme='magic'] .nav a.router-link-active {
+  border-bottom-color: var(--accent);
+  color: var(--heading);
+}
+
+/* pastel-rainbow gradient on display headings */
+[data-theme='magic'] .article-view h1,
+[data-theme='magic'] .article-view h2,
+[data-theme='magic'] .article-view h3,
+[data-theme='magic'] .prose h1,
+[data-theme='magic'] .prose h2 {
+  background: linear-gradient(95deg, #ec4f96 0%, #ffc857 30%, #6dd9b3 55%, #6cc7e8 78%, #b878d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 600;
+}
+
+[data-theme='magic'] .essay p:first-child::first-letter {
+  background: linear-gradient(135deg, #ec4f96 0%, #ffc857 50%, #b878d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-style: italic;
+  font-size: 3.2em;
+  line-height: 0.85;
+  margin-right: 0.06em;
+  filter: drop-shadow(0 2px 4px rgba(236, 79, 150, 0.20));
+}
+
+/* rounded pastel cards with shimmer border */
+[data-theme='magic'] .card {
+  background: linear-gradient(170deg, rgba(255, 233, 244, 0.6) 0%, rgba(255, 250, 233, 0.4) 50%, rgba(228, 240, 255, 0.5) 100%), var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--rule));
+  border-radius: 18px;
+  border-top: 3px solid var(--card-accent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 8px 24px rgba(192, 156, 232, 0.12);
+}
+[data-theme='magic'] .card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 12px 32px rgba(236, 79, 150, 0.20);
+  transform: translateY(-2px);
+}
+
+/* pill-shaped buttons with soft pastel gradient */
+[data-theme='magic'] button,
+[data-theme='magic'] .toolbar button,
+[data-theme='magic'] .editor footer button,
+[data-theme='magic'] .dialog button {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--rule));
+  padding-left: 1.1rem;
+  padding-right: 1.1rem;
+  background: rgba(255, 255, 255, 0.7);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+[data-theme='magic'] button:hover {
+  box-shadow: 0 0 0 3px rgba(236, 79, 150, 0.10);
+  transform: translateY(-1px);
+}
+[data-theme='magic'] button.primary,
+[data-theme='magic'] .toolbar button.primary,
+[data-theme='magic'] .editor footer button.primary,
+[data-theme='magic'] .dialog button.primary {
+  background: linear-gradient(120deg, #ff8fb8 0%, #ec4f96 50%, #b878d4 100%);
+  border: 0;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(236, 79, 150, 0.35);
+}
+[data-theme='magic'] button.primary:hover {
+  box-shadow: 0 6px 18px rgba(236, 79, 150, 0.50);
+}
+
+[data-theme='magic'] .cat-chip {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--rule));
+  border-radius: 999px;
+}
+[data-theme='magic'] .cat-chip.active {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* pastel highlighter on flag marks - per-category colour as ink.
+ * !important to win over the component's scoped :deep rule (equal specificity, scoped loads later). */
+[data-theme='magic'] .article-view mark.slop-flag {
+  border-bottom: none !important;
+  background: linear-gradient(transparent 50%, color-mix(in srgb, var(--flag-color, var(--accent)) 50%, transparent) 50%, color-mix(in srgb, var(--flag-color, var(--accent)) 50%, transparent) 95%, transparent 95%) !important;
+  border-radius: 3px;
+  padding: 0 0.08em;
+}
+[data-theme='magic'] .article-view mark.slop-flag:hover,
+[data-theme='magic'] .article-view mark.slop-flag.is-selected {
+  background: linear-gradient(transparent 25%, color-mix(in srgb, var(--flag-color, var(--accent)) 70%, transparent) 25%, color-mix(in srgb, var(--flag-color, var(--accent)) 70%, transparent) 100%) !important;
+}
+
+[data-theme='magic'] .flags-panel li {
+  border-radius: 12px;
+  border-color: color-mix(in srgb, var(--accent) 14%, var(--rule));
+  background: rgba(255, 255, 255, 0.85);
+}
+[data-theme='magic'] .flags-panel li.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 6px 18px rgba(236, 79, 150, 0.18);
+}
+
+/* article body & main panels - frosted, see-through to the sky */
+[data-theme='magic'] .flags-panel {
+  background: linear-gradient(180deg, rgba(254, 240, 247, 0.72) 0%, rgba(255, 248, 232, 0.72) 100%);
+  border-left: 1px solid color-mix(in srgb, var(--accent) 18%, var(--rule));
+  backdrop-filter: blur(4px);
+}
+
+[data-theme='magic'] .editor textarea {
+  background: #fff8ea;
+  color: var(--text);
+}
+
+[data-theme='magic'] *::-webkit-scrollbar { width: 12px; height: 12px; }
+[data-theme='magic'] *::-webkit-scrollbar-track { background: rgba(255, 232, 244, 0.4); }
+[data-theme='magic'] *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #ff8fb8, #b878d4);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+[data-theme='magic'] .lede {
+  border-left-color: var(--accent);
+}
+
+[data-theme='magic'] ::selection {
+  background: rgba(236, 79, 150, 0.28);
+  color: var(--heading);
+}

@@ -1,0 +1,25 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: inherit; }
+
+button { font-family: var(--font-ui); }
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Smooth theme transitions on the root surface tokens, not on inputs */
+.shell, .article-view, .flags-panel {
+  transition: background-color 250ms ease, color 250ms ease;
+}

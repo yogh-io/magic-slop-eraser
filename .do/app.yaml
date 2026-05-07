@@ -1,5 +1,8 @@
 name: slopmop
 region: ams
+domains:
+  - domain: slop.rip
+    type: PRIMARY
 services:
   - name: web
     dockerfile_path: Dockerfile

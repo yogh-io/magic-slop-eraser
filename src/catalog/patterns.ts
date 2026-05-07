@@ -234,7 +234,7 @@ The trick of the form is that it gestures at meaning without committing any. The
     rung: 2,
     blurb:
       'Load-bearing claims that turn on what no one is doing, has done, can do, or will say. PRIMARY TARGET.',
-    essay: `The kicker no agent catches, no editor quite flags, and no detector ever knows how to name - a load-bearing claim that turns on what nobody is doing. "The deal no mediator can broker." "The framework no administration has built." "A war whose aims have never been declared."
+    essay: `The kicker no agent catches, no editor quite flags, and no detector ever knows how to name - the move depends on a population the line itself has refused to enumerate. "The deal no mediator can broker." "The framework no administration has built." "The plan whose authors have never put their names to it."
 
 It feels devastating because it sounds like the writer has gone past the available evidence to a conclusion so universal that no mere person could carry it. In fact the writer has named no mediators, listed no administrations, declined to specify any aims. The line is loadbearing on a population the line itself has refused to enumerate. Works as mood. Collapses if you ask, gently, "which mediators?" The reader who knows the trick reads the line the way a mechanic listens to a misfire.`,
     whyItsSlop:
@@ -250,15 +250,15 @@ It feels devastating because it sounds like the writer has gone past the availab
     examples: [
       {
         sloppy: 'It is the deal no mediator can broker.',
-        better: 'The deal has to close inside Iran, not across a table.',
+        better: 'The deal has to close inside the company, not across a table.',
       },
       {
         sloppy: 'No investigation announced, no one relieved, no review board convened.',
-        better: 'The Pentagon has absorbed the losses and moved on.',
+        better: 'The agency has absorbed the losses and moved on.',
       },
       {
         sloppy: 'A campaign whose aims have never been written down.',
-        better: 'The aims were set in Jerusalem in February and have not been revised since.',
+        better: 'The aims were set at the leadership offsite in February and have not been revised since.',
       },
       {
         sloppy: 'There is no central authority distinct from the network it claims to manage.',
@@ -266,7 +266,7 @@ It feels devastating because it sounds like the writer has gone past the availab
       },
     ],
     skipRule:
-      'Enumerated-against-template absences are legitimate ("Eagle Claw produced the Holloway Commission. This operation: no investigation, no one relieved, no review board") - the rhetorical weight comes from the gap against a known expected sequence, and each clause is independently testable. Specific factual absences about named instruments ("no snap-back mechanism in the current agreement") are also legitimate.',
+      'Enumerated-against-template absences are legitimate ("The 2008 collapse produced the Dodd-Frank reforms. This crisis: no commission, no resignations, no new rules") - the rhetorical weight comes from the gap against a known expected sequence, and each clause is independently testable. Specific factual absences about named instruments ("no claw-back clause in the current contract") are also legitimate.',
   },
   {
     id: 'allusive-construct',
@@ -278,7 +278,7 @@ It feels devastating because it sounds like the writer has gone past the availab
     rung: 2,
     blurb:
       'The shape is "[unspecific] [relates to] [unspecific]." Both ends abstract or back-referring; the verb does the work. PRIMARY TARGET.',
-    essay: `The shape that means something only because the sentence before it did - both ends abstract, the verb in the middle doing all the work. "The cheque is written on the appearance of dominance the underlying reality no longer supports."
+    essay: `The line that means itself only by means of the line before it - reading it cold, it dissolves into the prose it was leaning on for warmth. "The cheque is written on the appearance of dominance the underlying reality no longer supports."
 
 Read it twice and you cannot tell who wrote it. It does not mean nothing - but it means whatever the previous paragraph just meant, in slightly different drag. A reader still holding the prior paragraph in working memory feels the warmth and reads the sentence as deep. Pull it out and read it cold and it reads like a fortune cookie that lost its ticker. The cleverness is borrowed, then collected as if earned.`,
     whyItsSlop:
@@ -296,11 +296,11 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
       },
       {
         sloppy: 'The bill arrives at the position the spending itself is hollowing out.',
-        better: 'Two carrier groups in the Pacific cost more than the deterrent they buy.',
+        better: 'The marketing budget eats more than the brand recognition it produces.',
       },
       {
         sloppy: 'The substrate gives out, and the appearance follows it.',
-        better: 'Dollar invoicing is dropping in the Gulf, and the dollar follows.',
+        better: 'Active users are dropping in core markets, and revenue follows.',
       },
       {
         sloppy: 'The arrangement does not collapse, and each cycle produces a fresh round of commitments.',
@@ -321,7 +321,7 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
     rung: 1,
     blurb:
       '"Not X - it\'s Y." The Y half mirrors the X half across a hinge - hence the name. The most reflexive structural shape in LLM output.',
-    essay: `It is not just a tic - it is a mechanically-produced stake-raise, because the form of the line ("Not X - it's Y") is what makes it feel like an argument before any argument has been built. The first half sets up something the second half will exceed - even when the first half is a strawman the model invented for the purpose of being exceeded.
+    essay: `What looks like an argument is actually a stunt - the model mechanically pairing a setup with a stake-raise to manufacture the rhythm of a position before any position has been built. The first half sets up something the second half will exceed, even when the first half is a strawman the model invented for the purpose of being exceeded.
 
 The result reads like an argument because the rhythm of the line resembles the rhythm of an argument. It is not an argument. The shape is good enough to fool the model into producing it and good enough to fool a tired reader into clapping. The writer's tell, when caught at this, is the look of someone who realises the audience laughed at their joke for the wrong reason.`,
     whyItsSlop:
@@ -349,7 +349,7 @@ The result reads like an argument because the rhythm of the line resembles the r
       },
     ],
     skipRule:
-      'Legitimate when the X position is a real, named position the piece is rebutting and the antithesis lands the rebuttal. "The Pentagon called this a tactical setback. It was a strategic defeat." That is contrast doing argumentative work.',
+      'Legitimate when the X position is a real, named position the piece is rebutting and the antithesis lands the rebuttal. "Management called this a quarterly miss. It was a strategic defeat." That is contrast doing argumentative work.',
   },
   {
     id: 'staccato',
@@ -418,8 +418,8 @@ Strip the line breaks and the content collapses into a single sentence about som
     mechanical: false,
     rung: 3,
     blurb:
-      'Same evaluative template applied to multiple subjects in sequence (US: ... / Iran: ... / Israel: ...).',
-    essay: `"The US faces a dilemma. China faces a dilemma. Russia faces a dilemma." Per-actor analysis by template-fill. Each entry feels uniform because each entry was generated by the same prompt to itself.
+      'Same evaluative template applied to multiple subjects in sequence (Engineering: ... / Sales: ... / Marketing: ...).',
+    essay: `Lexical patterns fit a template. Structural patterns fit a template. Argumentative patterns fit a template. The form is per-actor analysis by template-fill: each entry feels uniform because each entry was generated by the same prompt to itself.
 
 The form announces "I have considered every relevant party" while delivering the impression that all parties are doing the same thing - feeling the same kind of pressure, weighing the same kind of cost. Real geopolitics is uneven. Some actors are about to be irrelevant. Some are about to be invaded. Some are quietly winning. The slop version flattens all of that in service of a lens that fits no one in particular and looks comprehensive in the way a row of identical filing cabinets looks comprehensive.`,
     whyItsSlop:
@@ -428,12 +428,12 @@ The form announces "I have considered every relevant party" while delivering the
     examples: [
       {
         sloppy:
-          'For the US, the calculus is restraint. For Iran, the calculus is escalation. For Israel, the calculus is survival.',
+          'For Engineering, the priority is reliability. For Sales, the priority is volume. For Marketing, the priority is reach.',
         better:
-          'The US is stalling for domestic reasons. Iran has nothing to lose by escalating. Israel is no longer running a calculus; it is running a campaign.',
+          'Engineering is buried in tech debt and cannot ship. Sales has hit quota and is coasting. Marketing is reorganising for the third time this year.',
       },
       {
-        sloppy: 'Washington faces a dilemma. Beijing faces a dilemma. Moscow faces a dilemma.',
+        sloppy: 'The CFO faces a dilemma. The COO faces a dilemma. The CTO faces a dilemma.',
         better: '',
       },
     ],
@@ -448,7 +448,7 @@ The form announces "I have considered every relevant party" while delivering the
     rung: 2,
     blurb:
       '"While X has its merits, it also has drawbacks." Symmetrically balanced because the model is averaging perspectives.',
-    essay: `"While X has its merits, it also has drawbacks." A shrug delivered by a lawyer. Both sides get a clause; neither gets a verdict.
+    essay: `On one hand the form looks balanced; on the other hand, balance was never the point - both sides collect a clause, neither collects a verdict, and the writer leaves with the appearance of fairness without paying the cost of judgement. A shrug delivered by a lawyer.
 
 The model is, by training, allergic to commitment - any side it picks could be the side the user wanted to lose, and the cheapest way to avoid that is to pick neither. The writer who imitates this voice is doing it for safety too, but the safety is less visible to them: it looks, from the inside, like fairness. From outside, the form announces "I will not be the one who decides." The reader has come for someone who will.`,
     whyItsSlop:
@@ -479,7 +479,7 @@ The model is, by training, allergic to commitment - any side it picks could be t
     rung: 2,
     blurb:
       'Statements emphatic in tone but vague in claim. Sounds like an argument; commits to nothing.',
-    essay: `What a sentence sounds like when it wants to be both right and unaccountable. "This represents a significant development that could reshape how we think about the field."
+    essay: `This pattern marks a meaningful shift in how readers might engage with the prose model output - which is to say, it sounds like a position while delivering nothing the next paragraph could actually contradict. Read it twice.
 
 Read it twice. There is no claim. There is the shape of a claim, the register of a claim, the gravitas of one. The writer has delivered nothing falsifiable while having delivered something that scans as analysis. The model produces these on autopilot because the gradient rewarded confident-feeling sentences and punished wrong sentences, and the cheapest way to be confident without risking wrongness is to make sure there is nothing inside the confidence to be wrong about.`,
     whyItsSlop:
@@ -514,7 +514,7 @@ Read it twice. There is no claim. There is the shape of a claim, the register of
     rung: 1,
     blurb:
       'Authority claims without sources. The model cannot cite and will not admit it.',
-    essay: `"Studies have shown." Which studies? "Experts agree." Which experts? "Research indicates." Whose research?
+    essay: `Studies have shown that experts widely agree this pattern manufactures authority by sound, betting that the reader will not ask which studies or which experts. "Research indicates." Whose research?
 
 The form invokes authority the writer cannot actually produce, betting that the reader will not ask. The model is especially prone because the model knows it cannot cite - it does not have working URLs to gesture at - and the closest move available is to imply citation by sound. A sentence beginning "studies have shown" is, statistically, a sentence that has never been followed by a study. If a study had been there, the study would be in the line.`,
     whyItsSlop:
@@ -545,7 +545,7 @@ The form invokes authority the writer cannot actually produce, betting that the 
     rung: 2,
     blurb:
       'Any spicy claim immediately followed by "However, it\'s important to consider..." that defangs it.',
-    essay: `The model has been trained that any spicy claim should be followed by "however, it is important to consider..." and so the cushioning that defangs them gets added religiously.
+    essay: `This pattern is a reflexive form of slop - though, of course, it is important to consider that the model has been trained to cushion every take with exactly this kind of clause, added religiously after anything that risked sounding like a position.
 
 The cushion is not balance - it is the absence of nerve. Real qualification sharpens; it tells you which version of the claim survives and what would falsify the rest. Slop qualification softens, indiscriminately, until the original claim has been embalmed and laid out for visitation. By the time the next paragraph begins, the writer has said two things that mostly cancel and gestured at having considered both.`,
     whyItsSlop:
@@ -573,7 +573,7 @@ The cushion is not balance - it is the absence of nerve. Real qualification shar
     mechanical: false,
     rung: 2,
     blurb: 'Spending a paragraph re-articulating what was asked.',
-    essay: `"That is a great question. The question of whether X is one that..." The model buying time. The chatbot equivalent of a politician saying "I am glad you asked."
+    essay: `The question of whether this pattern matters is itself a complex one, requiring us to first define what we even mean by the question - which is the move: the model buying time by reflecting the question back instead of answering it. The chatbot equivalent of a politician saying "I am glad you asked."
 
 Real conversation answers; this performs the receipt of the question first, as if the question itself needed a small monument before being processed. In prose it survives as paragraph-long restatements of the thesis at the start of a section that was supposed to argue for it. The reader did not need their question reflected back. They needed an answer.`,
     whyItsSlop:
@@ -601,7 +601,7 @@ Real conversation answers; this performs the receipt of the question first, as i
     rung: 2,
     blurb:
       'Closing sentence that synthesises nothing. "Ultimately the relationship is complex and reflects broader dynamics."',
-    essay: `"Ultimately, the relationship between X and Y is complex and reflects broader dynamics in the field." Appears in every LLM essay. Contains zero information. The model's default exit when it has nothing to add - the prose equivalent of a smooth jazz outro that signals the end of the segment without saying what the segment was about.
+    essay: `In the end, what this pattern means for prose is, in many ways, the question itself - which is the form: a closing line that gestures at synthesis while delivering none, the model's default exit when it has nothing to add. The prose equivalent of a smooth jazz outro that signals the end of the segment without saying what the segment was about.
 
 Cut the line and the piece loses nothing because the line carried nothing. The model produces them not because it has reached a synthesis but because it has been trained that essays end this way, and so its essays end this way - like rivers that go through the formality of reaching the sea even when they are run dry.`,
     whyItsSlop:
@@ -631,7 +631,7 @@ Cut the line and the piece loses nothing because the line carried nothing. The m
     rung: 3,
     blurb:
       'Two sides presented as equally weighted because "both perspectives have merit" is a safer output than commitment.',
-    essay: `Distinct from bidirectional summary because the issue is voice rather than structure. Performative balance is the both-sides register applied to a piece that did not structurally promise to give two sides equal weight - the writer simply talks like someone who would, no matter what they are talking about.
+    essay: `There are good-faith arguments on both sides of this pattern, and reasonable writers may disagree - which is the diplomatic non-answer dressed as judiciousness, the both-sides register applied to a piece that never structurally promised to give two sides equal weight. The writer simply talks like someone who would, no matter what they are talking about.
 
 The result is the diplomatic non-answer dressed as judiciousness. The model defaults to it because every commitment is a risk and every risk has been punished by some training signal somewhere. The writer who imitates this voice has confused fair-mindedness with non-commitment. They are different things. One is a virtue. The other is the absence of one.`,
     whyItsSlop:
@@ -658,7 +658,7 @@ The result is the diplomatic non-answer dressed as judiciousness. The model defa
     rung: 2,
     blurb:
       '"While I\'m not an expert..." followed by confident expert-style analysis.',
-    essay: `"While I am not an expert..." followed by paragraph-long expert analysis. "There are many ways to think about this..." followed by exactly one.
+    essay: `Now, I am not a stylist by training, but it does seem clear that this preamble is humility theatre - a small badge worn on the lapel of a sentence that was always going to deliver a confident analysis the moment the badge was finished being adjusted. "There are many ways to think about this..." followed by exactly one.
 
 The form is the writer wearing a small badge that says HUMBLE before delivering a confident claim, in case the claim turns out badly and someone needs to point at the badge. The model loves this because deference is rewarded and confidence is punished separately, and the cheapest way to satisfy both gradients is to deliver the confidence and the deference together, in that order, with the deference up front for plausible deniability.`,
     whyItsSlop:
@@ -666,8 +666,8 @@ The form is the writer wearing a small badge that says HUMBLE before delivering 
     fix: 'Drop the humility throat-clearer. If the piece is genuinely uncertain, the uncertainty should be in the substance, not in the preamble.',
     examples: [
       {
-        sloppy: "Now, I'm not a Middle East expert, but it seems clear that the alliance is fraying.",
-        better: 'The alliance is fraying.',
+        sloppy: "Now, I'm not an economist, but it seems clear that the policy is broken.",
+        better: 'The policy is broken.',
       },
       {
         sloppy: 'There are many ways to look at this question, and reasonable people will disagree, but I think the deal will fail.',
@@ -685,7 +685,7 @@ The form is the writer wearing a small badge that says HUMBLE before delivering 
     rung: 1,
     blurb:
       '"I hope this helps!" / "Let me know if you\'d like to explore further."',
-    essay: `"I hope this helps!" The chatbot's signature, surviving in prose as "if readers take one thing away..." or "the hope is that...".
+    essay: `Hopefully this entry has been useful - and if readers take one thing from it, it should be that this is the chatbot's signature surviving in prose, the writer asking the reader to confirm the visit was alright on the way out the door.
 
 The piece either helps or it does not. Asking the reader to confirm that it helped is the writer asking permission to have written the piece, retroactively. In essays it shows up as a wistful little final line in which the writer expresses a wish about how the reader will receive what they have just read. The literary equivalent of waving at someone as they leave the room and asking, softly, whether the visit was alright.`,
     whyItsSlop:
@@ -718,7 +718,7 @@ The piece either helps or it does not. Asking the reader to confirm that it help
     rung: 2,
     blurb:
       'Two-point bullet lists for content that is genuinely a paragraph. Bolding the first three words of every bullet.',
-    essay: `The bullet list is the model's favourite shape because it converts paragraphs of thought into tidy little items the reader can scan past without doing the work of integrating.
+    essay: `First, sentences become items. Second, bolded leads do the rest of the lifting. Third, the reader skims past the prose this paragraph would otherwise have been - which is the move: the bullet list converting paragraphs of thought into tidy little items the reader can scan past without doing the work of integrating.
 
 Genuine list content - parallel items, scannable reference material - benefits from bullets. Most prose does not. Two-bullet "lists" are the worst offenders: a writer who needed to write a paragraph and decided, instead, to write a paragraph in two pieces with bullets in front of them. Bolding the first three words of each bullet is the same writer adding sequins. The reader's eye sliding down a bullet list is doing less work than reading prose - which means the writer did less work too, and the reader can feel it.`,
     whyItsSlop:
@@ -746,7 +746,7 @@ Genuine list content - parallel items, scannable reference material - benefits f
     rung: 3,
     blurb:
       '## Section for a two-paragraph block. ### Subsection for one paragraph.',
-    essay: `## Section. ### Subsection. #### Sub-subsection. The piece becomes an interface for navigating itself rather than a piece.
+    essay: `# Pattern overview. ## Why the model produces it. ### When it shows up. ### How to fix it. # Further reading. The piece becomes an interface for navigating itself - hierarchical scaffolding announcing a movement at every paragraph break, even when there is no movement, only paragraphs.
 
 Every header is the writer announcing a new movement. If the movement is two paragraphs long, the announcement is louder than the movement. The model defaults to header inflation because it has been rewarded for producing structured output - structure is the cheapest possible way to look organised - and so it returns hierarchical scaffolding even when the underlying content is one continuous thought. A real essay has occasional headers when the structure shifts. A slop essay is mostly headers.`,
     whyItsSlop:

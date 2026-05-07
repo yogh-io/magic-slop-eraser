@@ -2,10 +2,16 @@
 import { theme, setTheme } from '../state/theme'
 import type { ThemeId } from '../types'
 
-const options: { id: ThemeId; label: string }[] = [
-  { id: 'normal', label: 'normal' },
-  { id: 'magic', label: 'magic' },
-  { id: 'scholar', label: 'scholar' },
+interface Option {
+  id: ThemeId
+  label: string
+  glyph: string
+}
+
+const options: Option[] = [
+  { id: 'normal', label: 'normal', glyph: '◐' },     // ◐ light/dark balance
+  { id: 'magic', label: 'magic', glyph: '✦' },       // ✦ sparkle
+  { id: 'scholar', label: 'scholar', glyph: '❦' },   // ❦ fleuron
 ]
 </script>
 
@@ -16,9 +22,13 @@ const options: { id: ThemeId; label: string }[] = [
       :key="o.id"
       role="radio"
       :aria-checked="theme === o.id"
-      :class="{ active: theme === o.id }"
+      :aria-label="o.label"
+      :title="o.label"
+      :class="['theme-btn', `theme-${o.id}`, { active: theme === o.id }]"
       @click="setTheme(o.id)"
-    >{{ o.label }}</button>
+    >
+      <span class="glyph" aria-hidden="true">{{ o.glyph }}</span>
+    </button>
   </div>
 </template>
 
@@ -30,15 +40,23 @@ const options: { id: ThemeId; label: string }[] = [
   overflow: hidden;
   font-size: 0.78rem;
 }
-button {
+.theme-btn {
   background: transparent;
   border: 0;
   color: var(--muted);
   font: inherit;
-  padding: 0.3rem 0.75rem;
+  padding: 0.25rem 0.6rem;
   cursor: pointer;
-  text-transform: lowercase;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
 }
-button + button { border-left: 1px solid var(--rule); }
-button.active { background: var(--text); color: var(--bg); }
+.theme-btn + .theme-btn { border-left: 1px solid var(--rule); }
+.theme-btn:hover { color: var(--text); }
+.theme-btn.active { background: var(--text); color: var(--bg); }
+.theme-btn .glyph {
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-block;
+}
 </style>

@@ -39,7 +39,7 @@ export const router = createRouter({
       path: '/about',
       name: 'about',
       component: () => import('./pages/AboutPage.vue'),
-      meta: { title: 'About' },
+      meta: { title: 'Methodology' },
     },
     {
       path: '/d/:id',

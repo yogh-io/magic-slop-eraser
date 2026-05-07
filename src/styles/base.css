@@ -23,3 +23,39 @@ button { font-family: var(--font-ui); }
 .shell, .article-view, .flags-panel {
   transition: background-color 250ms ease, color 250ms ease;
 }
+
+/* During a theme switch, briefly transition every element's color-bearing
+ * properties so swatches, accents, borders, and gradients ease across instead
+ * of snapping. The class is added by state/theme.ts on swap and removed after
+ * the transition window so hover/focus animations stay responsive. */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 420ms ease,
+    background-image 420ms ease,
+    background 420ms ease,
+    color 420ms ease,
+    fill 420ms ease,
+    stroke 420ms ease,
+    border-color 420ms ease,
+    box-shadow 420ms ease,
+    text-decoration-color 420ms ease,
+    outline-color 420ms ease,
+    filter 420ms ease,
+    backdrop-filter 420ms ease,
+    opacity 420ms ease !important;
+}
+html.theme-transitioning body {
+  transition: background 420ms ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after,
+  html.theme-transitioning body {
+    transition: none !important;
+  }
+}

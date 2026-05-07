@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useDocStore } from '../state/doc'
 import ArticleView from '../components/ArticleView.vue'
 import FlagsPanel from '../components/FlagsPanel.vue'
@@ -16,8 +16,6 @@ const editBuffer = ref('')
 
 const selection = ref<{ start: number; end: number; text: string } | null>(null)
 const dialogOpen = ref(false)
-
-const score = computed(() => store.score)
 
 function openEditor(): void {
   editBuffer.value = store.source
@@ -88,11 +86,6 @@ In conclusion, the situation reflects broader dynamics at play. I hope this help
         <div class="toolbar">
           <button @click="openEditor">{{ store.source.trim() ? 'Edit source' : 'Paste markdown' }}</button>
           <button @click="loadSample">Load sample</button>
-          <div class="score" v-if="store.allFlags.length > 0">
-            <strong>{{ score.value.toFixed(1) }}</strong>
-            <span class="muted"> / 10 ·</span>
-            <span class="rationale">{{ score.rationale }}</span>
-          </div>
           <div class="spacer" />
           <button v-if="selection && selection.start >= 0" class="primary" @click="flagSelection">
             Flag selection
@@ -101,7 +94,12 @@ In conclusion, the situation reflects broader dynamics at play. I hope this help
         </div>
 
         <div v-if="!store.source.trim()" class="placeholder">
-          <p>Paste a markdown article in the editor to see slop density mapped onto the rendered prose.</p>
+          <p>
+            A scratchpad for the Rung 1 detector. Paste a markdown article and the mechanical
+            patterns light up against the rendered prose, one underline per match. The full agent
+            loop - flags walked one at a time, suggestions, resolution history - lives at the
+            document URLs and is wired up as the API stabilises.
+          </p>
           <button class="primary" @click="loadSample">Load a sample slop article</button>
         </div>
 
@@ -179,9 +177,6 @@ In conclusion, the situation reflects broader dynamics at play. I hope this help
   cursor: pointer;
 }
 .toolbar button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-.toolbar .score { display: flex; align-items: baseline; gap: 0.4rem; flex: 1; min-width: 0; }
-.toolbar .score strong { font-size: 1.05rem; font-family: var(--font-display); color: var(--text); }
-.toolbar .rationale { color: var(--muted); font-size: 0.86em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toolbar .spacer { flex: 1; }
 .muted { color: var(--muted); }
 

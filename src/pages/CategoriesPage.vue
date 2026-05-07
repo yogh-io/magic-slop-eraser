@@ -190,14 +190,18 @@ function categoryName(id: CategoryId): string {
     <header class="hd">
       <h1>The slop catalogue</h1>
       <p class="lede">
-        Twenty-four named patterns across five categories. Each pane is a single move the model
-        reaches for reflexively - not a generic writing complaint, but something distinctly produced
-        by current LLM training. Click for the full treatment.
+        Named patterns across five categories. Each pane is a single move the model reaches for
+        reflexively - not a generic writing complaint, but something distinctly produced by current
+        LLM training. Click for the full treatment.
       </p>
-      <p class="meta-tic">
-        <strong>The meta-tic is evenness.</strong> Real writing has lumps; models sand them off.
-        If a piece reads like every paragraph was equally edited, it was probably equally generated.
-        These twenty-four are the ridges the sander leaves behind.
+      <p class="lede">
+        The meta-tic is evenness. Real writing has lumps; models sand them off. If a piece reads
+        like every paragraph was equally edited, it was probably equally generated. These are the
+        ridges the sander leaves behind.
+      </p>
+      <p class="starting-set">
+        This is a starting set. The catalogue will be refined as we go - patterns added, sharpened,
+        retired - and as the framework matures you will be able to plug in your own.
       </p>
     </header>
 
@@ -350,15 +354,13 @@ h1 {
   color: var(--text);
   margin: 0 0 1rem;
 }
-.meta-tic {
-  border-left: 3px solid var(--accent);
-  padding: 0.4rem 0 0.4rem 1rem;
-  margin: 1rem 0 0;
+.starting-set {
+  margin: 1.2rem 0 0;
+  font-size: 0.88rem;
   color: var(--muted);
-  font-size: 0.96em;
   line-height: 1.55;
+  font-style: italic;
 }
-.meta-tic strong { color: var(--text); }
 
 .filter-bar {
   display: grid;

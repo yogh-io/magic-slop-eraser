@@ -7,7 +7,7 @@ export const patterns: PatternMeta[] = [
     category: 'lexical',
     name: 'Tier 1 lexicon',
     shortName: 'Tier 1',
-    severity: 'primary',
+    severity: 'high',
     scope: 'word',
     mechanical: true,
     rung: 1,
@@ -136,15 +136,15 @@ A kicker is the moment a piece's argument lands and the line lands with it. The 
     ],
   },
   {
-    id: 'hedge-cluster',
+    id: 'suffocation',
     category: 'lexical',
-    name: 'Hedge clusters',
-    severity: 'medium',
+    name: 'Suffocation',
+    severity: 'primary',
     scope: 'sentence',
     mechanical: true,
     rung: 1,
     blurb:
-      'Three or more hedges (generally, typically, often, somewhat, perhaps, possibly...) in a single sentence.',
+      'Three or more hedges (generally, typically, often, somewhat, perhaps, possibly...) stacked into a single sentence until the claim cannot breathe.',
     essay: `Generally, this tends to be somewhat more common in cases that, perhaps, arguably resemble the writer averaging across every possible claim until the shape of a claim emerges with none of its weight. One hedge is honesty about the limits. Three hedges in one sentence is a writer producing the conviction of a weather forecast read by a dying man.
 
 The model does this because the gradient that produced it punishes wrongness more than it punishes mush. Mush is safe. Mush plus more mush is even safer. By the third hedge the writer has reached the position from which no possible reader could disagree, because no possible reader could tell what they had said. The position is calm. It is also empty.`,
@@ -233,7 +233,7 @@ The trick of the form is that it gestures at meaning without committing any. The
     mechanical: false,
     rung: 2,
     blurb:
-      'Load-bearing claims that turn on what no one is doing, has done, can do, or will say. PRIMARY TARGET.',
+      'Load-bearing claims that turn on what no one is doing, has done, can do, or will say.',
     essay: `The kicker no agent catches, no editor quite flags, and no detector ever knows how to name - the move depends on a population the line itself has refused to enumerate. "The deal no mediator can broker." "The framework no administration has built." "The plan whose authors have never put their names to it."
 
 It feels devastating because it sounds like the writer has gone past the available evidence to a conclusion so universal that no mere person could carry it. In fact the writer has named no mediators, listed no administrations, declined to specify any aims. The line is loadbearing on a population the line itself has refused to enumerate. Works as mood. Collapses if you ask, gently, "which mediators?" The reader who knows the trick reads the line the way a mechanic listens to a misfire.`,
@@ -277,7 +277,7 @@ It feels devastating because it sounds like the writer has gone past the availab
     mechanical: false,
     rung: 2,
     blurb:
-      'The shape is "[unspecific] [relates to] [unspecific]." Both ends abstract or back-referring; the verb does the work. PRIMARY TARGET.',
+      'The shape is "[unspecific] [relates to] [unspecific]." Both ends abstract or back-referring; the verb does the work.',
     essay: `The line that means itself only by means of the line before it - reading it cold, it dissolves into the prose it was leaning on for warmth. "The cheque is written on the appearance of dominance the underlying reality no longer supports."
 
 Read it twice and you cannot tell who wrote it. It does not mean nothing - but it means whatever the previous paragraph just meant, in slightly different drag. A reader still holding the prior paragraph in working memory feels the warmth and reads the sentence as deep. Pull it out and read it cold and it reads like a fortune cookie that lost its ticker. The cleverness is borrowed, then collected as if earned.`,
@@ -756,6 +756,121 @@ Every header is the writer announcing a new movement. If the movement is two par
       {
         sloppy: 'A 600-word piece with eight ## sections, three of them a single paragraph long.',
         better: 'Two real headers, where the structure actually turns. Everything else as prose.',
+      },
+    ],
+  },
+
+  // ---- RUNG 3: ANALYTICAL FRAMEWORKS ----
+  {
+    id: 'lens-fits-everything',
+    category: 'argumentative',
+    name: 'Lens-fits-everything',
+    severity: 'high',
+    scope: 'piece',
+    mechanical: false,
+    rung: 3,
+    blurb:
+      'Pick a famous analytical lens (game theory, principal-agent, Overton window) and force the subject through it whether or not it fits.',
+    essay: `From a game-theoretic perspective, this pattern reaches for one canonical lens and then bends every observation to fit it. Game theory works on competition with defined payoffs. Principal-agent works on delegated authority with misaligned incentives. The Overton window works on what is sayable, not what is true. The slop move is to grab whichever lens sounds high-status for the topic and then narrate the topic from inside it - regardless of whether the topic actually has payoffs, principals, or a discourse layer worth modelling.
+
+The model loves named lenses for the same reason a freshman essay loves the word "essentially": they instantly produce structure without requiring the writer to find one. The reader gets a piece that reads like analysis but does the analysis on a different topic - the one the lens was built for. Real analytical frameworks earn their place when the subject's mechanics happen to fit their shape. They get borrowed when the writer needs the look of analysis without committing to the work of finding which lens the situation actually wants.`,
+    whyItsSlop:
+      'The lens is doing the analytical work the writer should have done. The conclusions end up being about competition / delegation / discourse, rather than about the subject.',
+    fix: 'Drop the lens. Describe what is actually happening. If a lens applies, derive its applicability from the substance, not the substance from the lens.',
+    examples: [
+      {
+        sloppy:
+          'Through the lens of game theory, the regulator faces a coordination problem: cooperate and lose autonomy, defect and lose legitimacy.',
+        better:
+          'The regulator has two staff lawyers and a deadline in three weeks. The framing of the problem is downstream of those facts.',
+      },
+      {
+        sloppy:
+          'The Overton window has shifted, making positions that were once unthinkable suddenly mainstream.',
+        better:
+          'Three named senators changed their public position last year - two of them after a primary challenger. That is the entire shift.',
+      },
+    ],
+  },
+  {
+    id: 'borrowed-framework',
+    category: 'structural',
+    name: 'Borrowed-framework filler',
+    shortName: 'Borrowed framework',
+    severity: 'medium',
+    scope: 'piece',
+    mechanical: false,
+    rung: 3,
+    blurb:
+      "Structuring the piece around someone else's named framework (2x2 matrix, three pillars, five forces, OODA loop) when the actual subject does not naturally take that shape.",
+    essay: `Three pillars support this analysis - which is the move: a borrowed scaffold (two-by-two matrix, four-stage funnel, five forces, three pillars, OODA loop) imported wholesale and used as the table of contents for a topic whose natural shape is something else. The framework is doing the structural work the writer never did, and the writer is hoping the reader will register the structural work as an argument.
+
+Borrowed frameworks are the IKEA furniture of essays. They assemble cleanly. They produce something that looks like an analysis the moment the last bullet is bolted on. They also make every piece look the same, because the framework is the piece - the actual subject is just what got slotted into quadrant two. The model defaults to them because borrowed structure is free and original structure is hard. The fix is to ask whether the subject wants the framework, or whether the framework just got there first.`,
+    whyItsSlop:
+      'The framework is the analysis. Swap in a different subject and the same scaffold still fits, which means the scaffold is not actually about this subject.',
+    fix: 'Throw out the borrowed structure. Find the shape the subject already has - usually a sequence, a single decision, a tension, or a reversal - and let the piece take that shape instead.',
+    examples: [
+      {
+        sloppy:
+          'There are four quadrants here: high cost / high impact, high cost / low impact, low cost / high impact, low cost / low impact.',
+        better: 'Two of the choices are cheap and obviously worth doing; one is expensive and worth doing anyway; the rest is noise.',
+      },
+      {
+        sloppy:
+          'Applying the OODA loop to the negotiation: observe the counterparty, orient on their interests, decide on a position, act.',
+        better: 'The counterparty needs the deal more than we do, and the deadline is theirs. That changes the order of every move.',
+      },
+    ],
+  },
+  {
+    id: 'reductive-reframe',
+    category: 'argumentative',
+    name: 'Reductive reframe',
+    severity: 'high',
+    scope: 'piece',
+    mechanical: false,
+    rung: 3,
+    blurb:
+      'A single declarative line ("what this is really about is X" / "fundamentally, this is a story of Y") that flattens a piece full of texture into one principle.',
+    essay: `What this pattern is fundamentally about is the urge to deliver a thesis-shaped sentence late in the piece - the kind that begins with "what this is really about" or "underneath it all, the question is" or "the deep story here is one of" - and then names a single principle large enough to absorb every detail in the preceding paragraphs into its gravity.
+
+The move converts texture into principle. Texture is what made the piece worth reading; principle is what is left when the texture has been crushed. The model produces these because they sound like insight - they have the cadence of a writer who has thought hard and arrived somewhere - and because they retroactively organise messy material the model could not actually organise on the way through. The reader who agrees with the principle did not need it. The reader who disagrees has just been told that all the texture in the piece was secretly about something they do not care about.`,
+    whyItsSlop:
+      'The reductive line is the model performing synthesis it did not do. The piece either earned the synthesis through the substance, in which case the line is redundant, or it did not, in which case the line is a lie.',
+    fix: 'Cut the line. If the piece needs a closer, write one that points at a specific consequence, not a general principle.',
+    examples: [
+      {
+        sloppy: 'Underneath the policy debate, what this is really about is who gets to define modernity.',
+        better: '',
+      },
+      {
+        sloppy: 'Fundamentally, the standoff is a story of trust eroded over decades.',
+        better: 'The 2014 talks failed for one specific reason; everything since has compounded that failure.',
+      },
+    ],
+  },
+  {
+    id: 'phantom-periodisation',
+    category: 'structural',
+    name: 'Phantom periodisation',
+    severity: 'medium',
+    scope: 'piece',
+    mechanical: false,
+    rung: 3,
+    blurb:
+      'Splitting a continuous topic into named eras / phases / waves to lend a sense of trajectory the substance does not earn.',
+    essay: `In the first wave, observers focused on capability. In the second wave, attention shifted to safety. In the third wave - which is the structure: a continuous topic chopped into discrete acts, given headers, and presented as if a clean inflection separated each from the next, when in fact the same arguments have been recycling on a rolling basis the whole time.
+
+Periodisation is a borrowed historian's move. Real historiography earns its periods by showing the discontinuity that justifies the break. The slop version produces the breaks for free, because dividing a thing into three labelled phases is the cheapest way to make a topic look like it has been thought about over time. The model loves it for the same reason it loves header inflation: imposed structure looks like analysis. The reader gets the impression that the topic has a story arc when really it has the same five questions answered five different times by different people.`,
+    whyItsSlop:
+      'The periods are imposed, not earned. Erase the labels and the substance does not change, which means the labels were doing decorative work, not analytical.',
+    fix: 'Either earn the period boundaries with a specific discontinuity at each one, or drop the periodisation and write the topic as it actually moved.',
+    examples: [
+      {
+        sloppy:
+          'The first generation of tools focused on detection. The second generation prioritised prevention. The third generation, currently emerging, emphasises orchestration.',
+        better:
+          'The earliest tools detected; the same vendors then bolted on prevention; orchestration is what the marketing pivoted to once detection and prevention stopped selling on their own.',
       },
     ],
   },

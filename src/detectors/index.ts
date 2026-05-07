@@ -161,11 +161,11 @@ const detectHedgeCluster: Detector = (ctx) => {
     const matches = [...text.matchAll(HEDGE_WORDS)]
     if (matches.length >= 3) {
       ctx.emit({
-        patternId: 'hedge-cluster',
+        patternId: 'suffocation',
         category: 'lexical',
         start: sent.start,
         end: sent.end,
-        rationale: `${matches.length} hedges in one sentence (${matches.map((m) => m[0]).join(', ')}). Sharpen or cut.`,
+        rationale: `${matches.length} hedges in one sentence (${matches.map((m) => m[0]).join(', ')}). The claim is suffocating - sharpen or cut.`,
       })
     }
   }
@@ -300,11 +300,12 @@ export function runDetectors(source: string): Flag[] {
 
 function severityFor(patternId: string): number {
   switch (patternId) {
-    case 'tier1-lexicon':
     case 'antithesis':
     case 'absent-actor':
     case 'allusive-construct':
+    case 'suffocation':
       return 0.95
+    case 'tier1-lexicon':
     case 'closers':
     case 'throat-clearing':
     case 'vague-gravitas':
@@ -314,7 +315,6 @@ function severityFor(patternId: string): number {
     case 'tier2-lexicon':
     case 'enthusiasm-inflation':
     case 'em-dash-density':
-    case 'hedge-cluster':
     case 'approval-seeking':
       return 0.6
     case 'header-inflation':

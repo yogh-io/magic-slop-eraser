@@ -74,7 +74,7 @@ function patternName(id: string): string {
 
     <div v-if="flags.length === 0" class="empty">
       <p>No flags raised yet. Paste a piece of prose into the editor to begin.</p>
-      <p class="muted">Mechanical detectors cover lexical tics, throat-clearing, closers, hedges, antithesis, em-dash density, false-precision, vague gravitas, staccato runs, and anaphora. The high-judgment patterns (absent-actor, allusive construct, hedged confidence) need a careful reader - select text to flag those by hand.</p>
+      <p class="muted">Mechanical detectors cover lexical tics, throat-clearing, closers, suffocation (stacked hedges), antithesis, em-dash density, false-precision, vague gravitas, staccato runs, and anaphora. The high-judgment patterns (absent-actor, allusive construct, hedged confidence) need a careful reader - select text to flag those by hand.</p>
     </div>
   </aside>
 </template>

@@ -17,15 +17,10 @@ defineProps<{
     </p>
 
     <ul class="links">
-      <li><router-link to="/categories">the slop catalogue</router-link> &middot; twenty-four named patterns</li>
+      <li><router-link to="/categories">the slop catalogue</router-link> &middot; the starting set of named patterns</li>
       <li><router-link to="/rungs">the three rungs</router-link> &middot; how the framework organises depth</li>
-      <li><router-link to="/about">about</router-link> &middot; what the project is</li>
+      <li><router-link to="/about">methodology</router-link> &middot; what the project is and how to use it</li>
     </ul>
-
-    <p class="aside">
-      The skill that drives this site is open source at
-      <a href="https://github.com/yogh-io/slopmop" target="_blank" rel="noopener">github.com/yogh-io/slopmop</a>.
-    </p>
   </article>
 </template>
 
@@ -68,18 +63,5 @@ ul.links a {
 }
 ul.links a:hover {
   border-bottom-color: var(--text);
-}
-.aside {
-  margin-top: 2rem;
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-.aside a {
-  color: var(--muted);
-  border-bottom: 1px dotted var(--rule);
-  text-decoration: none;
-}
-.aside a:hover {
-  color: var(--text);
 }
 </style>

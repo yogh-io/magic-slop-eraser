@@ -23,7 +23,7 @@ const rungs: RungInfo[] = [
     detection: 'Mechanical pre-pass. Pure pattern matching against a fixed catalogue. The whole detector ships with no model dependency.',
     fix: 'Substitute or cut. Most fixes are one or two characters. The pattern says what to do; the writer (or the agent acting on their behalf) takes the proposed replacement, edits it, or rejects it.',
     workflow: 'One flag at a time. The agent pulls the flag list, walks each, pushes a proposed edit, waits for the human verdict. The shape is the workshop pipeline used in long-form analytical writing - same one-flag-at-a-time interactive loop, applied to the regex layer.',
-    whatLivesHere: '11 patterns: the canonical AI lexicon, throat-clearing openers, closer phrases, hedge clusters, enthusiasm inflation, vague gravitas, the mirror construct, em-dash density, false-precision authority, approval-seeking closes.',
+    whatLivesHere: '11 patterns: the canonical AI lexicon, throat-clearing openers, closer phrases, suffocation (stacked hedges), enthusiasm inflation, vague gravitas, the mirror construct, em-dash density, false-precision authority, approval-seeking closes.',
   },
   {
     id: 2,
@@ -43,7 +43,7 @@ const rungs: RungInfo[] = [
     detection: 'Requires reading the piece as a piece, asking whether its content is being presented well. Frame stacking buries the thesis under preamble. Performative balance dilutes the position into nothing. Header inflation pads scaffolding where the argument should carry weight. These are the moves a chief editor catches on the second read.',
     fix: 'Substantial rewrite focused on what the piece is saying - its arguments, values, internal merits - and how clearly that comes through. The Rung 3 work is where the piece becomes the writer\'s rather than the model\'s. Tools at this rung resemble editorial pipelines: workshop and chief-edit in long-form analytical writing, with passes for voice, evidence, resonance, and vitality.',
     workflow: 'Outside the scope of an autonomous fixer. This rung is where the writer sits down with the agent and rewrites together. The eraser flags positions; the rewrite is collaborative, slow, and human-driven.',
-    whatLivesHere: '3 patterns: frame stacking, performative balance, header inflation.',
+    whatLivesHere: '7 patterns: frame stacking, performative balance, header inflation, lens-fits-everything, borrowed-framework filler, reductive reframe, phantom periodisation.',
   },
 ]
 
@@ -102,57 +102,10 @@ const counts = computed(() => {
       </dl>
     </section>
 
-    <section class="philosophy">
-      <h2>The philosophy</h2>
-
-      <p>
-        The eraser is an online site that stores prose, comments, suggestions, and resolution
-        history. It exposes an API for agentic coding tools (Claude Code, Codex, opencode, your
-        own scripts, our hosted reviewer) to push and pull edits and analysis. The browser is a
-        viewer; the agent is the writer; you are the orchestrator. This shape is the default -
-        the work happens through whatever agent you already use, not by hand-pasting in a
-        textarea.
-      </p>
-      <p>
-        Rung 1 (mechanical) is the part that ships <em>open-source</em>. The catalogue, the
-        regex detectors, the score. The portable Rung 1 framework is the heart of this project.
-        The plan is to extract it as a standalone library so other prose tools can adopt it
-        without rebuilding it from scratch.
-      </p>
-      <p>
-        Rung 2 needs a model. The detection is judgment-shaped, the fix is multi-option. The
-        agent runs the model call on its own side - whatever subscription or API access it
-        already has - and posts the suggestions back to the site.
-      </p>
-      <p>
-        Rung 3 is editorial and human-driven. We are not going to auto-rewrite your piece. The
-        eraser flags positions where structural work is needed and gets out of the way. Tools
-        that do the rewriting (workshop, chief-edit, the analogous editorial pipelines from
-        long-form-analysis projects) live alongside the eraser, not inside it.
-      </p>
-
-      <h2>The agent loop</h2>
-
-      <p>
-        The agent (whatever you use - Claude Code, Codex, opencode, a custom script - carrying
-        the eraser skill) connects to the site, loads the document, runs the Rung 1 detector,
-        walks the flags one at a time. For each flag it shows you the line in context, the
-        pattern that matched, and a proposed replacement. You watch in the browser. You accept,
-        edit, skip, or mark deliberate via the API or via the browser. The agent advances. When
-        Rung 1 is clear, the agent moves to Rung 2 - same loop, with the proposals coming from
-        the model. Rung 3 is collaborative: the agent flags positions; the rewrite happens with
-        you and the agent reading and editing together.
-      </p>
-
-      <h2>The score</h2>
-      <p>
-        The 0-10 score is computed from <strong>Rung 1 hits only</strong>. A score of 10 means
-        the piece has no detectable Rung 1 slop. Rung 2 and Rung 3 flags are reported separately
-        as counts; they are not folded into the score. The reason: an LLM flagging fewer things
-        on a given run would feel like progress without being it. The score is a Rung 1
-        milestone, not a verdict on the piece.
-      </p>
-    </section>
+    <p class="see-more">
+      How the rungs translate into a workflow - the agent, the browser, the orchestrator - is on
+      the <router-link to="/about">methodology</router-link> page.
+    </p>
   </article>
 </template>
 
@@ -253,18 +206,19 @@ dd {
   color: var(--text);
 }
 
-.philosophy {
-  margin-top: 3rem;
-  padding-top: 2rem;
+.see-more {
+  margin-top: 2.5rem;
+  padding-top: 1.2rem;
   border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.95em;
 }
-.philosophy h2 {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  margin: 1.5rem 0 0.7rem;
+.see-more a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule);
 }
-.philosophy h2:first-child { margin-top: 0; }
-.philosophy p { margin: 0 0 1em; }
+.see-more a:hover { border-bottom-color: var(--text); }
 
 @media (max-width: 720px) {
   dl { grid-template-columns: 1fr; gap: 0.15rem 0; }

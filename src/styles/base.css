@@ -59,3 +59,18 @@ html.theme-transitioning body {
     transition: none !important;
   }
 }
+
+/* View Transitions API path (Chromium, Safari 18+). Fonts, gradients, and
+ * other discrete properties get cross-faded between the old and new theme
+ * snapshots. Firefox falls through to the class-based path above. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}

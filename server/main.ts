@@ -12,6 +12,12 @@ const port = Number(process.env.PORT ?? 8787)
 const STATIC_DIR = process.env.STATIC_DIR ?? './dist'
 
 async function serveStatic(pathname: string): Promise<Response | null> {
+  // Never intercept well-known paths (ACME challenges, etc.). Let DO's edge or
+  // upstream proxy handle them; if nothing else does, return a clean 404
+  // rather than serving the SPA HTML.
+  if (pathname.startsWith('/.well-known/')) {
+    return new Response('not found', { status: 404 })
+  }
   const candidate = pathname === '/' ? '/index.html' : pathname
   const filePath = join(STATIC_DIR, candidate)
   try {

@@ -1,0 +1,16 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Write server SSH host key
+        run: echo "${{ secrets.SERVER_HOST_KEY }}" >> ~/.ssh/known_hosts
+      - name: Deploy
+        run: ssh root@116.202.98.229 'cd /opt/deploy/slopmop && git pull --ff-only && bash deploy.sh'

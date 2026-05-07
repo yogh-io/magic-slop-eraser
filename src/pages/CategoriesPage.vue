@@ -6,14 +6,15 @@ import type { CategoryId, PatternMeta, Scope, Rung } from '../types'
 
 const categoryOrder: CategoryId[] = ['lexical', 'structural', 'argumentative', 'tonal', 'format']
 
-type DetectionFilter = 'all' | 'mechanical' | 'judgment'
+type DetectionMode = 'mechanical' | 'judgment'
+const ALL_DETECTIONS: DetectionMode[] = ['mechanical', 'judgment']
 type Severity = PatternMeta['severity']
 const ALL_SEVERITIES: Severity[] = ['primary', 'high', 'medium', 'low']
 const ALL_SCOPES: Scope[] = ['word', 'phrase', 'sentence', 'paragraph', 'piece']
 const ALL_RUNGS: Rung[] = [1, 2, 3]
 
 interface Filters {
-  detection: DetectionFilter
+  detections: Set<DetectionMode>
   severities: Set<Severity>
   categories: Set<CategoryId>
   scopes: Set<Scope>
@@ -21,7 +22,7 @@ interface Filters {
 }
 
 const filters = reactive<Filters>({
-  detection: 'all',
+  detections: new Set(ALL_DETECTIONS),
   severities: new Set(ALL_SEVERITIES),
   categories: new Set(categoryOrder),
   scopes: new Set(ALL_SCOPES),
@@ -38,8 +39,8 @@ const orderedPatterns = computed(() => {
 
 const visiblePatterns = computed(() =>
   orderedPatterns.value.filter((p) => {
-    if (filters.detection === 'mechanical' && !p.mechanical) return false
-    if (filters.detection === 'judgment' && p.mechanical) return false
+    const mode: DetectionMode = p.mechanical ? 'mechanical' : 'judgment'
+    if (!filters.detections.has(mode)) return false
     if (!filters.severities.has(p.severity)) return false
     if (!filters.categories.has(p.category)) return false
     if (!filters.scopes.has(p.scope)) return false
@@ -50,7 +51,7 @@ const visiblePatterns = computed(() =>
 
 const isFiltered = computed(() => {
   return (
-    filters.detection !== 'all' ||
+    filters.detections.size !== ALL_DETECTIONS.length ||
     filters.severities.size !== ALL_SEVERITIES.length ||
     filters.categories.size !== categoryOrder.length ||
     filters.scopes.size !== ALL_SCOPES.length ||
@@ -58,8 +59,20 @@ const isFiltered = computed(() => {
   )
 })
 
-function setDetection(d: DetectionFilter): void {
-  filters.detection = d
+function toggleDetection(d: DetectionMode): void {
+  if (filters.detections.size === 1 && filters.detections.has(d)) {
+    filters.detections = new Set(ALL_DETECTIONS)
+    return
+  }
+  if (filters.detections.size === ALL_DETECTIONS.length) {
+    filters.detections = new Set([d])
+    return
+  }
+  const next = new Set(filters.detections)
+  if (next.has(d)) next.delete(d)
+  else next.add(d)
+  if (next.size === 0) filters.detections = new Set(ALL_DETECTIONS)
+  else filters.detections = next
 }
 
 function toggleSeverity(s: Severity): void {
@@ -131,7 +144,7 @@ function toggleRung(r: Rung): void {
 }
 
 function resetFilters(): void {
-  filters.detection = 'all'
+  filters.detections = new Set(ALL_DETECTIONS)
   filters.severities = new Set(ALL_SEVERITIES)
   filters.categories = new Set(categoryOrder)
   filters.scopes = new Set(ALL_SCOPES)
@@ -208,12 +221,12 @@ function categoryName(id: CategoryId): string {
 
       <div class="filter-row">
         <span class="filter-label">detection</span>
-        <div class="seg" role="group" aria-label="Detection method">
+        <div class="chips">
           <button
-            v-for="d in (['all','mechanical','judgment'] as const)"
+            v-for="d in ALL_DETECTIONS"
             :key="d"
-            :class="{ active: filters.detection === d }"
-            @click="setDetection(d)"
+            :class="['chip', { active: filters.detections.has(d) }]"
+            @click="toggleDetection(d)"
           >{{ d }}</button>
         </div>
       </div>
@@ -369,36 +382,12 @@ h1 {
   color: var(--muted);
   align-self: center;
 }
-.filter-row > .seg,
 .filter-row > .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
   align-items: center;
   min-width: 0;
-}
-
-.seg {
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  padding: 2px;
-  width: max-content;
-  gap: 0 !important;
-}
-.seg button {
-  background: transparent;
-  border: 0;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.86em;
-  padding: 0.25rem 0.85rem;
-  border-radius: 999px;
-  cursor: pointer;
-  text-transform: lowercase;
-}
-.seg button.active {
-  background: var(--text);
-  color: var(--bg);
 }
 
 .chip {

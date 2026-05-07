@@ -25,7 +25,7 @@
   --cat-format:        #6f5d1a;
 
   --font-prose: 'Iowan Old Style', 'Charter', 'Source Serif Pro', Georgia, serif;
-  --font-display: 'UnifrakturMaguntia', 'Cormorant SC', 'EB Garamond', Georgia, serif;
+  --font-display: 'Cormorant SC', 'EB Garamond', Georgia, serif;
   --font-ui: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
   --prose-size: 1.06rem;
   --prose-leading: 1.7;
@@ -49,7 +49,7 @@
   background: rgba(241, 230, 204, 0.88);
 }
 [data-theme='scholar'] .brand {
-  font-family: var(--font-display);
+  font-family: 'UnifrakturMaguntia', 'Cormorant SC', 'EB Garamond', Georgia, serif;
   font-size: 1.4rem;
   font-weight: 400;
   color: var(--heading);

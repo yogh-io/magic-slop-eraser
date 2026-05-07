@@ -62,6 +62,8 @@ export interface TextAnchor {
 
 export type FlagSource = 'mechanical' | 'llm' | 'user'
 
+export type FlagStatus = 'open' | 'resolved' | 'skipped' | 'kept-deliberate' | 'stale'
+
 export interface Flag {
   id: string
   patternId: string
@@ -71,8 +73,51 @@ export interface Flag {
   rationale: string
   excerpt: string
   severity: number
+  rung?: Rung
+  status?: FlagStatus
   userNote?: string
   createdAt: string
+}
+
+export type SuggestionVerdict = 'better' | 'worse' | 'close'
+
+export interface Suggestion {
+  id: string
+  flagId: string
+  text: string
+  prompt?: string
+  modelTag: string
+  verdict: SuggestionVerdict | null
+  isCurrentBest: boolean
+  createdAt: string
+}
+
+export interface Comment {
+  id: string
+  docId: string
+  flagId?: string
+  body: string
+  author: 'agent' | 'human'
+  createdAt: string
+}
+
+export type EventType =
+  | 'flag-added'
+  | 'flag-resolved'
+  | 'flag-skipped'
+  | 'flag-kept'
+  | 'flag-stale'
+  | 'suggestion-added'
+  | 'suggestion-verdict'
+  | 'comment-added'
+  | 'source-edited'
+  | 'document-replaced'
+
+export interface ResolutionEvent {
+  cursor: number
+  type: EventType
+  payload: Record<string, unknown>
+  ts: string
 }
 
 export interface CompanionDoc {

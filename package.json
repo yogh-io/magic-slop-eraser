@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "bun run server/main.ts",
+    "server:dev": "bun run --watch server/main.ts"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",

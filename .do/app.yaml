@@ -1,0 +1,28 @@
+name: slopmop
+region: ams
+services:
+  - name: web
+    dockerfile_path: Dockerfile
+    source_dir: /
+    github:
+      repo: yogh-io/slopmop
+      branch: main
+      deploy_on_push: true
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 8080
+    health_check:
+      http_path: /health
+    envs:
+      - key: NODE_ENV
+        scope: RUN_TIME
+        value: production
+      - key: PORT
+        scope: RUN_TIME
+        value: "8080"
+      - key: STATIC_DIR
+        scope: RUN_TIME
+        value: /app/dist
+      - key: STORAGE_DIR
+        scope: RUN_TIME
+        value: /app/data

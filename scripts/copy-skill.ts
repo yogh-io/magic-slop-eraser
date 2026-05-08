@@ -10,7 +10,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const src = resolve(__dirname, '../.claude/skills/eraser/SKILL.md')
+const src = resolve(__dirname, '../.claude/skills/slopmop/SKILL.md')
 const destDir = resolve(__dirname, '../public')
 const dest = resolve(destDir, 'slopmop.md')
 

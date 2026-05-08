@@ -4,11 +4,11 @@ skillVersion: 2026-05-08.1
 allowed-tools: Bash, Read, Edit, Monitor
 ---
 
-# eraser
+# slopmop
 
 A *steering loop* for fixing AI-slop in prose. The author defines shape; you (the agent) draft the prose; the author re-directs until the sentence lands. The work is the author's; you are the keyboard.
 
-The eraser site is the source of truth and the steering surface. You push prose, run detectors, then **pull author directives** off a queue, draft candidates, post **resolutions** back. The author sweeps directives in the browser at their own pace; you grind them in the background. The author re-engages, accepts or re-directs the candidates you posted, repeats.
+The slopmop site is the source of truth and the steering surface. You push prose, run detectors, then **pull author directives** off a queue, draft candidates, post **resolutions** back. The author sweeps directives in the browser at their own pace; you grind them in the background. The author re-engages, accepts or re-directs the candidates you posted, repeats.
 
 ## inputs
 
@@ -29,7 +29,7 @@ X-Skill-Version: 2026-05-08.1
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The eraser skill I have installed (v2026-05-08.1) is older than what the server expects (vX). Reinstall from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-08.1) is older than what the server expects (vX). Reinstall from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 

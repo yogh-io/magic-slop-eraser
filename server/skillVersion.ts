@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const SKILL_PATH = resolve(__dirname, '../.claude/skills/eraser/SKILL.md')
+const SKILL_PATH = resolve(__dirname, '../.claude/skills/slopmop/SKILL.md')
 
 /**
  * Parse the eraser skill's frontmatter and return its declared version.

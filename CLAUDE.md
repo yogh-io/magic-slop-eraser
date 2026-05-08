@@ -75,7 +75,7 @@ The eraser is **an online site, not a local app**. It stores prose, comments, su
 The shape:
 
 - **Site (server)** is the source of truth. It owns documents, flags, comment threads, suggestion candidates, resolution states, version history, and the queue of pending directives.
-- **Agent (drafter)** is an agentic coding tool (Claude Code, Codex, opencode, etc.) carrying the eraser skill, your own scripts, or our hosted reviewer. Whatever speaks the API qualifies. The agent runs detectors, surfaces flag batches, dequeues author directives, drafts candidates, posts them back, advances state.
+- **Agent (drafter)** is an agentic coding tool (Claude Code, Codex, opencode, etc.) carrying the slopmop skill, your own scripts, or our hosted reviewer. Whatever speaks the API qualifies. The agent runs detectors, surfaces flag batches, dequeues author directives, drafts candidates, posts them back, advances state.
 - **Browser (steering surface)** is where the writing happens *as steering*. The author sweeps batches of flags, gives shape directives, reviews returning candidates, accepts or re-directs. Accept / reject / edit / mark-deliberate / sweep-batch / submit-directives all live here.
 - **Writer (human)** holds the wheel. They define shape, react to drafts, decide what ships. The work is theirs; the agent is the keyboard. The author can also drive from the terminal via the agent directly when convenient - the browser and the terminal are equivalent surfaces onto the same state.
 
@@ -274,7 +274,7 @@ server/                 # Bun-based API. Imports src/anchoring + src/detectors d
     events.ts           # SSE + long-poll
     catalogue.ts        # read-only catalogue dump
 
-.claude/skills/eraser/  # the workshop loop as an agent skill
+.claude/skills/slopmop/  # the workshop loop as an agent skill
   SKILL.md              # protocol document
   README.md             # install/use
 

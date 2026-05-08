@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import MarkdownIt from 'markdown-it'
-import skillSrc from '../../.claude/skills/eraser/SKILL.md?raw'
+import skillSrc from '../../.claude/skills/slopmop/SKILL.md?raw'
 import { useOgHead } from '../composables/useOgHead'
 import { ORIGIN } from '../composables/useOgHead'
 
@@ -9,7 +9,7 @@ const md = new MarkdownIt({ html: false, linkify: true, typographer: false })
 const html = computed(() => md.render(skillSrc))
 
 const skillUrl = `${ORIGIN}/slopmop.md`
-const installPrompt = `Install the eraser skill from ${skillUrl} - fetch it, save it to .claude/skills/eraser/SKILL.md in this repo (or ~/.claude/skills/eraser/SKILL.md to install globally), and confirm it's available.`
+const installPrompt = `Install the slopmop skill from ${skillUrl} - fetch it, save it to .claude/skills/slopmop/SKILL.md in this repo (or ~/.claude/skills/slopmop/SKILL.md to install globally), and confirm it's available.`
 
 const copied = ref<'url' | 'prompt' | 'content' | null>(null)
 function copy(kind: 'url' | 'prompt' | 'content', text: string): void {
@@ -23,7 +23,7 @@ function copy(kind: 'url' | 'prompt' | 'content', text: string): void {
 }
 
 useOgHead(() => ({
-  title: 'The eraser skill',
+  title: 'The slopmop skill',
   description:
     'Walk a markdown document through the deslop loop, one flag at a time. Install in Claude Code (or any agentic coding tool) and point it at a Magic Slop Eraser document URL.',
   path: '/skill',
@@ -35,7 +35,7 @@ useOgHead(() => ({
   <article class="skill">
     <header class="hd">
       <p class="kicker">skill · agent</p>
-      <h1>The eraser skill</h1>
+      <h1>The slopmop skill</h1>
       <p class="lede">
         A workshop-shaped loop for fixing AI-slop in prose. The author defines shape,
         the agent drafts, the author re-directs until the sentence lands. Install it
@@ -62,8 +62,8 @@ useOgHead(() => ({
         <h3>2. Or curl it directly</h3>
         <p>For agents that don't fetch URLs themselves, or scripted installs:</p>
         <div class="snippet">
-          <pre>curl -o ~/.claude/skills/eraser/SKILL.md --create-dirs {{ skillUrl }}</pre>
-          <button type="button" class="copy" @click="copy('url', `curl -o ~/.claude/skills/eraser/SKILL.md --create-dirs ${skillUrl}`)">
+          <pre>curl -o ~/.claude/skills/slopmop/SKILL.md --create-dirs {{ skillUrl }}</pre>
+          <button type="button" class="copy" @click="copy('url', `curl -o ~/.claude/skills/slopmop/SKILL.md --create-dirs ${skillUrl}`)">
             {{ copied === 'url' ? 'copied' : 'copy' }}
           </button>
         </div>
@@ -73,8 +73,8 @@ useOgHead(() => ({
         <h3>3. Or copy the source below</h3>
         <p>
           Save it as <code>SKILL.md</code> inside your agent's skills directory
-          (Claude Code: <code>.claude/skills/eraser/SKILL.md</code> per project, or
-          <code>~/.claude/skills/eraser/SKILL.md</code> globally).
+          (Claude Code: <code>.claude/skills/slopmop/SKILL.md</code> per project, or
+          <code>~/.claude/skills/slopmop/SKILL.md</code> globally).
         </p>
         <button type="button" class="copy big" @click="copy('content', skillSrc)">
           {{ copied === 'content' ? 'copied' : 'copy SKILL.md to clipboard' }}

@@ -1,5 +1,6 @@
 ---
 description: Walk a markdown document through the Magic Slop Eraser deslop loop - pull author directives, draft candidates, post resolutions, repeat
+skillVersion: 2026-05-08.1
 allowed-tools: Bash, Read, Edit, Monitor
 ---
 
@@ -17,6 +18,20 @@ Two entry points:
 - **Existing URL**: `eraser https://{HOST}/d/{id}#t={token}` - parse `id` and `token`, GET the doc, resume.
 
 `HOST` defaults to whatever `ERASER_HOST` is set to. Local dev: `http://localhost:8787`.
+
+## skill version
+
+This file declares `skillVersion: 2026-05-08.1` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+
+```
+X-Skill-Version: 2026-05-08.1
+```
+
+Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
+
+> "The eraser skill I have installed (v2026-05-08.1) is older than what the server expects (vX). Reinstall from `${HOST}/skill/eraser`."
+
+The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 
 ## the loop
 
@@ -208,7 +223,7 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id/companion` | Full state for wrap-up |
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
 
-All authenticated calls require `Authorization: Bearer <token>` from the document creation response.
+All authenticated calls require `Authorization: Bearer <token>` from the document creation response. All calls should also send `X-Skill-Version: 2026-05-08.1` so the server can flag staleness.
 
 ## constraints
 

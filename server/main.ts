@@ -41,6 +41,9 @@ async function serveStatic(pathname: string): Promise<Response | null> {
 
 const server = Bun.serve({
   port,
+  // SSE streams need to live longer than Bun's default 10s request timeout.
+  // 0 disables the per-request timeout entirely; the client owns the lifecycle.
+  idleTimeout: 0,
   async fetch(req): Promise<Response> {
     const url = new URL(req.url)
     const { pathname } = url

@@ -3,6 +3,15 @@ import { computed, reactive } from 'vue'
 import { categories, getCategory } from '../catalog/categories'
 import { patterns } from '../catalog/patterns'
 import type { CategoryId, PatternMeta, Scope, Rung } from '../types'
+import { useOgHead } from '../composables/useOgHead'
+
+useOgHead(() => ({
+  title: 'The catalogue',
+  description:
+    'Every AI-slop pattern Magic Slop Eraser flags - tier-1 lexicon, throat-clearing, the mirror construct, absent-actor, frame-stacking, and twenty more. Filterable by rung, severity, scope, category.',
+  path: '/categories',
+  ogType: 'article',
+}))
 
 const categoryOrder: CategoryId[] = categories.map((c) => c.id)
 

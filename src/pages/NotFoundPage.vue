@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { useOgHead } from '../composables/useOgHead'
 
 const route = useRoute()
+
+useOgHead(() => ({
+  title: 'Not found',
+  description: 'No page at this URL. Probably a stale link, possibly a typo.',
+  path: route.fullPath,
+  ogType: 'website',
+}))
 </script>
 
 <template>

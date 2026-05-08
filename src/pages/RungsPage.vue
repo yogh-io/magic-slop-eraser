@@ -2,6 +2,15 @@
 import { computed } from 'vue'
 import { patterns } from '../catalog/patterns'
 import type { Rung } from '../types'
+import { useOgHead } from '../composables/useOgHead'
+
+useOgHead(() => ({
+  title: 'The three rungs',
+  description:
+    'Mechanical, passage-level judgment, and presentation. The framework organising AI-slop patterns by depth, with a paired-writing steering loop applied at every grain.',
+  path: '/rungs',
+  ogType: 'article',
+}))
 
 interface RungInfo {
   id: Rung

@@ -3,9 +3,18 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import aboutSrc from './about.md?raw'
+import { useOgHead } from '../composables/useOgHead'
 
 const md = new MarkdownIt({ html: true, linkify: true, typographer: false })
 const html = computed(() => md.render(aboutSrc))
+
+useOgHead(() => ({
+  title: 'Methodology',
+  description:
+    'How Magic Slop Eraser works: the three rungs (mechanical, passage-level judgment, presentation), the paired-writing steering loop, and the catalogue curation principle.',
+  path: '/about',
+  ogType: 'article',
+}))
 
 const router = useRouter()
 

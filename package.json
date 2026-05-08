@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit && bun scripts/generate-sitemap.ts && bun scripts/copy-skill.ts && vite-ssg build",
     "preview": "vite preview",
     "server": "bun run server/main.ts",
     "server:dev": "bun run --watch server/main.ts"
@@ -13,6 +13,7 @@
   "dependencies": {
     "markdown-it": "^14.1.0",
     "pinia": "^2.2.4",
+    "vite-ssg": "^28.3.0",
     "vue": "^3.5.13",
     "vue-router": "^4.4.5"
   },

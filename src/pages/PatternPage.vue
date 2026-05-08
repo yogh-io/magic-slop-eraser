@@ -2,11 +2,23 @@
 import { computed } from 'vue'
 import { getPattern } from '../catalog/patterns'
 import { getCategory } from '../catalog/categories'
+import { useOgHead } from '../composables/useOgHead'
 
 const props = defineProps<{ id: string }>()
 
 const pattern = computed(() => getPattern(props.id))
 const category = computed(() => (pattern.value ? getCategory(pattern.value.category) : null))
+
+useOgHead(() =>
+  pattern.value
+    ? {
+        title: pattern.value.name,
+        description: pattern.value.blurb,
+        path: `/patterns/${pattern.value.id}`,
+        ogType: 'article',
+      }
+    : null,
+)
 
 function paragraphs(text: string | undefined): string[] {
   if (!text) return []

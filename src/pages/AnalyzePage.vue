@@ -6,7 +6,16 @@ import FlagsPanel from '../components/FlagsPanel.vue'
 import UserHighlightDialog from '../components/UserHighlightDialog.vue'
 import LockedNotice from '../components/LockedNotice.vue'
 import { isUnlocked } from '../state/guard'
+import { useOgHead } from '../composables/useOgHead'
 import type { CategoryId } from '../types'
+
+useOgHead(() => ({
+  title: 'Magic Slop Eraser',
+  description:
+    'Paste prose, see flagged AI-slop, walk through fixes one at a time. A hosted detector and guided fixer driven by your own agent (Claude Code, Codex, opencode) over a steering API.',
+  path: '/',
+  ogType: 'website',
+}))
 
 const unlocked = isUnlocked()
 

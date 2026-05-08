@@ -39,7 +39,15 @@ const errorRef = session?.error ?? ref<string | null>(null)
 const doc = session?.doc ?? ref(null)
 const flags = session?.flags ?? ref<Flag[]>([])
 const responses = session?.responses ?? ref<DocResponse[]>([])
-const score = session?.score ?? ref(0)
+const score = session?.score ?? ref(null)
+const scoreValue = computed(() => score.value?.value ?? null)
+const scoreOpen = ref(false)
+function toggleScore(): void { scoreOpen.value = !scoreOpen.value }
+function barWidth(weighted: number): string {
+  const max = score.value?.topContributors[0]?.weighted ?? 1
+  const pct = max > 0 ? Math.min(100, (weighted / max) * 100) : 0
+  return `${pct}%`
+}
 const candidateByFlag = session?.candidateByFlag ?? computed(() => ({}) as Record<string, Suggestion | undefined>)
 const pendingResponseByFlag = session?.pendingResponseByFlag ?? computed(() => ({}) as Record<string, DocResponse | undefined>)
 const panelCounts = session?.panelCounts ?? computed(() => ({ open: 0, pending: 0, awaiting: 0, stuck: 0, closed: 0 }))
@@ -237,7 +245,21 @@ function dismissShare(): void {
           <h1>{{ doc?.title ?? 'Loading…' }}</h1>
         </div>
         <div v-if="doc" class="counts">
-          <span class="score">score {{ score }}</span>
+          <button
+            type="button"
+            class="score"
+            :class="{ 'is-open': scoreOpen, 'is-blank': scoreValue === null }"
+            @click="toggleScore"
+            :title="score?.rationale ?? 'no analysis yet'"
+          >
+            <span class="score-num">{{ scoreValue !== null ? scoreValue : '-' }}</span>
+            <span class="score-lbl">score</span>
+            <span class="score-rungs" v-if="score">
+              <span v-if="score.byRung[1].count > 0" class="r r-1">R1·{{ score.byRung[1].count }}</span>
+              <span v-if="score.byRung[2].count > 0" class="r r-2">R2·{{ score.byRung[2].count }}</span>
+              <span v-if="score.byRung[3].count > 0" class="r r-3">R3·{{ score.byRung[3].count }}</span>
+            </span>
+          </button>
           <span class="dot" />
           <span title="open"><b>{{ panelCounts.open }}</b> open</span>
           <span class="dot" />
@@ -250,6 +272,34 @@ function dismissShare(): void {
           <span class="muted">v{{ doc.version }}</span>
         </div>
       </header>
+
+      <section v-if="doc && scoreOpen" class="score-panel">
+        <div class="score-panel-head">
+          <h2>Score breakdown</h2>
+          <button type="button" class="close" @click="toggleScore" aria-label="close">×</button>
+        </div>
+        <p class="score-rationale" v-if="score">{{ score.rationale }}</p>
+        <div v-if="score" class="rung-grid">
+          <div v-for="r in [1, 2, 3] as const" :key="r" :class="['rung-cell', `rung-${r}`]">
+            <span class="rung-name">{{ rungName(r) }}</span>
+            <span class="rung-count"><b>{{ score.byRung[r].count }}</b> flags</span>
+            <span class="rung-weighted muted">weight {{ score.byRung[r].weighted.toFixed(2) }}</span>
+          </div>
+        </div>
+        <h3 v-if="score && score.topContributors.length > 0">By pattern</h3>
+        <ol v-if="score" class="contributors">
+          <li v-for="c in score.topContributors" :key="c.patternId">
+            <router-link :to="`/patterns/${c.patternId}`" class="pat-name">{{ c.patternId }}</router-link>
+            <span class="pat-count">{{ c.count }} ×</span>
+            <span class="pat-weight muted">{{ c.weighted.toFixed(2) }}</span>
+            <span class="pat-bar" :style="{ width: barWidth(c.weighted) }" />
+          </li>
+        </ol>
+        <p class="score-note muted">
+          Weights come from the drafter at flag-detection time, informed by the voice memo.
+          Score is the aggregate. Resolved flags drop out; the score updates as you sweep.
+        </p>
+      </section>
 
       <p v-if="loading" class="loading">connecting…</p>
       <p v-if="errorRef" class="err">error: {{ errorRef }}</p>
@@ -539,7 +589,146 @@ function dismissShare(): void {
   display: inline-block;
 }
 .counts .muted { color: var(--muted); }
-.counts .score { font-weight: 600; }
+
+.counts .score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.counts .score:hover { border-color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.counts .score.is-open { background: var(--text); color: var(--bg); border-color: var(--text); }
+.counts .score.is-open .muted, .counts .score.is-open .score-lbl { color: inherit; opacity: 0.7; }
+.counts .score.is-blank .score-num { color: var(--muted); }
+.counts .score-num { font-family: var(--font-display); font-weight: 700; font-size: 1.1em; line-height: 1; }
+.counts .score-lbl { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.7em; color: var(--muted); }
+.counts .score-rungs { display: inline-flex; gap: 0.3rem; margin-left: 0.2rem; }
+.counts .score-rungs .r {
+  font-size: 0.72em;
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--rule) 60%, transparent);
+  color: var(--text);
+}
+.counts .score-rungs .r-1 { color: var(--cat-lexical, var(--accent)); }
+.counts .score-rungs .r-2 { color: var(--cat-structural, var(--accent)); }
+.counts .score-rungs .r-3 { color: var(--cat-argumentative, var(--accent)); }
+
+.score-panel {
+  margin: 1rem 0 1.2rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.score-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.score-panel h2 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+  color: var(--muted);
+}
+.score-panel .close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0.3rem;
+}
+.score-panel .close:hover { color: var(--text); }
+.score-rationale {
+  font-style: italic;
+  color: var(--text);
+  margin: 0 0 1rem;
+}
+.rung-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin: 0.4rem 0 1rem;
+}
+.rung-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+.rung-cell.rung-1 { border-left: 3px solid var(--cat-lexical, var(--accent)); }
+.rung-cell.rung-2 { border-left: 3px solid var(--cat-structural, var(--accent)); }
+.rung-cell.rung-3 { border-left: 3px solid var(--cat-argumentative, var(--accent)); }
+.rung-name {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.rung-count { font-family: var(--font-display); font-size: 1.05rem; }
+.rung-count b { font-weight: 700; }
+.rung-weighted { font-size: 0.8rem; }
+.score-panel h3 {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0.8rem 0 0.4rem;
+  color: var(--muted);
+}
+.contributors {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.contributors li {
+  display: grid;
+  grid-template-columns: minmax(10ch, 1fr) auto auto;
+  gap: 0.6rem;
+  align-items: center;
+  position: relative;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.88rem;
+}
+.pat-name {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule);
+  z-index: 1;
+}
+.pat-name:hover { border-bottom-color: var(--text); }
+.pat-count { font-family: var(--font-mono); font-size: 0.85em; color: var(--muted); z-index: 1; }
+.pat-weight { font-family: var(--font-mono); font-size: 0.85em; z-index: 1; }
+.pat-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 3px;
+  z-index: 0;
+  pointer-events: none;
+}
+.score-note { margin: 0.8rem 0 0; font-size: 0.8rem; }
+
 .counts .pending b { color: #b88f3e; }
 .counts .awaiting b { color: #2f8f6a; }
 .counts .stuck b { color: #b8472d; }

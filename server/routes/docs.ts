@@ -71,16 +71,18 @@ export async function handleDocs(
   // GET /docs/:id
   if (verb === null && req.method === 'GET') {
     const flags = Object.values(state.flags)
-    const open = flags.filter((f) => (f.status ?? 'open') === 'open')
+    // Score considers open + awaiting-accept flags across all rungs - awaiting
+    // ones haven't been resolved yet and still represent slop in the prose.
+    const live = flags.filter((f) => {
+      const s = f.status ?? 'open'
+      return s === 'open' || s === 'awaiting-accept'
+    })
     const wordCount = approximateProseWordCount(state.doc.source, extractSkipZones(state.doc.source))
-    const score = scoreFromFlags(
-      open.filter((f) => (f.rung ?? 1) === 1),
-      wordCount,
-    )
+    const score = scoreFromFlags(live, wordCount)
     return json({
       doc: state.doc,
       sourceHash: state.doc.sourceHash,
-      counts: countsByRung(open),
+      counts: countsByRung(live),
       score,
       flags,
       agentHints: state.agentHints,

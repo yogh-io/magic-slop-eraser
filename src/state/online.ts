@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
-import type { AgentHints, DocResponse, Flag, ResolutionEvent, ResponseKind, Suggestion } from '../types'
+import type { AgentHints, DocResponse, Flag, Rung, ResolutionEvent, ResponseKind, Suggestion } from '../types'
 
 interface DocSummary {
   id: string
@@ -9,11 +9,18 @@ interface DocSummary {
   version: number
 }
 
+export interface ScoreInfo {
+  value: number
+  rationale: string
+  topContributors: { patternId: string; count: number; weighted: number }[]
+  byRung: Record<Rung, { count: number; weighted: number }>
+}
+
 interface FetchedDoc {
   doc: DocSummary
   sourceHash: string
   counts: { 1: number; 2: number; 3: number }
-  score: { value: number; rationale: string }
+  score: ScoreInfo
   flags: Flag[]
   agentHints: AgentHints
 }
@@ -26,7 +33,7 @@ export interface OnlineSession {
   flags: Ref<Flag[]>
   suggestions: Ref<Suggestion[]>
   responses: Ref<DocResponse[]>
-  score: Ref<number>
+  score: Ref<ScoreInfo | null>
   agentHints: Ref<AgentHints>
   /** Per-flag awaiting candidate, if one exists. */
   candidateByFlag: ComputedRef<Record<string, Suggestion | undefined>>
@@ -51,7 +58,7 @@ export function createOnlineSession(id: string): OnlineSession {
   const flags = ref<Flag[]>([])
   const suggestions = ref<Suggestion[]>([])
   const responses = ref<DocResponse[]>([])
-  const score = ref(0)
+  const score = ref<ScoreInfo | null>(null)
   const agentHints = ref<AgentHints>({})
   let cursor = 0
   let eventSource: EventSource | null = null
@@ -119,7 +126,7 @@ export function createOnlineSession(id: string): OnlineSession {
       const data = (await docRes.json()) as FetchedDoc
       doc.value = data.doc
       flags.value = data.flags
-      score.value = data.score?.value ?? 0
+      score.value = data.score ?? null
       agentHints.value = data.agentHints ?? {}
       cursor = data.doc.version
 
@@ -178,7 +185,7 @@ export function createOnlineSession(id: string): OnlineSession {
     const data = (await r.json()) as FetchedDoc
     doc.value = data.doc
     flags.value = data.flags
-    score.value = data.score?.value ?? 0
+    score.value = data.score ?? null
     agentHints.value = data.agentHints ?? {}
   }
 

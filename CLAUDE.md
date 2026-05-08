@@ -177,9 +177,15 @@ The API is the contract; the browser UI and any agent skill (Claude Code, Codex,
 
 ## The score
 
-The 0-10 score is currently computed from **Rung 1 hits only**, server-side, from `Flag.severity` weights. Score is a milestone, not a verdict.
+The 0-10 score is computed from **all live flags across all three rungs** (open + awaiting-accept). Per-flag `severity` is the load-bearing input - the drafter sets it at flag-detection time, weighted subjectively per instance and informed by the voice memo (a deliberate move scores low even if it matches a catalogued pattern). The server aggregates: density-based math, with pattern-specific ceilings for the worst offenders.
 
-This is in flux. The next iteration is drafter-computed: the drafter walks all three rungs, weights each finding subjectively (informed by the voice memo - a piece's deliberate moves don't count against it), and posts an overall score plus a per-pattern breakdown. The UI surfaces overall score and lets the user drill into per-pattern weight if they want. Until that lands, the server-side Rung 1 score is what's shown.
+`scoreFromFlags` in `src/detectors/index.ts` returns:
+- `value` - the 0-10 number
+- `rationale` - one-sentence summary ("Noticeable slop. (R1 4 / R2 2). Dominant tics: throat-clearing (3), ...")
+- `byRung` - per-rung `{ count, weighted }` so the UI can show where the slop is
+- `topContributors` - per-pattern `{ patternId, count, weighted }`, weight-sorted, all of them
+
+`GET /docs/:id` returns the full structure. The session-page UI shows the score as a clickable pill; click it for the breakdown panel (per-rung cells, per-pattern bars). Resolved flags drop out; the score updates as the author sweeps.
 
 ## Cross-cutting metadata
 

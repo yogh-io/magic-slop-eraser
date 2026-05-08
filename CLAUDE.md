@@ -88,12 +88,11 @@ The Rung 1 layer is intentionally portable: the catalogue + regex detectors + sc
 Source-of-truth entities the API exposes:
 
 - **Document**: source markdown, title, owner, word count, source hash (sha-256), version counter, created/updated timestamps. Source state has a small ring buffer of prior versions so revert is cheap.
-- **Flag**: an instance of a catalogued pattern at a specific anchor in a document. Carries `patternId`, `anchor` (start+end+prefix+suffix for relocation), `rung`, `severity`, `rationale`, current `status` (open / awaiting-accept / resolved / skipped / kept-deliberate / stale).
+- **Flag**: an instance of a catalogued pattern at a specific anchor in a document. Carries `patternId`, `anchor` (start+end+prefix+suffix for relocation), `rung`, `severity`, `rationale`, current `status` (open / awaiting-accept / resolved / skipped / kept-deliberate / stale), and `source` (`mechanical` for server regex hits, `llm` for agent-detected via `POST /docs/:id/flags`, `user` for human-contributed).
 - **Response**: an author-issued directive on a flag (free text or a common-case shortcut: *more committal*, *drop the qualifier*, *punchline first*, *cut to the verb*, *let me try: <text>*, *skip*, *keep*). Each user choice persists immediately - no batch submit. Status: `pending` (waiting for agent) / `resolved` (agent posted a candidate) / `stuck` (agent gave up via punt) / `cancelled` (user rescinded). The trail of responses per flag is the steering history.
-- **Suggestion**: a candidate edit attached to a flag, produced by the agent in response to a directive. Carries `pre` (the originally-anchored text) and `post` (the agent's candidate), the response it answered (`respondedTo`), the model tag, the prompt context. Per-flag candidates do not mutate the source - the browser renders them as overlays over the anchor span. They land in the source only when the user explicitly clicks accept.
+- **Suggestion**: a candidate edit attached to a flag. Two origin paths: in response to a directive (`respondedTo` set), or as an inline candidate the agent bundles with a flag at detection time (`respondedTo` absent - the flag goes straight to `awaiting-accept`). Carries `pre` (the originally-anchored text), `post` (the candidate), the model tag, optional prompt context. Per-flag candidates do not mutate the source - the browser renders them as overlays over the anchor span. They land in the source only when the user explicitly clicks accept.
 - **Comment**: free-form thread on a flag (or on a document). Used for human-to-agent coordination and for capturing why a flag was kept deliberately or why the agent punted.
 - **Resolution event**: append-only log of state transitions on flags, responses, and source. The companion document at session end is rendered from this log.
-- **User flag**: human-contributed flag with category, pattern, and rationale. Lives alongside mechanical flags. Improves the catalogue over time.
 
 The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor scheme are the prototypes for the document/flag/anchor parts of this model. The server reuses `src/anchoring/textAnchor.ts` and `src/detectors/index.ts` directly so client and server share the same anchor relocation and detection logic.
 
@@ -109,8 +108,17 @@ PUT    /docs/:id/source               { source }   # If-Match: <hash>; runs reco
 POST   /docs/:id/source/revert        { toVersion? }   # rolls back to a stored prior version
 DELETE /docs/:id
 
-# mechanical detection
-POST   /docs/:id/run-detectors        -> emits flag-added events; returns flag list
+# detection
+POST   /docs/:id/run-detectors        # Rung 1 server-side regex
+                                      -> emits flag-added events; returns flag list
+POST   /docs/:id/flags                # agent-side LLM detection (BYOM)
+                                      { flags: [{ patternId, start?, end?, text,
+                                                  rationale, severity?,
+                                                  suggestion? }],
+                                        modelTag, source? }
+                                      # If-Match: <hash>; relocates anchors;
+                                      # dedupes; flags with `suggestion` go
+                                      # straight to awaiting-accept.
 
 # user side: every choice is a Response, fired immediately
 POST   /docs/:id/responses            { flagId, body, kind: 'shortcut'|'free'|'let-me-try'|'skip'|'keep' }

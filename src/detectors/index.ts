@@ -175,7 +175,7 @@ export function runDetectors(source: string): Flag[] {
   return flags
 }
 
-function severityFor(patternId: string): number {
+export function severityFor(patternId: string): number {
   switch (patternId) {
     case 'antithesis':
     case 'absent-actor':

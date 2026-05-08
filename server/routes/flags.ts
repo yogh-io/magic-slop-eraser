@@ -1,12 +1,16 @@
 import type { DocStore } from '../store'
 import type { DocState } from '../types'
-import type { Comment, ResolutionEvent } from '../../src/types'
-import { relocateAnchor } from '../../src/anchoring/textAnchor'
+import type { Comment, Flag, FlagSource, ResolutionEvent, Suggestion, TextAnchor } from '../../src/types'
+import { makeAnchor, relocateAnchor } from '../../src/anchoring/textAnchor'
+import { patterns } from '../../src/catalog/patterns'
+import { severityFor } from '../../src/detectors'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
 import { fail } from '../auth'
 import { sha256Hex } from '../hash'
 import { reconcile } from '../reconcile'
+
+const patternMap = new Map(patterns.map((p) => [p.id, p]))
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -43,6 +47,115 @@ export async function handleFlags(
     if (status) flags = flags.filter((f) => (f.status ?? 'open') === status)
     flags.sort((a, b) => a.anchor.start - b.anchor.start)
     return json({ flags })
+  }
+
+  // POST /docs/:id/flags - agent submits LLM-detected flags (BYOM analysis)
+  // with optional inline suggestions. Each input flag carries patternId +
+  // anchor (start/end/text) + rationale; the server validates the anchor
+  // against current source (relocates if needed), dedupes against existing
+  // open flags, and creates Flag records. If `suggestion` is present, the
+  // server also creates a Suggestion (no respondedTo - agent-initial), and
+  // the flag goes straight to awaiting-accept so the author can take it
+  // without issuing a directive first.
+  if (segs.length === 0 && req.method === 'POST') {
+    const ifMatch = req.headers.get('if-match') ?? ''
+    if (ifMatch && ifMatch !== state.doc.sourceHash) {
+      return fail(412, 'source has moved (If-Match mismatch)')
+    }
+    const body = (await req.json().catch(() => null)) as {
+      flags?: AgentFlagInput[]
+      modelTag?: string
+      source?: FlagSource
+    } | null
+    if (!body || !Array.isArray(body.flags)) return fail(400, 'flags array required')
+    const fSource: FlagSource = body.source === 'user' ? 'user' : 'llm'
+    const modelTag = body.modelTag ?? 'unspecified'
+
+    const events: ResolutionEvent[] = []
+    const created: Flag[] = []
+    const skipped: Array<{ reason: string; patternId?: string; text?: string }> = []
+
+    for (const inp of body.flags) {
+      const meta = inp?.patternId ? patternMap.get(inp.patternId) : undefined
+      if (!meta) {
+        skipped.push({ reason: 'unknown patternId', patternId: inp?.patternId })
+        continue
+      }
+      if (typeof inp.text !== 'string' || inp.text.length === 0) {
+        skipped.push({ reason: 'text required', patternId: inp.patternId })
+        continue
+      }
+      if (typeof inp.rationale !== 'string' || inp.rationale.trim().length === 0) {
+        skipped.push({ reason: 'rationale required', patternId: inp.patternId })
+        continue
+      }
+
+      const located = locateAnchor(state.doc.source, inp)
+      if (!located) {
+        skipped.push({ reason: 'text not found in source', patternId: inp.patternId, text: inp.text })
+        continue
+      }
+      const anchor = makeAnchor(state.doc.source, located.start, located.end)
+
+      if (existsOpenFlag(state, inp.patternId, anchor)) {
+        skipped.push({ reason: 'duplicate of existing open flag', patternId: inp.patternId })
+        continue
+      }
+
+      const flagId = `llm-${crypto.randomUUID().slice(0, 8)}`
+      const stored: Flag = {
+        id: flagId,
+        patternId: inp.patternId,
+        category: meta.category,
+        source: fSource,
+        anchor,
+        rationale: inp.rationale.trim(),
+        excerpt: anchor.text,
+        severity: typeof inp.severity === 'number' ? inp.severity : severityFor(inp.patternId),
+        rung: meta.rung,
+        status: 'open',
+        createdAt: nowIso(),
+      }
+      state.flags[flagId] = stored
+
+      let suggestionEvent: ResolutionEvent | null = null
+      if (typeof inp.suggestion === 'string' && inp.suggestion.length > 0) {
+        const suggId = `s-${crypto.randomUUID().slice(0, 8)}`
+        const suggestion: Suggestion = {
+          id: suggId,
+          flagId,
+          pre: anchor.text,
+          post: inp.suggestion,
+          modelTag,
+          accepted: false,
+          createdAt: nowIso(),
+        }
+        state.suggestions[suggId] = suggestion
+        stored.status = 'awaiting-accept'
+        suggestionEvent = {
+          cursor: bumpCursor(state),
+          type: 'suggestion-added',
+          payload: { suggestionId: suggId, flagId, modelTag },
+          ts: nowIso(),
+        }
+      }
+
+      events.push({
+        cursor: bumpCursor(state),
+        type: 'flag-added',
+        payload: { flagId, patternId: stored.patternId, rung: stored.rung, source: fSource },
+        ts: nowIso(),
+      })
+      if (suggestionEvent) events.push(suggestionEvent)
+      created.push(stored)
+    }
+
+    await store.writeState(docId, state)
+    for (const e of events) {
+      await store.appendEvent(docId, e)
+      bus.publish(docId, e)
+    }
+    return json({ added: created.length, flags: created, skipped })
   }
 
   if (segs.length < 1) return fail(404, 'flag id required')
@@ -200,4 +313,53 @@ function pickAwaitingCandidate(state: DocState, flagId: string) {
     .filter((s) => s.flagId === flagId && !s.accepted)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   return list[0] ?? null
+}
+
+interface AgentFlagInput {
+  patternId: string
+  start?: number
+  end?: number
+  text: string
+  rationale: string
+  severity?: number
+  suggestion?: string
+}
+
+/**
+ * Find the agent's claimed anchor in the current source. Tries the exact
+ * start/end first; falls back to relocateAnchor with the prefix/suffix
+ * window built around `text`. Returns null if the text can't be located
+ * unambiguously.
+ */
+function locateAnchor(source: string, inp: AgentFlagInput): { start: number; end: number } | null {
+  const text = inp.text
+  if (
+    typeof inp.start === 'number' &&
+    typeof inp.end === 'number' &&
+    inp.start >= 0 &&
+    inp.end > inp.start &&
+    inp.end <= source.length &&
+    source.slice(inp.start, inp.end) === text
+  ) {
+    return { start: inp.start, end: inp.end }
+  }
+  // Fall back to single-occurrence search via relocateAnchor.
+  const provisional: TextAnchor = {
+    start: typeof inp.start === 'number' ? inp.start : 0,
+    end: typeof inp.end === 'number' ? inp.end : text.length,
+    text,
+    prefix: '',
+    suffix: '',
+  }
+  return relocateAnchor(source, provisional)
+}
+
+function existsOpenFlag(state: DocState, patternId: string, anchor: TextAnchor): boolean {
+  for (const f of Object.values(state.flags)) {
+    const status = f.status ?? 'open'
+    if (status !== 'open' && status !== 'awaiting-accept') continue
+    if (f.patternId !== patternId) continue
+    if (f.anchor.start === anchor.start && f.anchor.end === anchor.end) return true
+  }
+  return false
 }

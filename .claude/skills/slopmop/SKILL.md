@@ -1,6 +1,6 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-08.3
+skillVersion: 2026-05-08.4
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -21,15 +21,15 @@ Two entry points:
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-08.3` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+This file declares `skillVersion: 2026-05-08.4` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
 
 ```
-X-Skill-Version: 2026-05-08.3
+X-Skill-Version: 2026-05-08.4
 ```
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The slopmop skill I have installed (v2026-05-08.3) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-08.4) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 
@@ -57,13 +57,17 @@ If the author asks you to check for slopmop updates ("check for updates", "is th
 
 5. **Overwrite** the file with the fetched content using `Write`. Replace the whole file so frontmatter and body stay in sync - do not edit selectively.
 
-6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.3 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
+6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.4 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
 
 Do not try to re-parse this file mid-session - the harness loaded it once at startup and will not re-read until the next session.
 
-## the loop
+## the shape of the work
 
-This is the shape of the work, repeated until the author closes the session:
+Two phases. The first runs once at session start; the second runs on a loop.
+
+**Phase A - analysis (once, at start).** You read the catalogue, you read the source, you find slop, you post flags. This is bring-your-own-model: the slopmop server runs Rung 1 regex for you, but Rung 2 (passage-level judgment) and Rung 3 (presentation / editorial) need a model reading the prose, and that's you. Subagents over the source pay off here - one per Rung 2/3 pattern, dispatched in parallel, each a focused reader. Aggregate, dedupe, post.
+
+**Phase B - the steering loop (until the author says done).**
 
 1. **Pull** open work: `GET /docs/$ID/responses?status=pending` (with whatever filters narrow the queue - rung, category, severity, patternId, limit).
 2. **Process** each one: read the flag, the surrounding paragraph, the trail of prior directives + candidates on this flag. Pick a resolution path (per-flag patch or full-source push). Draft the candidate.
@@ -96,15 +100,83 @@ HASH=$(echo "$DOC" | jq -r .sourceHash)
 
 The doc id is the capability - anyone with the URL can drive the session, that's intentional. Treat it like any unguessable share link. Track `HASH` across the session. Every call that mutates the source returns the new hash in the response body; update your local copy each time.
 
-## 1. run mechanical detection
+## 1. analysis (BYOM)
 
-Once at the start, and again whenever the author asks. Emits flags for the whole catalogue's regex layer:
+You are the model. The catalogue is your spec. The slopmop server holds documents and orchestrates the loop, but it does not do passage-level reading - that's your job.
+
+### 1a. pull the catalogue once
+
+```bash
+curl -s "$HOST/catalogue" > /tmp/slopmop-catalogue.json
+```
+
+You get back `{ categories, patterns }`. Each pattern carries `id`, `category`, `name`, `severity`, `scope`, `rung`, `mechanical`, `blurb`, `whyItsSlop`, `fix`, often a long-form `essay`, `examples` with `sloppy` / `better` pairs, and a `skipRule` for false-positive guidance. Read them. The `whyItsSlop` and `skipRule` fields together are your detection spec - they describe what the pattern *is* and what it *isn't*.
+
+### 1b. trigger Rung 1 (server-side regex)
 
 ```bash
 curl -s -X POST "$HOST/docs/$ID/run-detectors"
 ```
 
-The author sweeps these flags in the browser. Their decisions arrive as Responses for you to pull.
+Cheap, deterministic, free. The server matches the catalogue's regex patterns against the source and emits Rung 1 flags. Don't redo this work; it's already done.
+
+### 1c. do Rung 2 / Rung 3 yourself
+
+Read `doc.source`. Walk the catalogue. For every pattern with `rung` 2 or 3 (and `mechanical: false`), find passages that match - by *reading*, not by regex. That's the whole point: these patterns are structural and contextual, and a model reading the prose is how they get caught.
+
+**Dispatch subagents.** This is where parallel subagents earn their keep. Pick a sharding strategy:
+
+- **One subagent per Rung 2 pattern.** Each gets the full source plus its assigned pattern's catalogue entry (`whyItsSlop`, `essay`, `examples`, `skipRule`). Returns a list of detected passages. Best when patterns are independent and the source isn't huge.
+- **One subagent per category, per rung.** Each handles 2-4 related patterns over the source. Cheaper if the source is long and you'd otherwise re-read it many times.
+- **One subagent per source section, walking all Rung 2/3 patterns at once.** Best when the source is long and section-coherent.
+
+Each subagent returns, per detected passage:
+
+- `patternId` (must match a catalogue id)
+- `text` (the exact substring)
+- `start`, `end` (character offsets into `doc.source`; if your subagent works in passages without offsets, just include `text` and the server will locate it)
+- `rationale` (1-2 sentences; the author reads this in the UI - explain why *this* passage is *that* pattern, not just restate the pattern)
+- `suggestion` (optional; an inline candidate rewrite)
+
+Aggregate the subagent outputs. Dedupe collisions on `patternId + text`. Drop matches that the catalogue's `skipRule` exempts.
+
+### 1d. submit your flags
+
+One batch, the source hash you have, agent-tagged.
+
+```bash
+curl -s -X POST -H "If-Match: $HASH" -H 'content-type: application/json' \
+  -d '{
+    "flags": [
+      {
+        "patternId": "absent-actor",
+        "start": 142,
+        "end": 198,
+        "text": "It was decided that the framework would be revised",
+        "rationale": "Passive plus \"it was decided\" hides who decided. The actor is unnamed; the sentence reads as policy by no one.",
+        "suggestion": "The committee revised the framework on Tuesday."
+      },
+      {
+        "patternId": "synthesis-of-nothing",
+        "text": "All of these threads point to a deeper question about how we should think about progress.",
+        "rationale": "The closer announces synthesis but synthesises nothing - it's a fortune-cookie ending pretending to be one. Drop it or replace with the actual takeaway.",
+        "suggestion": "We will not get better policy until the agencies start measuring what they ship."
+      }
+    ],
+    "modelTag": "claude-sonnet-4-6"
+  }' \
+  "$HOST/docs/$ID/flags"
+```
+
+The server validates each flag, relocates the anchor if the offsets don't line up exactly, dedupes against existing open flags, and returns `{ added, flags, skipped }`. Skipped entries carry a `reason` (`unknown patternId`, `text not found in source`, `duplicate of existing open flag`); use them to debug your detection.
+
+Flags without a `suggestion` go to status `open` - the author will sweep them and give a directive. Flags **with** a `suggestion` go straight to `awaiting-accept`: the author can take your candidate as-is, or push back with a directive. Either way they show up at their anchor in the UI.
+
+`If-Match` is optional but recommended. If the source moved between your read and your post (rare during analysis, more common during the steering loop), you get 412 - refetch the source, re-anchor, retry.
+
+### 1e. iterate if you want
+
+You can post more flags later (mid-loop, after re-reading sections, after the author asks you to look harder). Each `POST /flags` is incremental - you don't replace, you add. Dedupe is automatic, so re-running analysis is safe.
 
 ## 2. honour agent-hints
 
@@ -115,7 +187,7 @@ curl -s "$HOST/docs/$ID/agent-hints"
 # -> { "agentHints": { rungs?, categories?, severities?, patternIds?, paused? } }
 ```
 
-If `paused: true`, sleep and try later. Otherwise, fold the filter values into your responses pull as query params. The author can change hints mid-session, so re-read them between pulls.
+If `paused: true`, sleep and try later. Otherwise, fold the filter values into your responses pull as query params, and into your Phase A analysis (skip patterns the author has narrowed away). The author can change hints mid-session, so re-read them between pulls.
 
 ## 3. pull the queue
 
@@ -239,7 +311,9 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id` | Doc + counts + score + sourceHash + flags |
 | `PUT` | `/docs/:id/source` | Replace entire source (If-Match required) |
 | `POST` | `/docs/:id/source/revert` | Roll back to a prior version |
-| `POST` | `/docs/:id/run-detectors` | Run mechanical detectors |
+| `POST` | `/docs/:id/run-detectors` | Run mechanical (Rung 1) detectors server-side |
+| `GET` | `/catalogue` | Catalogue dump (no auth) - your detection spec |
+| `POST` | `/docs/:id/flags` | Submit your LLM-detected flags (with optional inline suggestions) |
 | `GET` | `/docs/:id/agent-hints` | Read author-set advisory filters |
 | `GET` | `/docs/:id/responses?status=pending&rung=&category=&severity=&patternId=&limit=` | Pull author directives (the queue) |
 | `POST` | `/docs/:id/responses/:rid/punt` | Agent gives up on a directive |
@@ -248,10 +322,12 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id/companion` | Full state for wrap-up |
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
 
-The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.3` so the server can flag staleness.
+The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.4` so the server can flag staleness.
 
 ## constraints
 
+- **You do the analysis, not the server.** This is bring-your-own-model. Server-side regex (`/run-detectors`) handles Rung 1; everything else is you reading the source against the catalogue, ideally with subagents in parallel. Never assume the server detected what only a model could detect.
+- **Rationales are read by the author.** When you post flags, write rationales the author wants to read in the UI. "Matches throat-clearing pattern" is dead weight; "the sentence opens with 'It's important to note that' before getting to the substance" is useful.
 - **Pull, don't push.** The author submits directives whenever they want; you pull when you have capacity. The queue holds work for you - none of it is missed if you're slow.
 - **Multiple candidates are fine.** Post one if there's a clear best take; post two or three when the directive admits real alternatives the author would want to compare. The author picks one, the rest become history. Don't manufacture filler variants - the bar is real difference, not coverage.
 - **Per-flag work is sequential, across flags is batched.** Pull a queue, process several in parallel, post a single resolutions batch. Then pull again.

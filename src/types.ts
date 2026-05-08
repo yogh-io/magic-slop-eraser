@@ -98,8 +98,10 @@ export interface Suggestion {
   /** The agent's candidate text. Replaces `pre` within the flag's anchor span
    *  when the user clicks accept. Until then it lives only as a render overlay. */
   post: string
-  /** The Response (directive) this candidate answers. */
-  respondedTo: string
+  /** The Response (directive) this candidate answers. Absent for agent-initial
+   *  suggestions submitted alongside flag detection (BYOM analysis), where the
+   *  candidate exists before any author directive. */
+  respondedTo?: string
   prompt?: string
   modelTag: string
   /** True once the user clicks accept and the source mutates; false while the

@@ -1,6 +1,6 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-08.6
+skillVersion: 2026-05-08.7
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -21,15 +21,15 @@ Two entry points:
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-08.6` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+This file declares `skillVersion: 2026-05-08.7` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
 
 ```
-X-Skill-Version: 2026-05-08.6
+X-Skill-Version: 2026-05-08.7
 ```
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The slopmop skill I have installed (v2026-05-08.6) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-08.7) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 
@@ -57,7 +57,7 @@ If the author asks you to check for slopmop updates ("check for updates", "is th
 
 5. **Overwrite** the file with the fetched content using `Write`. Replace the whole file so frontmatter and body stay in sync - do not edit selectively.
 
-6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.6 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
+6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.7 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
 
 Do not try to re-parse this file mid-session - the harness loaded it once at startup and will not re-read until the next session.
 
@@ -65,7 +65,7 @@ Do not try to re-parse this file mid-session - the harness loaded it once at sta
 
 Two phases. The first runs once at session start; the second runs on a loop.
 
-**Phase A - analysis (once, at start).** Bring-your-own-model: the slopmop server runs Rung 1 regex for you, but Rung 2 (judgment) and Rung 3 (editorial) need a model reading the prose. Read the source, walk the catalogue, post flags via `POST /flags`. Subagents (Task tool) parallelise this well; shape the dispatch as suits the prose.
+**Phase A - analysis (once, at start).** Bring-your-own-model: all detection is yours. Read the source, walk the catalogue, post flags via `POST /flags`. Subagents (Task tool) parallelise this well; shape the dispatch as suits the prose.
 
 **Phase B - the steering loop (until the author says done).**
 
@@ -102,7 +102,7 @@ The doc id is the capability - anyone with the URL can drive the session, that's
 
 ## 1. analysis (BYOM)
 
-You are the **drafter**. The slopmop server runs Rung 1 regex via `/run-detectors`; Rung 2 (judgment) and Rung 3 (editorial) need a model reading the prose, and that's you.
+You are the **drafter**. All detection - Rung 1 (lexical), Rung 2 (judgment), Rung 3 (editorial) - is yours. The server stores the catalogue, the docs, the flags, and orchestrates the steering loop, but it does not read prose. That's you.
 
 ### 1a. pull the catalogue
 
@@ -112,15 +112,9 @@ curl -s "$HOST/catalogue" > /tmp/slopmop-catalogue.json
 
 `{ categories, patterns }`. Each pattern carries `whyItsSlop`, `fix`, `examples` (sloppy / better pairs), `skipRule`, and often a long-form `essay`. That's your detection spec; the `skipRule` is your preservation rule.
 
-### 1b. trigger Rung 1
+### 1b. detect
 
-```bash
-curl -s -X POST "$HOST/docs/$ID/run-detectors"
-```
-
-### 1c. detect Rung 2 / Rung 3
-
-Walk the catalogue's Rung 2 and Rung 3 patterns over the source. Subagents parallelise this - shape the dispatch as fits the prose. A useful pattern: a quick voice-memo subagent first (register, formal devices the piece is using deliberately, passages that look like slop but aren't), then a detection subagent per rung seeded with the memo. But the dispatch is yours to choose; the prose tells you what shape works.
+Walk the catalogue against the source. Subagents parallelise this - shape the dispatch as fits the prose. A useful pattern: a quick voice-memo subagent first (register, formal devices the piece is using deliberately, passages that look like slop but aren't), then a detection subagent per rung seeded with the memo. But the dispatch is yours to choose; the prose tells you what shape works.
 
 What each detected flag should carry:
 
@@ -130,7 +124,7 @@ What each detected flag should carry:
 - `rationale` - why *this* passage is *that* pattern. The author reads it in the UI. "Matches throat-clearing" is dead weight; "the sentence opens with 'It's important to note that' before the substance, asking the reader's permission to make the point" is useful.
 - `suggestion` - optional inline candidate. Include when the fix is mechanical and short (a substitute, a cut, a clear active-voice rewrite). Omit when the rewrite needs the author's voice or judgment, and leave those for the steering loop.
 
-### 1d. submit
+### 1c. submit
 
 ```bash
 curl -s -X POST -H "If-Match: $HASH" -H 'content-type: application/json' \
@@ -285,9 +279,8 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id` | Doc + counts + score + sourceHash + flags |
 | `PUT` | `/docs/:id/source` | Replace entire source (If-Match required) |
 | `POST` | `/docs/:id/source/revert` | Roll back to a prior version |
-| `POST` | `/docs/:id/run-detectors` | Run mechanical (Rung 1) detectors server-side |
 | `GET` | `/catalogue` | Catalogue dump (no auth) - your detection spec |
-| `POST` | `/docs/:id/flags` | Submit your LLM-detected flags (with optional inline suggestions) |
+| `POST` | `/docs/:id/flags` | Submit your detected flags (with optional inline suggestions) |
 | `GET` | `/docs/:id/agent-hints` | Read author-set advisory filters |
 | `GET` | `/docs/:id/responses?status=pending&rung=&category=&severity=&patternId=&limit=` | Pull author directives (the queue) |
 | `POST` | `/docs/:id/responses/:rid/punt` | Agent gives up on a directive |
@@ -296,11 +289,11 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id/companion` | Full state for wrap-up |
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
 
-The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.6` so the server can flag staleness.
+The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.7` so the server can flag staleness.
 
 ## constraints
 
-- **You do Rung 2 / Rung 3 analysis, not the server.** Server-side regex (`/run-detectors`) handles Rung 1; everything else is reading.
+- **All detection is yours.** Rung 1, 2, and 3 - the server doesn't read prose. The catalogue is the spec; you walk it.
 - **The author shapes; you write.** Slopmop's loop is: you draft, author redirects via shape directives. Never ask the author to write the sentence.
 - **Pull, don't push.** The author submits directives whenever they want; you pull when you have capacity. The queue holds work for you - none of it is missed if you're slow.
 - **Multiple candidates are fine.** Post one if there's a clear best take; post two or three when the directive admits real alternatives the author would want to compare. The author picks one, the rest become history. Don't manufacture filler variants - the bar is real difference, not coverage.

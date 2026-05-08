@@ -39,9 +39,8 @@ function paragraphs(text: string | undefined): string[] {
     <header class="hd">
       <h1>{{ pattern.name }}</h1>
       <div class="badges">
-        <router-link :to="`/rungs`" :class="['rung', `rung-${pattern.rung}`]" :title="`Rung ${pattern.rung}`">R{{ pattern.rung }} · {{ pattern.rung === 1 ? 'mechanical' : pattern.rung === 2 ? 'passage judgment' : 'presentation' }}</router-link>
+        <router-link :to="`/rungs`" :class="['rung', `rung-${pattern.rung}`]" :title="`Rung ${pattern.rung}`">R{{ pattern.rung }} · {{ pattern.rung === 1 ? 'lexical' : pattern.rung === 2 ? 'passage judgment' : 'presentation' }}</router-link>
         <span :class="['sev', `sev-${pattern.severity}`]">{{ pattern.severity }}</span>
-        <span class="mech">{{ pattern.mechanical ? 'mechanical detector' : 'judgment detector' }}</span>
         <span class="scope">{{ pattern.scope }}-scope</span>
         <router-link :to="`/categories/${category.id}`" class="cat-tag">
           <span class="dot" :style="{ background: `var(--cat-${category.id})` }" />

@@ -25,6 +25,6 @@ slopmop ./article.md
 slopmop https://slopmop.io/d/abc123#t=xyz
 ```
 
-The skill walks you through Rung 1 (mechanical, regex), Rung 2 (passage-level judgment, LLM-assisted), and Rung 3 (presentation / editorial, human-driven). Each flag is a paired writing moment: the author defines shape, the agent drafts the prose, the author re-directs until the sentence lands. Per-flag work is sequential; across flags, the agent surfaces a batch and the author sweeps it with directives.
+The skill walks you through Rung 1 (lexical, word-and-phrase), Rung 2 (passage-level judgment), and Rung 3 (presentation / editorial). Detection is the drafter's job at every rung - the catalogue is the spec, the model reads the prose. Each flag is a paired writing moment: the author defines shape, the drafter writes the prose, the author re-directs until the sentence lands. Per-flag work is sequential; across flags, the drafter surfaces a batch and the author sweeps it with directives.
 
 See [`SKILL.md`](./SKILL.md) for the protocol.

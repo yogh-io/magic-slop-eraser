@@ -19,7 +19,6 @@ interface Entry {
 
 const entries: Entry[] = [
   { loc: '/', changefreq: 'monthly', priority: '0.8' },
-  { loc: '/local', changefreq: 'monthly', priority: '0.5' },
   { loc: '/about', changefreq: 'monthly', priority: '0.9' },
   { loc: '/rungs', changefreq: 'monthly', priority: '0.9' },
   { loc: '/categories', changefreq: 'weekly', priority: '0.9' },

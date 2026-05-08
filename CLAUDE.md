@@ -8,37 +8,34 @@ This file is the framework definition. Read it before working on the catalogue, 
 
 Slopmop identifies AI-slop patterns in prose and walks the writer through fixing them one at a time. The catalogue is a generalisation of the in-house deslop infrastructure built for `` (analytical-prose project), itself derived from the patterns one notices when one has read enough LLM output to be annoyed by it.
 
-The project organises every catalogued pattern into one of three **rungs**, ordered by *depth*. Rung 1 is the bottom (mechanical, surface-level, free) and Rung 3 is the top (structural, whole-piece, editorial). Detection difficulty is a separate axis (the `mechanical` boolean); a pattern can be mechanical to detect but still belong to Rung 3 if its fix requires substantial rewriting. The rung is what governs the user-facing workflow.
+The project organises every catalogued pattern into one of three **rungs**, ordered by *depth* (the *fix-shape* the pattern requires). Rung 1 is the bottom (lexical, word-and-phrase swap) and Rung 3 is the top (structural, whole-piece editorial rewrite). The rung governs the user-facing workflow.
 
 The numbering is **layer, not order**. An agent or author picks the entry rung based on the draft's stage: a structurally clean draft starts at Rung 1 and climbs up; a tangled draft starts at Rung 3 and works down so polish does not get spent on prose about to be cut.
 
+**Detection is the drafter's job at every rung.** All slopmop patterns are LLM-detected. The catalogue is the spec; the drafter (a Claude Code session, primarily) walks it against the source, applies each pattern's `skipRule` for context, and posts flags via `POST /docs/:id/flags`. The server stores documents, flags, and the steering-loop state. It does not read prose.
+
 ## The three rungs
 
-### Rung 1 - mechanical (bottom)
+### Rung 1 - lexical (bottom)
 
-- **Detection**: regex. Pure pattern matching against a fixed catalogue. Ships with no model dependency.
-- **Fix**: substitution or cut. A short / dumb-model LLM can suggest a replacement but is not required.
-- **Where it runs**: anywhere - in the browser, on the server, in the agent's process. No network call, no API key.
-- **Workflow**: one flag at a time. The agent pulls the flag list, walks each, pushes a proposed edit, waits for the human verdict. Same shape as the workshop pipeline in `/.claude/commands/workshop.md` - one-flag-at-a-time interactive loop, applied to the regex layer.
-- **Patterns currently here (11)**: `tier1-lexicon`, `tier2-lexicon`, `throat-clearing`, `closers`, `hedge-cluster`, `enthusiasm-inflation`, `vague-gravitas`, `antithesis` (mirror construct), `em-dash-density`, `false-precision`, `approval-seeking`.
-
-This rung is the heart of the project. It ships **open-source**. The plan is to **extract Rung 1 as a portable framework** so other prose tools can adopt the same catalogue without rebuilding it.
+- **Scope**: word and phrase. The dead AI vocabulary, throat-clearing openers, vague-gravitas closers, the mirror construct as a syntactic shape.
+- **Fix**: substitution or cut. Most fixes are one or two characters. The pattern says what to do; the drafter proposes the substitution; the author takes it, edits it, or rejects it.
+- **Workflow**: the simplest form of the steering loop. The drafter surfaces a batch of flags with substitutions proposed for each (inline `suggestion` field on the flag); the author sweeps with yes / cut / edit / skip / keep, often resolving most in a single pass. Lexical patterns rarely need re-direction - the substitution either lands or it does not.
+- **Patterns currently here**: `tier1-lexicon`, `tier2-lexicon`, `throat-clearing`, `closers`, `enthusiasm-inflation`, `vague-gravitas`, `antithesis` (mirror construct), `suffocation` (stacked hedges), `em-dash-density`, `false-precision`, `approval-seeking`.
 
 ### Rung 2 - passage-level judgment (middle)
 
-- **Detection**: a capable LLM reading a sentence, or a small cluster of two or three sentences, in paragraph context. Local regex misses these because the pattern is structural, not lexical: a passage whose subject is unnamed, a closer that synthesises nothing, a paragraph that walks across both sides without committing.
-- **Fix**: rewriting the passage with two or three candidate forms; sometimes a single word changes, sometimes the whole sentence is reshaped, sometimes a small cluster is rebuilt. Author picks one, customises, or rejects. Always reversible.
-- **Where it runs**: requires an LLM call. The agent invokes the model from its own side - whatever subscription or API access it already has - and posts suggestions back to the site.
-- **Workflow**: a *steering loop*, batched. The agent posts one or more candidates per flag (one when the directive is unambiguous, two or three when it admits real alternatives); the author sweeps the flag batch with shape directives ("more committal", "drop the qualifier", "punchline first", "cut to the verb"); the agent re-attempts each in the background; the author re-engages and re-directs until the sentence lands. Many short turns per flag, often across two or three sweeps. BETTER / WORSE / CLOSE is fuel for the next iteration, not a final ranking. No batch auto-fix - every accept is the author's.
-- **Patterns currently here (10)**: `absent-actor`, `allusive-construct`, `staccato`, `bidirectional-summary`, `hedged-confidence`, `pivot-to-balance`, `restating-question`, `synthesis-of-nothing`, `performative-humility`, `bullets-where-prose`.
+- **Scope**: a sentence, or a small cluster of two or three sentences, in paragraph context. The patterns here are structural, not lexical: a passage whose subject is unnamed, a closer that synthesises nothing, a paragraph that walks across both sides without committing.
+- **Fix**: rewriting the passage with one or more candidate forms. Sometimes a single word changes, sometimes the whole sentence is reshaped, sometimes a small cluster is rebuilt. Author picks one, customises, or rejects. Always reversible.
+- **Workflow**: a *steering loop*, batched. The drafter posts one or more candidates per flag (one when the directive is unambiguous, two or three when it admits real alternatives); the author sweeps with shape directives ("more committal", "drop the qualifier", "punchline first", "cut to the verb"); the drafter re-attempts each in the background; the author re-engages and re-directs until the sentence lands. BETTER / WORSE / CLOSE is fuel for the next iteration, not a final ranking. No batch auto-fix - every accept is the author's.
+- **Patterns currently here**: `absent-actor`, `allusive-construct`, `staccato`, `bidirectional-summary`, `hedged-confidence`, `pivot-to-balance`, `restating-question`, `synthesis-of-nothing`, `performative-humility`, `bullets-where-prose`.
 
 ### Rung 3 - presentation / editorial (top)
 
-- **Detection**: requires reading the piece as a piece. The question is whether its substance - the actual arguments, values, internal merits of what is being said - is coming through to the reader. Frame stacking buries the thesis under preamble; performative balance dilutes the position into nothing; header inflation pads scaffolding where the argument should carry weight. These are the moves a chief editor catches on the second read.
+- **Scope**: the piece as a piece. The question is whether its substance - the actual arguments, values, internal merits of what is being said - is coming through to the reader. Frame stacking buries the thesis under preamble; performative balance dilutes the position into nothing; header inflation pads scaffolding where the argument should carry weight. These are the moves a chief editor catches on the second read.
 - **Fix**: substantial rewrite focused on what the piece is *saying*, not just where it sits on the page. Outside the scope of an autonomous fixer. Slopmop flags positions where the presentation of the content needs reworking and gets out of the way.
-- **Where it runs**: outside the in-browser detector's scope. Slopmop flags positions; the rewrite is collaborative, slow, human-driven.
-- **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the agent reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the agent drafts the prose, the author re-directs. The relevant references in `` are `.claude/commands/workshop.md` (interactive multi-pass diagnostic + author-driven rewriting) and `.claude/commands/chief-edit.md` (the ship gate / blurb / preamble drafter). Rung 3 in slopmop is positioned as the entry point to that kind of workflow.
-- **Patterns currently here (3)**: `frame-stacking`, `performative-balance`, `header-inflation`.
+- **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the drafter reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the drafter drafts the prose, the author re-directs. The relevant references in `` are `.claude/commands/workshop.md` (interactive multi-pass diagnostic + author-driven rewriting) and `.claude/commands/chief-edit.md` (the ship gate / blurb / preamble drafter). Rung 3 in slopmop is positioned as the entry point to that kind of workflow.
+- **Patterns currently here**: `frame-stacking`, `performative-balance`, `header-inflation`.
 
 ## The loop: paired writing in batched turns
 
@@ -79,22 +76,22 @@ The shape:
 - **Browser (steering surface)** is where the writing happens *as steering*. The author sweeps batches of flags, gives shape directives, reviews returning candidates, accepts or re-directs. Accept / reject / edit / mark-deliberate / sweep-batch / submit-directives all live here.
 - **Writer (human)** holds the wheel. They define shape, react to drafts, decide what ships. The work is theirs; the agent is the keyboard. The author can also drive from the terminal via the agent directly when convenient - the browser and the terminal are equivalent surfaces onto the same state.
 
-This is the default flow. The browser-only paste-and-fix interface still exists as a fallback for users without an agent, but the project is designed agent-first.
+This is the only flow. There is no server-side detection - detection is the drafter's job. The browser without an agent attached gets you a session URL and an empty flag panel; the agent attached to that URL is what populates it.
 
-The Rung 1 layer is intentionally portable: the catalogue + regex detectors + scoring will be extractable as a standalone library other prose tools can vendor. Commercial / pricing model is not yet decided and is intentionally left out of this document; do not encode tier assumptions into the architecture.
+The catalogue is intentionally portable: a curated list of pattern entries with `whyItsSlop` / `fix` / `examples` / `skipRule` plus the rung classification. Other prose tools can vendor it as a prompt-spec library; the implementation that matters is whatever drafter walks the catalogue against the source. Commercial / pricing model is not yet decided and is intentionally left out of this document; do not encode tier assumptions into the architecture.
 
 ## Data model (planned for the hosted side)
 
 Source-of-truth entities the API exposes:
 
 - **Document**: source markdown, title, owner, word count, source hash (sha-256), version counter, created/updated timestamps. Source state has a small ring buffer of prior versions so revert is cheap.
-- **Flag**: an instance of a catalogued pattern at a specific anchor in a document. Carries `patternId`, `anchor` (start+end+prefix+suffix for relocation), `rung`, `severity`, `rationale`, current `status` (open / awaiting-accept / resolved / skipped / kept-deliberate / stale), and `source` (`mechanical` for server regex hits, `llm` for agent-detected via `POST /docs/:id/flags`, `user` for human-contributed).
+- **Flag**: an instance of a catalogued pattern at a specific anchor in a document. Carries `patternId`, `anchor` (start+end+prefix+suffix for relocation), `rung`, `severity`, `rationale`, current `status` (open / awaiting-accept / resolved / skipped / kept-deliberate / stale), and `source` (`llm` for drafter-detected via `POST /docs/:id/flags`, `user` for human-contributed).
 - **Response**: an author-issued directive on a flag (free text or a common-case shortcut: *more committal*, *drop the qualifier*, *punchline first*, *cut to the verb*, *let me try: <text>*, *skip*, *keep*). Each user choice persists immediately - no batch submit. Status: `pending` (waiting for agent) / `resolved` (agent posted a candidate) / `stuck` (agent gave up via punt) / `cancelled` (user rescinded). The trail of responses per flag is the steering history.
 - **Suggestion**: a candidate edit attached to a flag. Two origin paths: in response to a directive (`respondedTo` set), or as an inline candidate the agent bundles with a flag at detection time (`respondedTo` absent - the flag goes straight to `awaiting-accept`). Carries `pre` (the originally-anchored text), `post` (the candidate), the model tag, optional prompt context. Per-flag candidates do not mutate the source - the browser renders them as overlays over the anchor span. They land in the source only when the user explicitly clicks accept.
 - **Comment**: free-form thread on a flag (or on a document). Used for human-to-agent coordination and for capturing why a flag was kept deliberately or why the agent punted.
 - **Resolution event**: append-only log of state transitions on flags, responses, and source. The companion document at session end is rendered from this log.
 
-The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor scheme are the prototypes for the document/flag/anchor parts of this model. The server reuses `src/anchoring/textAnchor.ts` and `src/detectors/index.ts` directly so client and server share the same anchor relocation and detection logic.
+The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor scheme are the prototypes for the document/flag/anchor parts of this model. The server reuses `src/anchoring/textAnchor.ts` directly so client and server share the same anchor relocation logic.
 
 ## API surface
 
@@ -108,11 +105,8 @@ PUT    /docs/:id/source               { source }   # If-Match: <hash>; runs reco
 POST   /docs/:id/source/revert        { toVersion? }   # rolls back to a stored prior version
 DELETE /docs/:id
 
-# detection
-POST   /docs/:id/run-detectors        # Rung 1 server-side regex
-                                      -> emits flag-added events; returns flag list
-POST   /docs/:id/flags                # agent-side LLM detection (BYOM)
-                                      { flags: [{ patternId, start?, end?, text,
+# detection (drafter-side; BYOM)
+POST   /docs/:id/flags                { flags: [{ patternId, start?, end?, text,
                                                   rationale, severity?,
                                                   suggestion? }],
                                         modelTag, source? }
@@ -183,21 +177,22 @@ The API is the contract; the browser UI and any agent skill (Claude Code, Codex,
 
 ## The score
 
-The 0-10 score is computed from **Rung 1 hits only**. A score of 10 means the piece has no detectable Rung 1 slop. Rationale: Rung 2 and Rung 3 are reading-comprehension work; reducing them to a number would flatter the score in ways that would feel like progress without being it. The score is a Rung 1 milestone, not a verdict on the piece. Rung 2 and Rung 3 counts are reported separately on the analyse view.
+The 0-10 score is currently computed from **Rung 1 hits only**, server-side, from `Flag.severity` weights. Score is a milestone, not a verdict.
+
+This is in flux. The next iteration is drafter-computed: the drafter walks all three rungs, weights each finding subjectively (informed by the voice memo - a piece's deliberate moves don't count against it), and posts an overall score plus a per-pattern breakdown. The UI surfaces overall score and lets the user drill into per-pattern weight if they want. Until that lands, the server-side Rung 1 score is what's shown.
 
 ## Cross-cutting metadata
 
-Every pattern carries five super-category tags. They are independent axes; a pattern can be filtered by any combination.
+Every pattern carries four super-category tags. They are independent axes; a pattern can be filtered by any combination.
 
 | Tag | Values | What it means |
 |---|---|---|
-| `rung` | 1 / 2 / 3 | Depth of the pattern (mechanical / sentence / structural). Drives the workflow. |
-| `mechanical` | boolean | Detection difficulty. True = regex-friendly. |
+| `rung` | 1 / 2 / 3 | Depth of the fix (lexical / sentence / structural). Drives the workflow. |
 | `scope` | word / phrase / sentence / paragraph / piece | Operating scope on the prose. |
 | `category` | lexical / structural / argumentative / tonal / format | The five high-level categories from the original DESLOP-GUIDE. |
-| `severity` | primary / high / medium / low | How hard it pulls down the score and how aggressively to flag it. |
+| `severity` | primary / high / medium / low | A nominal weight; overridable per-flag at detection time by drafter judgement. |
 
-The catalogue UI (`/categories`) lets users filter on all five.
+The catalogue UI (`/categories`) lets users filter on all four.
 
 ## Voice / writing style across the project
 
@@ -223,9 +218,9 @@ Gated pages (`AnalyzePage`, `OnlineDocPage`) render `LockedNotice` when locked a
 ## What does NOT belong here
 
 - **No batch auto-fixing.** Every change is the author's. Even Rung 1 fixes are confirmed one at a time.
-- **No score for Rung 2 / Rung 3.** They are reported as counts, not folded into the 0-10.
+- **No server-side detection.** The drafter does all detection. The server stores documents, flags, and orchestrates the steering loop.
 - **No autonomous Rung 3 rewriting.** Slopmop flags positions; the rewrite is collaborative, by design.
-- **No bypass of the API.** The browser UI and any agent skill are all clients of the same API surface. If something works in one but not the other, the API is incomplete.
+- **No bypass of the API.** The browser UI and any drafter skill are all clients of the same API surface. If something works in one but not the other, the API is incomplete.
 
 ## File layout
 
@@ -235,8 +230,8 @@ src/
     categories.ts       # 5 categories with essays
     patterns.ts         # 24 patterns with full metadata + essays
   detectors/
-    index.ts            # all Rung 1 mechanical detectors
-    skipZones.ts        # code-block / blockquote exclusions
+    index.ts            # scoring helpers (severityFor, scoreFromFlags); detection itself is drafter-side
+    skipZones.ts        # code-block / blockquote exclusions (used for word-count and as drafter context)
   anchoring/
     textAnchor.ts       # robust text anchors (prefix+suffix)
     domHighlight.ts     # DOM walker for injecting <mark> spans
@@ -270,17 +265,17 @@ src/
 server/                 # Bun-based API. Imports src/anchoring + src/detectors directly.
   main.ts               # Bun.serve entry, route dispatch, static file serving
   shared.ts             # json/notFound helpers
-  auth.ts               # Bearer-token check
+  auth.ts               # fail() helper (no auth - doc UUID is the capability)
   bus.ts                # in-memory per-doc pub/sub for SSE
   types.ts              # DocState, DocRecord, NewDocInput
   store/
     index.ts            # DocStore interface + factory
     disk.ts             # DiskStore: state.json + events.ndjson
   routes/
-    docs.ts             # /docs, /docs/:id, source, run-detectors, companion
-    flags.ts            # /docs/:id/flags + per-flag actions
+    docs.ts             # /docs, /docs/:id, source, companion, agent-hints, voice-samples
+    flags.ts            # /docs/:id/flags (POST: drafter-side detection) + per-flag actions
     events.ts           # SSE + long-poll
-    catalogue.ts        # read-only catalogue dump
+    catalogue.ts        # read-only catalogue dump (the drafter's detection spec)
 
 .claude/skills/slopmop/  # the workshop loop as an agent skill
   SKILL.md              # protocol document
@@ -292,10 +287,10 @@ Dockerfile              # multi-stage: Node frontend build + Bun runtime
 
 ## Adding a pattern
 
-1. Decide the rung. Use depth, not detection difficulty: if the fix is "substitute or cut", it's Rung 1. If the fix is "rewrite the sentence with options", Rung 2. If the fix touches the whole piece, Rung 3.
+1. Decide the rung. Use fix-shape: if the fix is "substitute or cut a word/phrase", it's Rung 1. If the fix is "rewrite the sentence with options", Rung 2. If the fix touches the whole piece, Rung 3.
 2. Pick a category from the existing five. If a pattern doesn't fit, push back rather than create a sixth.
-3. Add the entry to `src/catalog/patterns.ts` with all required fields: `id`, `category`, `name`, `severity`, `scope`, `rung`, `mechanical`, `blurb`, `whyItsSlop`, `fix`, `examples`. Optional: `essay`, `subShapes`, `skipRule`, `shortName`.
-4. If `mechanical: true`, add a detector function in `src/detectors/index.ts` and register it in `ALL_DETECTORS`. Add a severity weight in `severityFor`. Consider whether the pattern deserves a score ceiling.
+3. Add the entry to `src/catalog/patterns.ts` with all required fields: `id`, `category`, `name`, `severity`, `scope`, `rung`, `blurb`, `whyItsSlop`, `fix`, `examples`. Optional: `essay`, `subShapes`, `skipRule`, `shortName`. Make `whyItsSlop` and `skipRule` strong - those are what the drafter reads as its detection spec.
+4. Add a severity weight in `src/detectors/index.ts:severityFor` if the pattern is severe enough to deserve more than the 0.6 default. Consider whether the pattern deserves a score ceiling in `scoreFromFlags`.
 5. Verify in the browser: navigate to `/patterns/<id>` and check the page renders. Check the catalogue grid. Check the filter chips count correctly.
 
 ## Removing a pattern

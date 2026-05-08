@@ -81,14 +81,13 @@ async function route(req: Request): Promise<Response> {
     const verb = segs[2] ?? null
     const subVerb = segs[3] ?? null
 
-    // /docs/:id  or  /docs/:id/source[/revert]  or  /docs/:id/run-detectors
+    // /docs/:id  or  /docs/:id/source[/revert]
     // or /docs/:id/agent-hints  or /docs/:id/voice-samples  or /docs/:id/companion
     if (segs.length === 2) {
       return handleDocs(req, store, docId, null)
     }
     if (
       verb === 'source' ||
-      verb === 'run-detectors' ||
       verb === 'agent-hints' ||
       verb === 'voice-samples' ||
       verb === 'companion'

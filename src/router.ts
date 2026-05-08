@@ -8,12 +8,6 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: 'Analyse' },
   },
   {
-    path: '/local',
-    name: 'local',
-    component: () => import('./pages/LocalAnalysisPage.vue'),
-    meta: { title: 'Local scratchpad' },
-  },
-  {
     path: '/categories',
     name: 'categories',
     component: () => import('./pages/CategoriesPage.vue'),

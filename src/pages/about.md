@@ -8,7 +8,7 @@ The bar is *actually annoying*, not *AI-fingerprint*. We curate against "would a
 
 ## The rungs
 
-The catalogue organises patterns by *depth* into three [Rungs](/rungs): mechanical (regex, free), passage-level judgment (LLM-assisted), and presentation / editorial (whole-piece). The numbering is layer, not order - clean drafts climb from the bottom; tangled drafts start at the top and work down. The score is Rung 1 only.
+The catalogue organises patterns by *depth* into three [Rungs](/rungs): lexical (word and phrase), passage-level judgment (sentence and small cluster), and presentation / editorial (whole-piece). The numbering is layer, not order - clean drafts climb from the bottom; tangled drafts start at the top and work down. Detection is the drafter's job; the catalogue is the spec.
 
 ## The loop
 
@@ -24,4 +24,4 @@ The protocol the agent runs against is published as a [skill](/skill) - a `SKILL
 
 ## Desloppifier or editorial tool
 
-Honest answer: we do not know yet. Rung 1 is a desloppifier - regex, free, portable. Rung 3 is an editorial workshop - whole-piece rewrites, slow, collaborative. We will find out which centre of gravity wins by using the tool on our own writing. For now the bottom rung is the front door and the top rung is the destination.
+Honest answer: we do not know yet. Rung 1 is a desloppifier - lexical hits, fast to fix. Rung 3 is an editorial workshop - whole-piece rewrites, slow, collaborative. We will find out which centre of gravity wins by using the tool on our own writing. For now the bottom rung is the front door and the top rung is the destination.

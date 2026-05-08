@@ -15,8 +15,6 @@ useOgHead(() => ({
 
 const categoryOrder: CategoryId[] = categories.map((c) => c.id)
 
-type DetectionMode = 'mechanical' | 'judgment'
-const ALL_DETECTIONS: DetectionMode[] = ['mechanical', 'judgment']
 type Severity = PatternMeta['severity']
 const ALL_SEVERITIES: Severity[] = ['primary', 'high', 'medium', 'low']
 // word/phrase scopes are hidden from the filter UI for now; patterns with those
@@ -25,7 +23,6 @@ const ALL_SCOPES: Scope[] = ['sentence', 'paragraph', 'piece']
 const ALL_RUNGS: Rung[] = [1, 2, 3]
 
 interface Filters {
-  detections: Set<DetectionMode>
   severities: Set<Severity>
   categories: Set<CategoryId>
   scopes: Set<Scope>
@@ -33,7 +30,6 @@ interface Filters {
 }
 
 const filters = reactive<Filters>({
-  detections: new Set(ALL_DETECTIONS),
   severities: new Set(ALL_SEVERITIES),
   categories: new Set(categoryOrder),
   scopes: new Set(ALL_SCOPES),
@@ -50,8 +46,6 @@ const orderedPatterns = computed(() => {
 
 const visiblePatterns = computed(() =>
   orderedPatterns.value.filter((p) => {
-    const mode: DetectionMode = p.mechanical ? 'mechanical' : 'judgment'
-    if (!filters.detections.has(mode)) return false
     if (!filters.severities.has(p.severity)) return false
     if (!filters.categories.has(p.category)) return false
     if (ALL_SCOPES.includes(p.scope) && !filters.scopes.has(p.scope)) return false
@@ -62,29 +56,12 @@ const visiblePatterns = computed(() =>
 
 const isFiltered = computed(() => {
   return (
-    filters.detections.size !== ALL_DETECTIONS.length ||
     filters.severities.size !== ALL_SEVERITIES.length ||
     filters.categories.size !== categoryOrder.length ||
     filters.scopes.size !== ALL_SCOPES.length ||
     filters.rungs.size !== ALL_RUNGS.length
   )
 })
-
-function toggleDetection(d: DetectionMode): void {
-  if (filters.detections.size === 1 && filters.detections.has(d)) {
-    filters.detections = new Set(ALL_DETECTIONS)
-    return
-  }
-  if (filters.detections.size === ALL_DETECTIONS.length) {
-    filters.detections = new Set([d])
-    return
-  }
-  const next = new Set(filters.detections)
-  if (next.has(d)) next.delete(d)
-  else next.add(d)
-  if (next.size === 0) filters.detections = new Set(ALL_DETECTIONS)
-  else filters.detections = next
-}
 
 function toggleSeverity(s: Severity): void {
   // If only this severity is currently selected, treat the click as "show all" (toggle behaviour
@@ -155,7 +132,6 @@ function toggleRung(r: Rung): void {
 }
 
 function resetFilters(): void {
-  filters.detections = new Set(ALL_DETECTIONS)
   filters.severities = new Set(ALL_SEVERITIES)
   filters.categories = new Set(categoryOrder)
   filters.scopes = new Set(ALL_SCOPES)
@@ -224,21 +200,9 @@ function categoryName(id: CategoryId): string {
             @click="toggleRung(r)"
           >
             <span class="rung-mark">R{{ r }}</span>
-            <span>{{ r === 1 ? 'mechanical' : r === 2 ? 'passage judgment' : 'presentation' }}</span>
+            <span>{{ r === 1 ? 'lexical' : r === 2 ? 'passage judgment' : 'presentation' }}</span>
           </button>
           <router-link to="/rungs" class="filter-link">what are rungs?</router-link>
-        </div>
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">detection</span>
-        <div class="chips">
-          <button
-            v-for="d in ALL_DETECTIONS"
-            :key="d"
-            :class="['chip', { active: filters.detections.has(d) }]"
-            @click="toggleDetection(d)"
-          >{{ d }}</button>
         </div>
       </div>
 

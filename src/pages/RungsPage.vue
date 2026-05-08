@@ -26,12 +26,12 @@ interface RungInfo {
 const rungs: RungInfo[] = [
   {
     id: 1,
-    label: 'Rung 1 - mechanical',
-    tagline: 'Word-and-phrase slop. Bottom rung. Free.',
-    who: 'A regex finds it. A short, dumb model could suggest a replacement, but does not have to.',
-    detection: 'Mechanical pre-pass. Pure pattern matching against a fixed catalogue. The whole detector ships with no model dependency.',
+    label: 'Rung 1 - lexical',
+    tagline: 'Word-and-phrase slop. Bottom rung.',
+    who: 'A reader spots the word and the fix is a substitution or a cut. The drafter catches these on its first scan; the author sweeps and resolves most in one pass.',
+    detection: 'Word- or phrase-level recognition against the catalogue. The drafter applies each pattern\'s `whyItsSlop` and `skipRule` to the source - "delve" in metaphorical use is slop; "delve into the soil samples" is fine, the catalogue says so. Context decides; the model handles context.',
     fix: 'Substitute or cut. Most fixes are one or two characters. The pattern says what to do; the writer (or the agent acting on their behalf) takes the proposed replacement, edits it, or rejects it.',
-    workflow: 'The simplest form of the steering loop. The agent surfaces a batch of flags with a substitution proposed for each; the author sweeps with yes / cut / edit / skip / keep, often resolving most of them in a single pass. Mechanical patterns rarely need re-direction - the substitution either lands or it does not.',
+    workflow: 'The simplest form of the steering loop. The agent surfaces a batch of flags with a substitution proposed for each; the author sweeps with yes / cut / edit / skip / keep, often resolving most of them in a single pass. Lexical patterns rarely need re-direction - the substitution either lands or it does not.',
     whatLivesHere: 'The canonical AI lexicon, throat-clearing openers, closers, suffocation (stacked hedges), enthusiasm inflation, vague gravitas, and the mirror construct.',
   },
   {
@@ -68,14 +68,13 @@ const counts = computed(() => {
     <header class="hd">
       <h1>The three rungs</h1>
       <p class="lede">
-        Slop is not all the same. Some of it is one dead word that a regex finds and a substitution
-        replaces. Some of it is a clumsy sentence the writer cannot see in their own draft but can
-        fix in two minutes if pointed at it. Some of it is the whole piece arguing with itself,
-        requiring substantial rewrites. The rungs organise these by <em>depth</em>, not by
-        difficulty.
+        Slop is not all the same. Some of it is one dead word a substitution replaces. Some of it
+        is a clumsy sentence the writer cannot see in their own draft but can fix in two minutes if
+        pointed at it. Some of it is the whole piece arguing with itself, requiring substantial
+        rewrites. The rungs organise these by <em>depth</em>, not by difficulty.
       </p>
       <p class="lede">
-        The numbering is layer, not order. Rung 1 is the bottom (mechanical, surface-level) and
+        The numbering is layer, not order. Rung 1 is the bottom (lexical, word-and-phrase) and
         Rung 3 is the top (structural, whole-piece). An agent or author picks the entry rung based
         on the draft's stage - a structurally clean piece can start at Rung 1 and climb up; a
         tangled draft starts at Rung 3 and works down so polish does not get spent on prose about

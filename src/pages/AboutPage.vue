@@ -11,7 +11,7 @@ const html = computed(() => md.render(aboutSrc))
 useOgHead(() => ({
   title: 'Methodology',
   description:
-    'How slopmop works: the three rungs (mechanical, passage-level judgment, presentation), the paired-writing steering loop, and the catalogue curation principle.',
+    'How slopmop works: the three rungs (lexical, passage-level judgment, presentation), the paired-writing steering loop, and the catalogue curation principle.',
   path: '/about',
   ogType: 'article',
 }))

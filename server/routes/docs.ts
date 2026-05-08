@@ -2,7 +2,7 @@ import type { DocStore } from '../store'
 import type { DocState, NewDocInput, SourceVersion } from '../types'
 import { SOURCE_HISTORY_LIMIT } from '../types'
 import type { AgentHints, Flag, ResolutionEvent } from '../../src/types'
-import { runDetectors, scoreFromFlags } from '../../src/detectors'
+import { scoreFromFlags } from '../../src/detectors'
 import { extractSkipZones, approximateProseWordCount } from '../../src/detectors/skipZones'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
@@ -148,31 +148,6 @@ export async function handleDocs(
     return json({ ok: true, version: state.doc.version, sourceHash: state.doc.sourceHash })
   }
 
-  // POST /docs/:id/run-detectors
-  if (verb === 'run-detectors' && req.method === 'POST') {
-    const newFlags = runDetectors(state.doc.source)
-    const events: ResolutionEvent[] = []
-    for (const flag of newFlags) {
-      // Dedupe: if an open flag already exists with the same patternId at the same anchor span, skip.
-      if (existsOpenFlag(state, flag)) continue
-      const id = `mech-${crypto.randomUUID().slice(0, 8)}`
-      const stored: Flag = { ...flag, id, status: 'open', rung: rungFor(flag.patternId) }
-      state.flags[id] = stored
-      events.push({
-        cursor: bumpCursor(state),
-        type: 'flag-added',
-        payload: { flagId: id, patternId: stored.patternId, rung: stored.rung },
-        ts: nowIso(),
-      })
-    }
-    await store.writeState(docId, state)
-    for (const e of events) {
-      await store.appendEvent(docId, e)
-      bus.publish(docId, e)
-    }
-    return json({ added: events.length, flags: Object.values(state.flags) })
-  }
-
   // GET / PUT /docs/:id/agent-hints
   if (verb === 'agent-hints' && subVerb === null) {
     if (req.method === 'GET') return json({ agentHints: state.agentHints })
@@ -229,36 +204,6 @@ function countsByRung(flags: Flag[]): { 1: number; 2: number; 3: number } {
   const out = { 1: 0, 2: 0, 3: 0 }
   for (const f of flags) out[(f.rung ?? 1) as 1 | 2 | 3] += 1
   return out
-}
-
-function rungFor(patternId: string): 1 | 2 | 3 {
-  const r2 = new Set([
-    'absent-actor',
-    'allusive-construct',
-    'staccato',
-    'bidirectional-summary',
-    'hedged-confidence',
-    'pivot-to-balance',
-    'restating-question',
-    'synthesis-of-nothing',
-    'performative-humility',
-    'bullets-where-prose',
-  ])
-  const r3 = new Set(['frame-stacking', 'performative-balance', 'header-inflation'])
-  if (r3.has(patternId)) return 3
-  if (r2.has(patternId)) return 2
-  return 1
-}
-
-function existsOpenFlag(state: DocState, candidate: Flag): boolean {
-  for (const f of Object.values(state.flags)) {
-    if ((f.status ?? 'open') !== 'open' && (f.status ?? 'open') !== 'awaiting-accept') continue
-    if (f.patternId !== candidate.patternId) continue
-    if (f.anchor.start === candidate.anchor.start && f.anchor.end === candidate.anchor.end) {
-      return true
-    }
-  }
-  return false
 }
 
 function pushHistory(state: DocState, cause: SourceVersion['cause']): void {

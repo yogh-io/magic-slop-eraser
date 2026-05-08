@@ -23,9 +23,8 @@ export interface ReconcileResult {
  *  - Anchor fails to relocate → flag goes stale. Pending responses cancelled.
  *    Awaiting candidates discarded.
  *
- * Does NOT re-run mechanical detectors. New flags are surfaced only when the
- * caller explicitly requests another detection pass via `POST /run-detectors`,
- * so the user controls when new slop appears in the queue.
+ * Does NOT trigger detection. New flags only appear when the drafter posts
+ * them via `POST /docs/:id/flags`. Reconcile is a relocator, not a detector.
  *
  * Mutates `state` in place and returns the events to append + publish. The
  * caller persists the state and ships the events.

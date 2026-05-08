@@ -9,7 +9,6 @@ export const patterns: PatternMeta[] = [
     shortName: 'Tier 1',
     severity: 'high',
     scope: 'word',
-    mechanical: true,
     rung: 1,
     blurb:
       'The canonical AI vocabulary. Almost no human writer reaches for these; LLMs love them.',
@@ -46,7 +45,6 @@ The model reaches for them not because they describe anything but because they w
     name: 'Throat-clearing openers',
     severity: 'high',
     scope: 'phrase',
-    mechanical: true,
     rung: 1,
     blurb:
       'Sentence-opening phrases that announce "I am about to say something" instead of just saying it.',
@@ -80,7 +78,6 @@ A real writer does not say "importantly." The word "importantly" is the writer a
     name: 'Closer phrases',
     severity: 'high',
     scope: 'phrase',
-    mechanical: true,
     rung: 1,
     blurb: 'Phrases that announce the end and add nothing.',
     essay: `In conclusion, ultimately, all in all, this is the writer raising a hand to be excused before saying the line that was supposed to land on its own. "All in all" is the writer who did not earn the conclusion drafting a small ceremony in lieu of one.
@@ -111,7 +108,6 @@ A kicker is the moment a piece's argument lands and the line lands with it. The 
     name: 'Suffocation',
     severity: 'primary',
     scope: 'sentence',
-    mechanical: true,
     rung: 1,
     blurb:
       'Three or more hedges (generally, typically, often, somewhat, perhaps, possibly...) stacked into a single sentence until the claim cannot breathe.',
@@ -140,7 +136,6 @@ The model does this because the gradient that produced it punishes wrongness mor
     name: 'Enthusiasm inflation',
     severity: 'medium',
     scope: 'word',
-    mechanical: true,
     rung: 1,
     blurb: 'When everything is fascinating, nothing is.',
     essay: `A fascinating pattern with profound implications - remarkable in scope, striking in frequency, compelling enough that the model has to rate its own observations to get them across to a reader who would otherwise not be impressed. The model has been trained that "fascinating" pairs with "development" and "remarkable" pairs with "shift," and so it pairs them, on autopilot, in the absence of any actual fascination on its part - it is, after all, a function.
@@ -166,7 +161,6 @@ The reader's enthusiasm budget runs out around the second "remarkable." After th
     name: 'Vague gravitas',
     severity: 'high',
     scope: 'phrase',
-    mechanical: true,
     rung: 1,
     blurb: 'Phrases that simulate insight without delivering it.',
     essay: `This pattern raises important questions about how prose simulates insight without delivering any, with profound implications for the reader who keeps waiting for the implications to arrive. "Has profound implications" is what a sentence says about itself when it has nothing implied.
@@ -200,7 +194,6 @@ The trick of the form is that it gestures at meaning without committing any. The
     shortName: 'Absent actor',
     severity: 'primary',
     scope: 'sentence',
-    mechanical: false,
     rung: 2,
     blurb:
       'Load-bearing claims that turn on what no one is doing, has done, can do, or will say.',
@@ -244,7 +237,6 @@ It feels devastating because it sounds like the writer has gone past the availab
     name: 'Allusive construct',
     severity: 'primary',
     scope: 'sentence',
-    mechanical: false,
     rung: 2,
     blurb:
       'The shape is "[unspecific] [relates to] [unspecific]." Both ends abstract or back-referring; the verb does the work.',
@@ -287,7 +279,6 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
     shortName: 'Mirror',
     severity: 'primary',
     scope: 'sentence',
-    mechanical: true,
     rung: 1,
     blurb:
       '"Not X - it\'s Y." The shape isn\'t making an argument; it\'s borrowing the cadence of one. The most reflexive structural move in LLM output.',
@@ -327,7 +318,6 @@ This isn't subtle craft - it's a reflex. The cadence is unmistakable: a beat, a 
     name: 'Frame stacking',
     severity: 'high',
     scope: 'piece',
-    mechanical: false,
     rung: 3,
     blurb:
       'Same evaluative template applied to multiple subjects in sequence (Engineering: ... / Sales: ... / Marketing: ...).',
@@ -358,7 +348,6 @@ The form announces "I have considered every relevant party" while delivering the
     name: 'Hedged confidence',
     severity: 'high',
     scope: 'sentence',
-    mechanical: false,
     rung: 2,
     blurb:
       'Statements emphatic in tone but vague in claim. Sounds like an argument; commits to nothing.',
@@ -393,7 +382,6 @@ Read it twice. There is no claim. There is the shape of a claim, the register of
     name: 'Synthesis of nothing',
     severity: 'high',
     scope: 'sentence',
-    mechanical: false,
     rung: 2,
     blurb:
       'Closing sentence that synthesises nothing. "Ultimately the relationship is complex and reflects broader dynamics."',
@@ -422,7 +410,6 @@ Cut the line and the piece loses nothing because the line carried nothing. The m
     name: 'Performative balance',
     severity: 'high',
     scope: 'paragraph',
-    mechanical: false,
     rung: 2,
     blurb:
       'Symmetrical balance - at the sentence, paragraph, or whole-piece scale - used as a cushion against committing to a position.',
@@ -464,7 +451,6 @@ The model is, by training, allergic to commitment - any side it picks could be t
     name: 'Lens-fits-everything',
     severity: 'high',
     scope: 'piece',
-    mechanical: false,
     rung: 3,
     blurb:
       'Pick a famous analytical lens (game theory, principal-agent, Overton window) and force the subject through it whether or not it fits.',

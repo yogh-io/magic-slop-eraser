@@ -86,7 +86,7 @@ function rungLabel(r: number | undefined): string {
 }
 
 function rungName(r: number | undefined): string {
-  if (r === 1) return 'mechanical'
+  if (r === 1) return 'lexical'
   if (r === 2) return 'passage'
   if (r === 3) return 'presentation'
   return 'unknown'

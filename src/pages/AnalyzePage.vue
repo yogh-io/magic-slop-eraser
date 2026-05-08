@@ -67,8 +67,6 @@ async function createSession(): Promise<void> {
       throw new Error(`${r.status}: ${await r.text()}`)
     }
     const created = (await r.json()) as { id: string }
-    // Auto-run detectors so flags exist when the user lands on the doc page.
-    await fetch(`/docs/${created.id}/run-detectors`, { method: 'POST' })
     await router.push({ path: `/d/${created.id}` })
   } catch (e) {
     errorMsg.value = e instanceof Error ? e.message : String(e)
@@ -85,10 +83,10 @@ async function createSession(): Promise<void> {
       <p class="kicker">start a session</p>
       <h1>Paste an article. Get a steering URL.</h1>
       <p class="lede">
-        Drop prose in below. We mint a private session, run the mechanical detectors, and
-        hand back a URL. Open it yourself, or hand it to an agent (Claude Code, Codex,
-        opencode, our hosted reviewer) - they pull directives, you direct fixes. Either
-        side can drive; the document is the source of truth.
+        Drop prose in below. We mint a private session and hand back a URL. Open it
+        yourself, or hand it to an agent (Claude Code primarily) - it walks the catalogue
+        against your prose, posts flags, drafts candidates from your directives. You
+        sweep, redirect, accept. The document is the source of truth.
       </p>
     </header>
 
@@ -123,8 +121,6 @@ async function createSession(): Promise<void> {
         <button type="button" class="quiet" @click="loadSample" :disabled="submitting">
           load a sample
         </button>
-        <span class="spacer" />
-        <router-link to="/local" class="alt">…or analyse locally without a session</router-link>
       </div>
     </form>
 

@@ -44,8 +44,8 @@ function paragraphs(text: string | undefined): string[] {
       <p v-for="(para, i) in paragraphs(category.essay)" :key="i">{{ para }}</p>
     </section>
 
-    <p class="blurb mechanical-hint">
-      <span class="muted">Mechanical summary:</span> {{ category.blurb }}
+    <p class="blurb summary-hint">
+      <span class="muted">Summary:</span> {{ category.blurb }}
     </p>
 
     <h2 class="section-rule">The patterns in this category</h2>
@@ -58,7 +58,7 @@ function paragraphs(text: string | undefined): string[] {
           </h2>
           <div class="badges">
             <span :class="['sev', `sev-${p.severity}`]">{{ p.severity }}</span>
-            <span class="mech">{{ p.mechanical ? 'mechanical' : 'judgment' }}</span>
+            <span :class="['rung', `rung-${p.rung}`]">R{{ p.rung }}</span>
           </div>
         </header>
         <p class="blurb">{{ p.blurb }}</p>
@@ -106,12 +106,12 @@ h1 { font-family: var(--font-display); font-size: 2.2rem; margin: 0; }
 }
 
 .blurb { color: var(--muted); margin: 0 0 2rem; line-height: 1.6; font-size: 0.92em; }
-.mechanical-hint {
+.summary-hint {
   border-top: 1px solid var(--rule);
   padding-top: 0.9rem;
   margin-top: 1.5rem;
 }
-.mechanical-hint .muted {
+.summary-hint .muted {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -141,7 +141,7 @@ h1 { font-family: var(--font-display); font-size: 2.2rem; margin: 0; }
 
 .badges { margin-left: auto; display: flex; gap: 0.4rem; }
 .badges .sev,
-.badges .mech {
+.badges .rung {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;

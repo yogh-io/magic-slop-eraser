@@ -45,7 +45,6 @@ export interface PatternMeta {
   severity: 'primary' | 'high' | 'medium' | 'low'
   scope: Scope
   rung: Rung
-  mechanical: boolean
   blurb: string
   essay?: string
   whyItsSlop: string
@@ -63,7 +62,7 @@ export interface TextAnchor {
   suffix: string
 }
 
-export type FlagSource = 'mechanical' | 'llm' | 'user'
+export type FlagSource = 'llm' | 'user'
 
 export type FlagStatus =
   | 'open'

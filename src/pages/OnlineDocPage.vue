@@ -181,7 +181,7 @@ const shareUrl = computed(() => {
 const agentPrompt = computed(() => {
   if (!shareUrl.value) return ''
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  return `Open the eraser session at ${shareUrl.value} and drive its deslop loop. If the eraser skill isn't installed, fetch ${origin}/skill.md and save it to .claude/skills/eraser/SKILL.md. Then pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
+  return `Open the eraser session at ${shareUrl.value} and drive its deslop loop. If the eraser skill isn't installed, fetch ${origin}/slopmop.md and save it to .claude/skills/eraser/SKILL.md. Then pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
 })
 
 const shareVisible = computed(() => {

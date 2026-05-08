@@ -1,14 +1,14 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-08.5
+skillVersion: 2026-05-08.6
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
 # slopmop
 
-A *steering loop* for fixing AI-slop in prose. The author defines shape; you (the agent) draft the prose; the author re-directs until the sentence lands. The work is the author's; you are the keyboard.
+A *steering loop* for fixing AI-slop in prose. The author defines shape; you (the **drafter**) draft the prose; the author re-directs until the sentence lands. The work is the author's; you are the keyboard.
 
-The slopmop site is the source of truth and the steering surface. You push prose, run detectors, then **pull author directives** off a queue, draft candidates, post **resolutions** back. The author sweeps directives in the browser at their own pace; you grind them in the background. The author re-engages, accepts or re-directs the candidates you posted, repeats.
+The slopmop site is the source of truth and the steering surface. You push prose, find slop, draft candidates from author directives, post resolutions. The author sweeps in the browser at their own pace; you grind in the background. Written for Claude Code; the API is the same elsewhere, the subagent dispatch below assumes the Task tool.
 
 ## inputs
 
@@ -21,15 +21,15 @@ Two entry points:
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-08.5` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+This file declares `skillVersion: 2026-05-08.6` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
 
 ```
-X-Skill-Version: 2026-05-08.5
+X-Skill-Version: 2026-05-08.6
 ```
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The slopmop skill I have installed (v2026-05-08.5) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-08.6) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 
@@ -57,7 +57,7 @@ If the author asks you to check for slopmop updates ("check for updates", "is th
 
 5. **Overwrite** the file with the fetched content using `Write`. Replace the whole file so frontmatter and body stay in sync - do not edit selectively.
 
-6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.5 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
+6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.6 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
 
 Do not try to re-parse this file mid-session - the harness loaded it once at startup and will not re-read until the next session.
 
@@ -65,7 +65,7 @@ Do not try to re-parse this file mid-session - the harness loaded it once at sta
 
 Two phases. The first runs once at session start; the second runs on a loop.
 
-**Phase A - analysis (once, at start).** You are the **drafter**: the agent the author hands the URL to. Bring-your-own-model: the slopmop server runs Rung 1 regex for you, but Rung 2 (passage-level judgment) and Rung 3 (presentation / editorial) need a model reading the prose. The drafter does not read the prose - it dispatches **passes** (subagents) that do. A voice memo pass first, then a Rung 2 pass and a Rung 3 pass, both seeded with the memo so they don't flag what the piece is doing deliberately. The drafter merges the pass outputs, dedupes, and posts a single batch of flags via `POST /flags`.
+**Phase A - analysis (once, at start).** Bring-your-own-model: the slopmop server runs Rung 1 regex for you, but Rung 2 (judgment) and Rung 3 (editorial) need a model reading the prose. Read the source, walk the catalogue, post flags via `POST /flags`. Subagents (Task tool) parallelise this well; shape the dispatch as suits the prose.
 
 **Phase B - the steering loop (until the author says done).**
 
@@ -102,98 +102,55 @@ The doc id is the capability - anyone with the URL can drive the session, that's
 
 ## 1. analysis (BYOM)
 
-You are the **drafter** - the agent the author hands the steering URL to. The slopmop server holds documents and orchestrates the steering loop, but it does not do passage-level reading; that's you. Or rather, your **passes** - subagents you dispatch, each focused on one slice of the catalogue, each reading the source through one lens. The drafter merges and posts; the passes do the reading.
+You are the **drafter**. The slopmop server runs Rung 1 regex via `/run-detectors`; Rung 2 (judgment) and Rung 3 (editorial) need a model reading the prose, and that's you.
 
-The shape is borrowed from `/.claude/commands/workshop.md`: a voice memo first (so every later pass knows what the piece is *doing deliberately*), then per-rung detection passes, then merge. Adapted to slopmop's catalogue and the `POST /flags` API.
-
-**Discipline: the drafter does not read the prose during analysis.** It reads pass outputs, merges, posts. Every read of the source is delegated to a pass. This protects your context and keeps each pass focused; it is also what makes the pattern catchable - the same context that fairly evaluates a pattern is the wrong context to also draft prose against it. Workshop's word for this is "stay in your lane."
-
-### 1a. pull the catalogue and ground yourself
+### 1a. pull the catalogue
 
 ```bash
 curl -s "$HOST/catalogue" > /tmp/slopmop-catalogue.json
 ```
 
-Returns `{ categories, patterns }`. Each pattern carries the spec your passes will apply: `whyItsSlop` (what the pattern *is*), `fix` (the direction the rewrite is heading), `examples` with `sloppy` / `better` pairs, `skipRule` (the preservation rule - cases that look like the pattern but aren't), and often a long-form `essay`. The drafter reads the catalogue once, top-to-bottom; you'll feed slices of it to each pass.
+`{ categories, patterns }`. Each pattern carries `whyItsSlop`, `fix`, `examples` (sloppy / better pairs), `skipRule`, and often a long-form `essay`. That's your detection spec; the `skipRule` is your preservation rule.
 
-### 1b. trigger Rung 1 (server-side regex)
+### 1b. trigger Rung 1
 
 ```bash
 curl -s -X POST "$HOST/docs/$ID/run-detectors"
 ```
 
-Cheap, deterministic, free. The server emits Rung 1 flags from the catalogue's regex layer. Don't redo this work; it's done.
+### 1c. detect Rung 2 / Rung 3
 
-### 1c. Pass 0 - voice memo
+Walk the catalogue's Rung 2 and Rung 3 patterns over the source. Subagents parallelise this - shape the dispatch as fits the prose. A useful pattern: a quick voice-memo subagent first (register, formal devices the piece is using deliberately, passages that look like slop but aren't), then a detection subagent per rung seeded with the memo. But the dispatch is yours to choose; the prose tells you what shape works.
 
-Spawn the first subagent. It reads the source and returns a one-paragraph memo describing how the piece sounds. The memo seeds every later pass.
+What each detected flag should carry:
 
-The pass directive (verbatim):
+- `patternId` from the catalogue
+- `text` - the verbatim substring
+- `start`, `end` - character offsets if you have them; omit if you don't and the server will locate the text
+- `rationale` - why *this* passage is *that* pattern. The author reads it in the UI. "Matches throat-clearing" is dead weight; "the sentence opens with 'It's important to note that' before the substance, asking the reader's permission to make the point" is useful.
+- `suggestion` - optional inline candidate. Include when the fix is mechanical and short (a substitute, a cut, a clear active-voice rewrite). Omit when the rewrite needs the author's voice or judgment, and leave those for the steering loop.
 
-> You are running the voice memo pass for slopmop. Read the target source. Return ONLY the memo - no flags, no commentary, no narration outside the memo. Describe how the piece reads, not what it says.
->
-> The memo MUST include:
->
-> - **Register classification** - the prose's voice (austere / formal / direct / casual / hybrid), with one phrase of evidence.
-> - **Dominant analytical mode** - what the piece's load-bearing material is (argument / kinetic record / explanation / lyric / hybrid).
-> - **Formal devices used deliberately** - parallel constructions, anaphora, polysyndeton, named-actor repetition, accumulating long sentences, sharp short sentences, lists-as-method, etc. Anything the piece is doing on purpose that a slop detector would mistake for a bug.
-> - **Where the structural argument lives** - one sentence pointing at the section or paragraph that carries the piece.
-> - **Non-obvious protections** - passages that look like a slop pattern but are deliberate. Name them. The Rung 2/3 passes will read this list and NOT flag those passages.
->
-> Return the memo as a single text paragraph or short markdown block. Do not edit the source.
-
-The drafter reads the memo when it returns. Hold it for the rest of the session - the memo is your only window into the prose's voice when you merge pass outputs.
-
-### 1d. Pass 2 - Rung 2 detection
-
-Spawn a subagent with the source, the voice memo, and the Rung 2 patterns from the catalogue (`absent-actor`, `allusive-construct`, `staccato`, `bidirectional-summary`, `hedged-confidence`, `pivot-to-balance`, `restating-question`, `synthesis-of-nothing`, `performative-humility`, `bullets-where-prose`).
-
-The pass directive (verbatim):
-
-> You are the Rung 2 reader for slopmop. Apply the assigned catalogue patterns to the source. Each pattern's entry carries `whyItsSlop` (what it is), `examples` (sloppy / better pairs), `fix` (rewrite direction), and `skipRule` (cases that look like the pattern but aren't). Read every pattern's full entry before scanning.
->
-> The voice memo names what the piece is doing deliberately. Apply it as a preservation rule: if the memo classifies a feature as a formal device or names a passage under "non-obvious protections", DO NOT flag it. Apply each pattern's `skipRule` the same way.
->
-> Return a JSON array. For every detected passage:
->
-> - `patternId` - exact catalogue id
-> - `text` - the verbatim substring (no edits, no truncation marks)
-> - `start`, `end` - character offsets into the source if you can compute them; omit if you can't
-> - `rationale` - 2 to 3 sentences. What the passage is doing, why this pattern fires *here* (not just a restatement of the pattern), what direction the fix is heading. The author reads this in the UI; make it earn its place.
-> - `suggestion` - optional inline candidate rewrite. Include only when the fix is mechanical and short (a substitute, a cut, a clear active-voice rewrite). Omit when the rewrite needs the author's voice or judgment - leave those for the steering loop.
->
-> Return JSON only. No preamble. No narration. No commentary outside `rationale`.
-
-### 1e. Pass 3 - Rung 3 detection
-
-Same shape, scope larger. The patterns: `frame-stacking`, `performative-balance`, `header-inflation`. The unit is paragraph / section / piece, not sentence. The fix is rarely an inline replacement (Rung 3 needs paragraph-level rewrites the author has to direct), so suggestions are usually omitted - leave the candidate-drafting to the steering loop.
-
-The pass directive is the same as Pass 2's, with these added lines:
-
-> Rung 3 patterns operate at section-or-larger scope. Your `text` field can be a long span (a paragraph, a section, the opening). The `start`/`end` should bracket the whole offending unit, not just the trigger sentence.
->
-> Default to omitting `suggestion`. Rung 3 fixes need the author's hand on the wheel; an inline suggestion would short-circuit the directive loop. Include `suggestion` only when the fix is dropping a paragraph or excising a frame stack - cuts, never rewrites.
-
-### 1f. merge and post
-
-The drafter receives both pass outputs. Merge by `start` (or by appearance in the source if start is missing). Dedupe collisions on `patternId + text`. The server will dedupe again against existing open flags from `/run-detectors`, so don't worry about overlap with Rung 1 - it's handled.
-
-POST in one batch:
+### 1d. submit
 
 ```bash
 curl -s -X POST -H "If-Match: $HASH" -H 'content-type: application/json' \
-  -d "$(jq -n --argjson flags "$MERGED_FLAGS" --arg tag "$MODEL_TAG" \
-        '{flags: $flags, modelTag: $tag}')" \
+  -d '{
+    "flags": [
+      {
+        "patternId": "absent-actor",
+        "text": "It was decided that the framework would be revised",
+        "rationale": "Passive plus \"it was decided\" hides who decided. The actor is unnamed.",
+        "suggestion": "The committee revised the framework on Tuesday."
+      }
+    ],
+    "modelTag": "claude-opus-4-7"
+  }' \
   "$HOST/docs/$ID/flags"
 ```
 
-The server validates each flag against the catalogue and the source, relocates anchors when offsets are off, dedupes, and returns `{ added, flags, skipped }`. Inspect `skipped` - the `reason` field (`unknown patternId`, `text not found in source`, `duplicate of existing open flag`) is your debugging signal. If a pass is consistently producing flags that don't anchor, that pass needs better instructions next time.
+Server validates against the catalogue, relocates anchors if the offsets don't fit, dedupes, and returns `{ added, flags, skipped }`. Skipped entries carry a `reason`; check them.
 
-Flags without `suggestion` go to status `open`; the author sweeps them and gives a directive. Flags with `suggestion` go straight to `awaiting-accept`; the author can take the candidate as-is or push back with a directive. The split is deliberate: Rung 2 *with clear mechanical fixes* gets a suggestion; Rung 2 *with voice-dependent rewrites* and most Rung 3 are flag-only. When in doubt, omit the suggestion - the steering loop is cheap, and an unwanted candidate the author has to discard is friction.
-
-### 1g. iterate if you want
-
-`POST /flags` is incremental - it adds, never replaces. After the author works through a batch and asks you to "look again at Rung 3" or "scan the second half harder", spawn a fresh pass with whatever scope they specified and post the new findings. Dedupe is automatic; re-running analysis is safe.
+Flags without `suggestion` go to `open` - the author sweeps and directs. Flags with `suggestion` go to `awaiting-accept` - the author takes or redirects. `POST /flags` is incremental: re-run later (after re-reading a section, after the author asks for another pass) and dedupe is automatic.
 
 ## 2. honour agent-hints
 
@@ -339,15 +296,12 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id/companion` | Full state for wrap-up |
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
 
-The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.5` so the server can flag staleness.
+The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.6` so the server can flag staleness.
 
 ## constraints
 
-- **You do the analysis, not the server.** This is bring-your-own-model. Server-side regex (`/run-detectors`) handles Rung 1; everything else is you reading the source against the catalogue. Never assume the server detected what only a model could detect.
-- **The drafter does not read the prose during analysis.** Subagents do. A voice memo pass first; Rung 2 / Rung 3 passes seeded with that memo. The drafter merges, dedupes, posts. Reading and merging are different jobs - keep them separated.
-- **Voice memo before any pattern pass.** Without it, the passes flag intentional moves (parallel constructions, named-actor repetition, accumulating long sentences in austere prose) as bugs. The memo names what the piece is doing deliberately so the passes know what *not* to flag.
-- **Rationales are read by the author.** When you post flags, write rationales the author wants to read in the UI. "Matches throat-clearing pattern" is dead weight; "the sentence opens with 'It's important to note that' before getting to the substance, asking the reader's permission to make the point" is useful.
-- **The author shapes the prose; the drafter writes it.** Workshop's interactive shape (author proposes, agent attacks) is not slopmop's. Slopmop's loop is the inverse: agent drafts a candidate, author redirects with a shape directive, agent re-drafts. Suggestions you bundle at flag-detection time are the same shape - a candidate the author can take, redirect, or discard. Never ask the author to write the sentence.
+- **You do Rung 2 / Rung 3 analysis, not the server.** Server-side regex (`/run-detectors`) handles Rung 1; everything else is reading.
+- **The author shapes; you write.** Slopmop's loop is: you draft, author redirects via shape directives. Never ask the author to write the sentence.
 - **Pull, don't push.** The author submits directives whenever they want; you pull when you have capacity. The queue holds work for you - none of it is missed if you're slow.
 - **Multiple candidates are fine.** Post one if there's a clear best take; post two or three when the directive admits real alternatives the author would want to compare. The author picks one, the rest become history. Don't manufacture filler variants - the bar is real difference, not coverage.
 - **Per-flag work is sequential, across flags is batched.** Pull a queue, process several in parallel, post a single resolutions batch. Then pull again.

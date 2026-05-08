@@ -23,7 +23,7 @@ const entries: Entry[] = [
   { loc: '/about', changefreq: 'monthly', priority: '0.9' },
   { loc: '/rungs', changefreq: 'monthly', priority: '0.9' },
   { loc: '/categories', changefreq: 'weekly', priority: '0.9' },
-  { loc: '/skill/eraser', changefreq: 'monthly', priority: '0.7' },
+  { loc: '/skill', changefreq: 'monthly', priority: '0.7' },
 ]
 
 for (const c of categories) {

@@ -180,7 +180,8 @@ const shareUrl = computed(() => {
 
 const agentPrompt = computed(() => {
   if (!shareUrl.value) return ''
-  return `Open the eraser session at ${shareUrl.value} and walk it through the deslop loop. Pull pending responses, draft candidates, post resolutions; punt anything you can't handle. The site has the SKILL.md if you don't have it installed yet.`
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `Open the eraser session at ${shareUrl.value} and drive its deslop loop. If the eraser skill isn't installed, fetch ${origin}/skill.md and save it to .claude/skills/eraser/SKILL.md. Then pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
 })
 
 const shareVisible = computed(() => {

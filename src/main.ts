@@ -46,7 +46,7 @@ export function includedRoutes(): string[] {
     '/categories',
     '/rungs',
     '/about',
-    '/skill/eraser',
+    '/skill',
   ]
   const categoryRoutes = categories.map((c) => `/categories/${c.id}`)
   const patternRoutes = patterns.map((p) => `/patterns/${p.id}`)

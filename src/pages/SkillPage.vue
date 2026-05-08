@@ -8,7 +8,7 @@ import { ORIGIN } from '../composables/useOgHead'
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false })
 const html = computed(() => md.render(skillSrc))
 
-const skillUrl = `${ORIGIN}/skill/eraser/SKILL.md`
+const skillUrl = `${ORIGIN}/skill.md`
 const installPrompt = `Install the eraser skill from ${skillUrl} - fetch it, save it to .claude/skills/eraser/SKILL.md in this repo (or ~/.claude/skills/eraser/SKILL.md to install globally), and confirm it's available.`
 
 const copied = ref<'url' | 'prompt' | 'content' | null>(null)
@@ -26,7 +26,7 @@ useOgHead(() => ({
   title: 'The eraser skill',
   description:
     'Walk a markdown document through the deslop loop, one flag at a time. Install in Claude Code (or any agentic coding tool) and point it at a Magic Slop Eraser document URL.',
-  path: '/skill/eraser',
+  path: '/skill',
   ogType: 'article',
 }))
 </script>

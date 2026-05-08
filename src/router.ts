@@ -46,8 +46,8 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: 'Methodology' },
   },
   {
-    path: '/skill/eraser',
-    name: 'skill-eraser',
+    path: '/skill',
+    name: 'skill',
     component: () => import('./pages/SkillPage.vue'),
     meta: { title: 'Eraser skill' },
   },

@@ -20,6 +20,8 @@ The trick is *time arbitrage*: the author's attention is the scarce resource; th
 
 The site is a frontend, not the agent. You bring the agent - any Claude Code, Codex, or opencode session, your own scripts, or our hosted reviewer - and it talks to the site over an API. The catalogue, the flag panel, and the directive sweep all live here; the writing model is whatever you already have access to.
 
+The protocol the agent runs against is published as a [skill](/skill) - a `SKILL.md` you install in your agent's skills directory. Three install paths: paste a one-line prompt into Claude Code (it fetches and saves the file), `curl` the raw `SKILL.md` into `~/.claude/skills/eraser/`, or copy the content from the page directly. Same protocol regardless.
+
 ## Desloppifier or editorial tool
 
 Honest answer: we do not know yet. Rung 1 is a desloppifier - regex, free, portable. Rung 3 is an editorial workshop - whole-piece rewrites, slow, collaborative. We will find out which centre of gravity wins by using the tool on our own writing. For now the bottom rung is the front door and the top rung is the destination.

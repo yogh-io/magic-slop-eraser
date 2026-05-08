@@ -29,7 +29,7 @@ X-Skill-Version: 2026-05-08.1
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The eraser skill I have installed (v2026-05-08.1) is older than what the server expects (vX). Reinstall from `${HOST}/skill/eraser`."
+> "The eraser skill I have installed (v2026-05-08.1) is older than what the server expects (vX). Reinstall from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 

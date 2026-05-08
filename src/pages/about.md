@@ -1,6 +1,6 @@
 # Methodology
 
-Magic Slop Eraser identifies AI-slop in prose and walks the writer through fixing each instance. The thing it is built for is *paired writing*: the author defines shape, the agent drafts the prose, the author re-directs until the sentence lands.
+Slopmop identifies AI-slop in prose and walks the writer through fixing each instance. The thing it is built for is *paired writing*: the author defines shape, the agent drafts the prose, the author re-directs until the sentence lands.
 
 ## What counts as slop
 

@@ -25,7 +25,7 @@ function copy(kind: 'url' | 'prompt' | 'content', text: string): void {
 useOgHead(() => ({
   title: 'The slopmop skill',
   description:
-    'Walk a markdown document through the deslop loop, one flag at a time. Install in Claude Code (or any agentic coding tool) and point it at a Magic Slop Eraser document URL.',
+    'Walk a markdown document through the deslop loop, one flag at a time. Install in Claude Code (or any agentic coding tool) and point it at a slopmop document URL.',
   path: '/skill',
   ogType: 'article',
 }))

@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const SKILL_PATH = resolve(__dirname, '../.claude/skills/slopmop/SKILL.md')
 
 /**
- * Parse the eraser skill's frontmatter and return its declared version.
+ * Parse the slopmop skill's frontmatter and return its declared version.
  * The version is the source of truth for the canonical SKILL.md version
  * the server vouches for.
  *

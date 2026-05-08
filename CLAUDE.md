@@ -1,4 +1,4 @@
-# Magic Slop Eraser
+# slopmop
 
 A hosted online AI-slop detector and guided fixer. Prose in, flagged article out, walked through fix-by-fix - the writing happens in a *paired loop*: the author defines shape, the agent drafts the prose, and the author's taste enters every step. The browser is the steering surface; an agentic coding tool (Claude Code, Codex, opencode, your own scripts, or our hosted reviewer) is the keyboard.
 
@@ -6,7 +6,7 @@ This file is the framework definition. Read it before working on the catalogue, 
 
 ## What this project is
 
-Magic Slop Eraser identifies AI-slop patterns in prose and walks the writer through fixing them one at a time. The catalogue is a generalisation of the in-house deslop infrastructure built for `` (analytical-prose project), itself derived from the patterns one notices when one has read enough LLM output to be annoyed by it.
+Slopmop identifies AI-slop patterns in prose and walks the writer through fixing them one at a time. The catalogue is a generalisation of the in-house deslop infrastructure built for `` (analytical-prose project), itself derived from the patterns one notices when one has read enough LLM output to be annoyed by it.
 
 The project organises every catalogued pattern into one of three **rungs**, ordered by *depth*. Rung 1 is the bottom (mechanical, surface-level, free) and Rung 3 is the top (structural, whole-piece, editorial). Detection difficulty is a separate axis (the `mechanical` boolean); a pattern can be mechanical to detect but still belong to Rung 3 if its fix requires substantial rewriting. The rung is what governs the user-facing workflow.
 
@@ -35,14 +35,14 @@ This rung is the heart of the project. It ships **open-source**. The plan is to 
 ### Rung 3 - presentation / editorial (top)
 
 - **Detection**: requires reading the piece as a piece. The question is whether its substance - the actual arguments, values, internal merits of what is being said - is coming through to the reader. Frame stacking buries the thesis under preamble; performative balance dilutes the position into nothing; header inflation pads scaffolding where the argument should carry weight. These are the moves a chief editor catches on the second read.
-- **Fix**: substantial rewrite focused on what the piece is *saying*, not just where it sits on the page. Outside the scope of an autonomous fixer. The eraser flags positions where the presentation of the content needs reworking and gets out of the way.
-- **Where it runs**: outside the in-browser detector's scope. The eraser flags positions; the rewrite is collaborative, slow, human-driven.
-- **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the agent reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the agent drafts the prose, the author re-directs. The relevant references in `` are `.claude/commands/workshop.md` (interactive multi-pass diagnostic + author-driven rewriting) and `.claude/commands/chief-edit.md` (the ship gate / blurb / preamble drafter). Rung 3 in the eraser is positioned as the entry point to that kind of workflow.
+- **Fix**: substantial rewrite focused on what the piece is *saying*, not just where it sits on the page. Outside the scope of an autonomous fixer. Slopmop flags positions where the presentation of the content needs reworking and gets out of the way.
+- **Where it runs**: outside the in-browser detector's scope. Slopmop flags positions; the rewrite is collaborative, slow, human-driven.
+- **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the agent reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the agent drafts the prose, the author re-directs. The relevant references in `` are `.claude/commands/workshop.md` (interactive multi-pass diagnostic + author-driven rewriting) and `.claude/commands/chief-edit.md` (the ship gate / blurb / preamble drafter). Rung 3 in slopmop is positioned as the entry point to that kind of workflow.
 - **Patterns currently here (3)**: `frame-stacking`, `performative-balance`, `header-inflation`.
 
 ## The loop: paired writing in batched turns
 
-The eraser is not a delegation tool. The author does not say "agent, fix this paragraph" and walk away. Each fix is a paired writing moment - the author defines the shape, the agent does the prose execution, and the author's taste enters every step. But the pairing is *batched*, not synchronous.
+Slopmop is not a delegation tool. The author does not say "agent, fix this paragraph" and walk away. Each fix is a paired writing moment - the author defines the shape, the agent does the prose execution, and the author's taste enters every step. But the pairing is *batched*, not synchronous.
 
 The interaction shape:
 
@@ -70,7 +70,7 @@ Rung 1 is the simplest form (one substitution, one verdict, often resolvable in 
 
 ## Architecture: the hosted site + agent loop
 
-The eraser is **an online site, not a local app**. It stores prose, comments, suggestions, anchors, and resolution history. It exposes an API for agents to push and pull edits and analysis.
+Slopmop is **an online site, not a local app**. It stores prose, comments, suggestions, anchors, and resolution history. It exposes an API for agents to push and pull edits and analysis.
 
 The shape:
 
@@ -99,11 +99,11 @@ The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor sche
 
 ## API surface
 
-Bun-based HTTP server in `server/`. File-based persistence via `DiskStore` (per-doc `state.json` + `events.ndjson`). Per-document share token via `Authorization: Bearer <token>`. SSE primary listen channel; long-poll fallback.
+Bun-based HTTP server in `server/`. File-based persistence via `DiskStore` (per-doc `state.json` + `events.ndjson`). The doc UUID is the capability - anyone with the URL can drive the session, no separate auth header. SSE primary listen channel; long-poll fallback.
 
 ```
 # document lifecycle
-POST   /docs                          { source, title? } -> { id, token, sourceHash }
+POST   /docs                          { source, title? } -> { id, sourceHash, eventsUrl }
 GET    /docs/:id                      -> { doc, counts, score, flags, sourceHash }
 PUT    /docs/:id/source               { source }   # If-Match: <hash>; runs reconcile
 POST   /docs/:id/source/revert        { toVersion? }   # rolls back to a stored prior version
@@ -208,7 +208,7 @@ Live deploys ship the catalogue, the rungs page, and the about page open. The in
 
 `src/state/guard.ts` exposes `isUnlocked()`, true when:
 - The hostname is `localhost` / `127.0.0.1` / `*.localhost`, or
-- `sessionStorage.eraser.work === '1'` (set the first time the user visits with `?work` in the URL; the param is stripped on bootstrap so it doesn't stick around in shared links)
+- `sessionStorage.slopmop.work === '1'` (set the first time the user visits with `?work` in the URL; the param is stripped on bootstrap so it doesn't stick around in shared links)
 
 Gated pages (`AnalyzePage`, `OnlineDocPage`) render `LockedNotice` when locked and the full UI otherwise. Adding new gated surfaces: import `isUnlocked` and `LockedNotice`, render the notice on `!isUnlocked()`. Do not gate the catalogue, rungs, or about - those carry the methodology and stay public.
 
@@ -216,7 +216,7 @@ Gated pages (`AnalyzePage`, `OnlineDocPage`) render `LockedNotice` when locked a
 
 - **No batch auto-fixing.** Every change is the author's. Even Rung 1 fixes are confirmed one at a time.
 - **No score for Rung 2 / Rung 3.** They are reported as counts, not folded into the 0-10.
-- **No autonomous Rung 3 rewriting.** The eraser flags positions; the rewrite is collaborative, by design.
+- **No autonomous Rung 3 rewriting.** Slopmop flags positions; the rewrite is collaborative, by design.
 - **No bypass of the API.** The browser UI and any agent skill are all clients of the same API surface. If something works in one but not the other, the API is incomplete.
 
 ## File layout

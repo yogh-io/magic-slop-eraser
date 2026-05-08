@@ -1,7 +1,7 @@
 import { computed, type ComputedRef, type MaybeRefOrGetter, toValue } from 'vue'
 import { useHead } from '@unhead/vue'
 
-const SITE_NAME = 'Magic Slop Eraser'
+const SITE_NAME = 'slopmop'
 const SITE_TAGLINE = 'AI slop detector and guided fixer'
 const ORIGIN = 'https://slopmop.io'
 

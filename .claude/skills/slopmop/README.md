@@ -1,6 +1,6 @@
 # slopmop skill
 
-Walks a markdown document through the Magic Slop Eraser deslop loop. The skill is the workflow; [slopmop.io](https://slopmop.io) is the source of truth and the steering UI.
+Walks a markdown document through the slopmop deslop loop. The skill is the workflow; [slopmop.io](https://slopmop.io) is the source of truth and the steering UI.
 
 ## install
 
@@ -11,10 +11,12 @@ Copy this directory to wherever your agent looks for skills:
 - Or fetch the canonical SKILL.md directly: `curl -o ~/.claude/skills/slopmop/SKILL.md --create-dirs https://slopmop.io/slopmop.md`
 - Other agentic tools (Codex, opencode, etc.): copy `SKILL.md` to wherever your runtime reads skill descriptors
 
+Once installed, you can also tell the running agent "check for slopmop updates" - it will fetch the latest from `slopmop.io/slopmop.md` and overwrite the local file in place. Reload the session to pick up the new version.
+
 ## use
 
 ```bash
-ERASER_HOST=https://slopmop.io   # or http://localhost:8787 for dev
+SLOPMOP_HOST=https://slopmop.io   # or http://localhost:8787 for dev
 
 # from a local file
 slopmop ./article.md

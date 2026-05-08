@@ -1,4 +1,4 @@
-const SESSION_KEY = 'eraser.work'
+const SESSION_KEY = 'slopmop.work'
 
 function isLocalhost(): boolean {
   if (typeof window === 'undefined') return false

@@ -1,5 +1,5 @@
 /**
- * Copies the canonical eraser SKILL.md into public/slopmop.md so agents can
+ * Copies the canonical slopmop SKILL.md into public/slopmop.md so agents can
  * fetch it at /slopmop.md after build. The URL artifact carries the project
  * identity; the local install path inside Claude Code stays SKILL.md (the
  * convention the loader expects). The HTML page at /skill imports the same

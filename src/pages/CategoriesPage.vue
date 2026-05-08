@@ -8,7 +8,7 @@ import { useOgHead } from '../composables/useOgHead'
 useOgHead(() => ({
   title: 'The catalogue',
   description:
-    'Every AI-slop pattern Magic Slop Eraser flags - tier-1 lexicon, throat-clearing, the mirror construct, absent-actor, frame-stacking, and twenty more. Filterable by rung, severity, scope, category.',
+    'Every AI-slop pattern slopmop flags - tier-1 lexicon, throat-clearing, the mirror construct, absent-actor, frame-stacking, and twenty more. Filterable by rung, severity, scope, category.',
   path: '/categories',
   ogType: 'article',
 }))

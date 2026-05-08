@@ -1,7 +1,7 @@
 ---
-description: Walk a markdown document through the Magic Slop Eraser deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-08.1
-allowed-tools: Bash, Read, Edit, Monitor
+description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
+skillVersion: 2026-05-08.2
+allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
 # slopmop
@@ -14,24 +14,52 @@ The slopmop site is the source of truth and the steering surface. You push prose
 
 Two entry points:
 
-- **Local file**: `eraser ./article.md` - POST it to a fresh doc, surface the share URL, ask the author to open it.
-- **Existing URL**: `eraser https://{HOST}/d/{id}#t={token}` - parse `id` and `token`, GET the doc, resume.
+- **Local file**: `slopmop ./article.md` - POST it to a fresh doc, surface the share URL, ask the author to open it.
+- **Existing URL**: `slopmop https://{HOST}/d/{id}` - parse `id`, GET the doc, resume.
 
-`HOST` defaults to whatever `ERASER_HOST` is set to. Local dev: `http://localhost:8787`.
+`HOST` defaults to whatever `SLOPMOP_HOST` is set to. Local dev: `http://localhost:8787`.
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-08.1` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+This file declares `skillVersion: 2026-05-08.2` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
 
 ```
-X-Skill-Version: 2026-05-08.1
+X-Skill-Version: 2026-05-08.2
 ```
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The slopmop skill I have installed (v2026-05-08.1) is older than what the server expects (vX). Reinstall from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-08.2) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
+
+## self-update
+
+If the author asks you to check for slopmop updates ("check for updates", "is the skill current?", "pull the latest skill", "update slopmop"), or you flagged staleness above and the author wants to act on it, run this flow:
+
+1. **Fetch the canonical skill** from the production site - always `slopmop.io`, not `${HOST}`. The canonical version is what the public deploy serves; local-dev hosts can be behind.
+
+   ```bash
+   curl -sf https://slopmop.io/slopmop.md -o /tmp/slopmop-latest.md
+   ```
+
+2. **Read the version** from the fetched file's frontmatter (the `skillVersion:` line in the leading `---` block).
+
+3. **Compare** against your declared version (line 3 of this file). If they match, tell the author "already current (vX)" and stop.
+
+4. **Locate your installed SKILL.md.** It is one of:
+
+   - `~/.claude/skills/slopmop/SKILL.md` (Claude Code global install)
+   - `.claude/skills/slopmop/SKILL.md` (project-local, relative to the session's cwd)
+   - Whichever path the runtime loaded this skill from for non-Claude-Code agents
+
+   Read the frontmatter of each candidate that exists; the one whose `skillVersion` matches your declared version is the file you were loaded from. If both match, update both. If neither matches, tell the author you cannot find the source file and stop.
+
+5. **Overwrite** the file with the fetched content using `Write`. Replace the whole file so frontmatter and body stay in sync - do not edit selectively.
+
+6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.2 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
+
+Do not try to re-parse this file mid-session - the harness loaded it once at startup and will not re-read until the next session.
 
 ## the loop
 
@@ -54,27 +82,26 @@ DOC=$(curl -s -X POST "$HOST/docs" \
   -H 'content-type: application/json' \
   -d "{\"source\": $SOURCE, \"title\": \"$(basename $FILE)\"}")
 ID=$(echo "$DOC" | jq -r .id)
-TOKEN=$(echo "$DOC" | jq -r .token)
 HASH=$(echo "$DOC" | jq -r .sourceHash)
 ```
 
-Tell the author: "Open `${HOST}/d/${ID}#t=${TOKEN}` in your browser. I'll wait."
+Tell the author: "Open `${HOST}/d/${ID}` in your browser. I'll wait."
 
-If given a URL: parse `{id, token}` from the URL + fragment, then:
+If given a URL: parse `{id}` from the path, then:
 
 ```bash
-DOC=$(curl -s -H "Authorization: Bearer $TOKEN" "$HOST/docs/$ID")
+DOC=$(curl -s "$HOST/docs/$ID")
 HASH=$(echo "$DOC" | jq -r .sourceHash)
 ```
 
-Track `HASH` across the session. Every call that mutates the source returns the new hash in the response body; update your local copy each time.
+The doc id is the capability - anyone with the URL can drive the session, that's intentional. Treat it like any unguessable share link. Track `HASH` across the session. Every call that mutates the source returns the new hash in the response body; update your local copy each time.
 
 ## 1. run mechanical detection
 
 Once at the start, and again whenever the author asks. Emits flags for the whole catalogue's regex layer:
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $TOKEN" "$HOST/docs/$ID/run-detectors"
+curl -s -X POST "$HOST/docs/$ID/run-detectors"
 ```
 
 The author sweeps these flags in the browser. Their decisions arrive as Responses for you to pull.
@@ -84,7 +111,7 @@ The author sweeps these flags in the browser. Their decisions arrive as Response
 The author can pin filters that scope what work you should pick up first. Read them on each pull cycle:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "$HOST/docs/$ID/agent-hints"
+curl -s "$HOST/docs/$ID/agent-hints"
 # -> { "agentHints": { rungs?, categories?, severities?, patternIds?, paused? } }
 ```
 
@@ -93,8 +120,7 @@ If `paused: true`, sleep and try later. Otherwise, fold the filter values into y
 ## 3. pull the queue
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "$HOST/docs/$ID/responses?status=pending&rung=1,2&limit=10"
+curl -s "$HOST/docs/$ID/responses?status=pending&rung=1,2&limit=10"
 ```
 
 Returns an array of Response objects. Each carries `id` (the `rid`), `flagId`, `kind` (`shortcut` / `free` / `let-me-try` / `skip` / `keep`), and `body` (the directive text).
@@ -104,7 +130,7 @@ Returns an array of Response objects. Each carries `id` (the `rid`), `flagId`, `
 For each response, fetch the doc state once per loop and find the flag in it:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "$HOST/docs/$ID" \
+curl -s "$HOST/docs/$ID" \
   | jq --arg fid "$FID" '.flags[] | select(.id == $fid)'
 ```
 
@@ -113,7 +139,7 @@ The flag carries `anchor` (start/end/text/prefix/suffix), `rationale`, `excerpt`
 For flags that already have a trail (re-directions on prior candidates), pull the suggestion history from the companion endpoint:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "$HOST/docs/$ID/companion" \
+curl -s "$HOST/docs/$ID/companion" \
   | jq --arg fid "$FID" '.suggestions | map(select(.flagId == $fid)) | sort_by(.createdAt)'
 ```
 
@@ -128,7 +154,7 @@ Two paths. Pick per fix.
 Edit fits within the flag's anchor span. Source is not mutated by your post; the candidate becomes an *awaiting-accept* overlay the author reviews and accepts (or re-directs) in the browser.
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+curl -s -X POST \
   -H "If-Match: $HASH" \
   -H 'content-type: application/json' \
   -d "{
@@ -148,7 +174,7 @@ Edit needs to move text outside any single anchor span - paragraph rearrangement
 
 ```bash
 NEW_SOURCE=$(jq -Rs . < new-source.md)
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+curl -s -X POST \
   -H "If-Match: $HASH" \
   -H 'content-type: application/json' \
   -d "{
@@ -176,7 +202,7 @@ Always pass `If-Match: <sourceHash>`. If the source has moved since you fetched 
 Some directives won't have a clean fix. "Punchline first" on a paragraph with no clear punchline. "More committal" on a sentence that's already as direct as it can be. Don't fake a candidate to clear the queue - punt:
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+curl -s -X POST \
   -H 'content-type: application/json' \
   -d "{\"reason\": \"no clear punchline; the paragraph has three parallel beats already\"}" \
   "$HOST/docs/$ID/responses/$RID/punt"
@@ -189,8 +215,7 @@ Status flips to `stuck`. The author sees it in the panel, gives a different dire
 The author's accepted rewrites are the calibration samples for their voice. Pull a batch on session start, and again every dozen resolutions or so:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "$HOST/docs/$ID/voice-samples?n=20"
+curl -s "$HOST/docs/$ID/voice-samples?n=20"
 # -> [{ pre, post, directive, patternId, rung }, ...]
 ```
 
@@ -201,10 +226,10 @@ Pack them into your prompt as few-shot examples. Voice converges over the sessio
 When the author says `done`, or `responses?status=pending` returns empty repeatedly, fetch the companion:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "$HOST/docs/$ID/companion" > companion.json
+curl -s "$HOST/docs/$ID/companion" > companion.json
 ```
 
-Contains the full event log, the final source, every flag's resolution, every response, every candidate. If invoked as `eraser ./article.md --apply`, write the final source back to the file (use `Edit` to keep a clean diff). Otherwise, print the path and let the author copy edits over.
+Contains the full event log, the final source, every flag's resolution, every response, every candidate. If invoked as `slopmop ./article.md --apply`, write the final source back to the file (use `Edit` to keep a clean diff). Otherwise, print the path and let the author copy edits over.
 
 ## API reference
 
@@ -223,7 +248,7 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id/companion` | Full state for wrap-up |
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
 
-All authenticated calls require `Authorization: Bearer <token>` from the document creation response. All calls should also send `X-Skill-Version: 2026-05-08.1` so the server can flag staleness.
+The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.2` so the server can flag staleness.
 
 ## constraints
 

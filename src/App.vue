@@ -8,7 +8,7 @@ import ThemePicker from './components/ThemePicker.vue'
     <header class="topbar">
       <RouterLink to="/" class="brand">
         <span class="mark">&#x2756;</span>
-        <span class="title">Magic Slop Eraser</span>
+        <span class="title">slopmop</span>
       </RouterLink>
       <nav class="nav">
         <RouterLink to="/">Analyse</RouterLink>

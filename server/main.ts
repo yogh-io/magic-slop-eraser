@@ -134,4 +134,4 @@ const server = Bun.serve({
   },
 })
 
-console.log(`eraser server listening on http://localhost:${server.port} (skill ${SKILL_VERSION})`)
+console.log(`slopmop server listening on http://localhost:${server.port} (skill ${SKILL_VERSION})`)

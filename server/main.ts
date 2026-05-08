@@ -3,6 +3,8 @@ import { stat } from 'node:fs/promises'
 import { createStore } from './store'
 import { handleDocs } from './routes/docs'
 import { handleFlags } from './routes/flags'
+import { handleResponses } from './routes/responses'
+import { handleResolutions } from './routes/resolutions'
 import { handleEvents } from './routes/events'
 import { handleCatalogue } from './routes/catalogue'
 import { json, notFound } from './shared'
@@ -12,9 +14,6 @@ const port = Number(process.env.PORT ?? 8787)
 const STATIC_DIR = process.env.STATIC_DIR ?? './dist'
 
 async function serveStatic(pathname: string): Promise<Response | null> {
-  // Never intercept well-known paths (ACME challenges, etc.). Let DO's edge or
-  // upstream proxy handle them; if nothing else does, return a clean 404
-  // rather than serving the SPA HTML.
   if (pathname.startsWith('/.well-known/')) {
     return new Response('not found', { status: 404 })
   }
@@ -29,7 +28,6 @@ async function serveStatic(pathname: string): Promise<Response | null> {
   } catch {
     // fall through
   }
-  // SPA fallback: serve index.html for non-asset routes
   if (!pathname.startsWith('/assets/') && !/\.\w+$/.test(pathname)) {
     try {
       const idx = Bun.file(join(STATIC_DIR, 'index.html'))
@@ -54,25 +52,47 @@ const server = Bun.serve({
     }
 
     if (pathname.startsWith('/docs')) {
-      const segs = pathname.split('/').filter(Boolean) // ['docs', id?, 'flags'?, fid?, 'verb'?]
-      // /docs (POST)  or /docs/:id (GET, PUT/source, DELETE)
-      if (segs.length === 1) {
-        return handleDocs(req, store, null, null)
-      }
+      const segs = pathname.split('/').filter(Boolean) // ['docs', id?, verb?, sub?, ...]
+
+      // POST /docs
+      if (segs.length === 1) return handleDocs(req, store, null, null)
+
       const docId = segs[1]
-      if (segs.length === 2 || (segs.length === 3 && segs[2] === 'source') || (segs.length === 3 && segs[2] === 'run-detectors')) {
-        return handleDocs(req, store, docId, segs[2] ?? null)
+      const verb = segs[2] ?? null
+      const subVerb = segs[3] ?? null
+
+      // /docs/:id  or  /docs/:id/source[/revert]  or  /docs/:id/run-detectors
+      // or /docs/:id/agent-hints  or /docs/:id/voice-samples  or /docs/:id/companion
+      if (segs.length === 2) {
+        return handleDocs(req, store, docId, null)
       }
+      if (
+        verb === 'source' ||
+        verb === 'run-detectors' ||
+        verb === 'agent-hints' ||
+        verb === 'voice-samples' ||
+        verb === 'companion'
+      ) {
+        if (segs.length <= 4) return handleDocs(req, store, docId, verb, subVerb)
+      }
+
       // /docs/:id/events  or /docs/:id/events/poll
-      if (segs[2] === 'events') {
-        return handleEvents(req, store, docId, segs[3] ?? null)
+      if (verb === 'events') {
+        return handleEvents(req, store, docId, subVerb)
       }
-      // /docs/:id/companion
-      if (segs[2] === 'companion') {
-        return handleDocs(req, store, docId, 'companion')
+
+      // /docs/:id/responses[/:rid[/punt|/cancel]]
+      if (verb === 'responses') {
+        return handleResponses(req, store, docId, segs.slice(3))
       }
-      // /docs/:id/flags ...
-      if (segs[2] === 'flags') {
+
+      // /docs/:id/resolutions
+      if (verb === 'resolutions' && segs.length === 3) {
+        return handleResolutions(req, store, docId)
+      }
+
+      // /docs/:id/flags[/:fid[/verb]]
+      if (verb === 'flags') {
         return handleFlags(req, store, docId, segs.slice(3))
       }
     }

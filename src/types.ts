@@ -65,7 +65,13 @@ export interface TextAnchor {
 
 export type FlagSource = 'mechanical' | 'llm' | 'user'
 
-export type FlagStatus = 'open' | 'resolved' | 'skipped' | 'kept-deliberate' | 'stale'
+export type FlagStatus =
+  | 'open'
+  | 'awaiting-accept'
+  | 'resolved'
+  | 'skipped'
+  | 'kept-deliberate'
+  | 'stale'
 
 export interface Flag {
   id: string
@@ -82,17 +88,51 @@ export interface Flag {
   createdAt: string
 }
 
-export type SuggestionVerdict = 'better' | 'worse' | 'close'
-
 export interface Suggestion {
   id: string
   flagId: string
-  text: string
+  /** The originally-anchored text this candidate replaces. Captured at suggestion
+   *  creation so the side-by-side UI and hold-to-toggle gesture have both texts
+   *  available without rehydrating from the source. */
+  pre: string
+  /** The agent's candidate text. Replaces `pre` within the flag's anchor span
+   *  when the user clicks accept. Until then it lives only as a render overlay. */
+  post: string
+  /** The Response (directive) this candidate answers. */
+  respondedTo: string
   prompt?: string
   modelTag: string
-  verdict: SuggestionVerdict | null
-  isCurrentBest: boolean
+  /** True once the user clicks accept and the source mutates; false while the
+   *  candidate is in awaiting-accept overlay state. */
+  accepted: boolean
   createdAt: string
+}
+
+export type ResponseStatus = 'pending' | 'resolved' | 'stuck' | 'cancelled'
+
+export type ResponseKind = 'shortcut' | 'free' | 'let-me-try' | 'skip' | 'keep'
+
+/**
+ * An author-issued directive on a flag. Each user choice persists immediately;
+ * the trail per flag is the steering history. Shortcut + free directives queue
+ * for agent processing; let-me-try / skip / keep self-resolve without agent
+ * involvement.
+ */
+export interface DocResponse {
+  id: string
+  flagId: string
+  body: string
+  kind: ResponseKind
+  status: ResponseStatus
+  /** Resulting suggestion ID once status flips to 'resolved' via agent path. */
+  resolvedSuggestionId?: string
+  /** Free-form reason if status is 'stuck' (agent punted). */
+  stuckReason?: string
+  /** When auto-resolved by a source mutation (user paste-edit, full-source push
+   *  that changed the anchored text), records the cause. */
+  respondedBy?: 'agent' | 'source-edit' | 'self'
+  createdAt: string
+  resolvedAt?: string
 }
 
 export interface Comment {
@@ -104,16 +144,36 @@ export interface Comment {
   createdAt: string
 }
 
+/**
+ * Server-side hints describing what the user wants the agent to prioritise.
+ * Advisory; honoured by convention via the agent's pull filters. Fields are
+ * inclusive filters - omitting a field means "any value".
+ */
+export interface AgentHints {
+  rungs?: Rung[]
+  categories?: CategoryId[]
+  severities?: PatternMeta['severity'][]
+  patternIds?: string[]
+  paused?: boolean
+}
+
 export type EventType =
   | 'flag-added'
+  | 'flag-awaiting-accept'
   | 'flag-resolved'
   | 'flag-skipped'
   | 'flag-kept'
   | 'flag-stale'
   | 'suggestion-added'
-  | 'suggestion-verdict'
+  | 'suggestion-discarded'
+  | 'response-added'
+  | 'response-resolved'
+  | 'response-stuck'
+  | 'response-cancelled'
   | 'comment-added'
   | 'source-edited'
+  | 'source-reverted'
+  | 'agent-hints-updated'
   | 'document-replaced'
 
 export interface ResolutionEvent {

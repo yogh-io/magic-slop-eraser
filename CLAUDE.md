@@ -87,12 +87,12 @@ The Rung 1 layer is intentionally portable: the catalogue + regex detectors + sc
 
 Source-of-truth entities the API exposes:
 
-- **Document**: source markdown, title, owner, word count, created/updated timestamps.
-- **Flag**: an instance of a catalogued pattern at a specific anchor in a document. Carries `patternId`, `anchor` (start+end+prefix+suffix for relocation), `rung`, `severity`, `rationale`, current `status` (open / resolved / skipped / kept-deliberate).
-- **Suggestion**: a candidate edit attached to a flag. Carries the candidate text, the directive that produced it, the model that drafted it, the prompt context, and a `verdict` field for BETTER / WORSE / CLOSE direction-of-travel against the running best.
-- **Directive**: an author-issued shape directive on a flag (free text or a common-case shortcut: *more committal*, *drop the qualifier*, *punchline first*, etc.). Queued for async processing by the agent; resolves into a new Suggestion. The directive history per flag is the steering trail.
-- **Comment**: free-form thread on a flag (or on a document). Used for human-to-agent coordination and for capturing why a flag was kept deliberately.
-- **Resolution event**: append-only log of state transitions on flags. The companion document at the end of a session is rendered from this log.
+- **Document**: source markdown, title, owner, word count, source hash (sha-256), version counter, created/updated timestamps. Source state has a small ring buffer of prior versions so revert is cheap.
+- **Flag**: an instance of a catalogued pattern at a specific anchor in a document. Carries `patternId`, `anchor` (start+end+prefix+suffix for relocation), `rung`, `severity`, `rationale`, current `status` (open / awaiting-accept / resolved / skipped / kept-deliberate / stale).
+- **Response**: an author-issued directive on a flag (free text or a common-case shortcut: *more committal*, *drop the qualifier*, *punchline first*, *cut to the verb*, *let me try: <text>*, *skip*, *keep*). Each user choice persists immediately - no batch submit. Status: `pending` (waiting for agent) / `resolved` (agent posted a candidate) / `stuck` (agent gave up via punt) / `cancelled` (user rescinded). The trail of responses per flag is the steering history.
+- **Suggestion**: a candidate edit attached to a flag, produced by the agent in response to a directive. Carries `pre` (the originally-anchored text) and `post` (the agent's candidate), the response it answered (`respondedTo`), the model tag, the prompt context. Per-flag candidates do not mutate the source - the browser renders them as overlays over the anchor span. They land in the source only when the user explicitly clicks accept.
+- **Comment**: free-form thread on a flag (or on a document). Used for human-to-agent coordination and for capturing why a flag was kept deliberately or why the agent punted.
+- **Resolution event**: append-only log of state transitions on flags, responses, and source. The companion document at session end is rendered from this log.
 - **User flag**: human-contributed flag with category, pattern, and rationale. Lives alongside mechanical flags. Improves the catalogue over time.
 
 The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor scheme are the prototypes for the document/flag/anchor parts of this model. The server reuses `src/anchoring/textAnchor.ts` and `src/detectors/index.ts` directly so client and server share the same anchor relocation and detection logic.
@@ -103,34 +103,73 @@ Bun-based HTTP server in `server/`. File-based persistence via `DiskStore` (per-
 
 ```
 # document lifecycle
-POST   /docs                          { source, title? } -> { id, token, eventsUrl }
-GET    /docs/:id                      -> { doc, counts, score, flags }
-PUT    /docs/:id/source               { source } -> relocates open anchors, emits source-edited
+POST   /docs                          { source, title? } -> { id, token, sourceHash }
+GET    /docs/:id                      -> { doc, counts, score, flags, sourceHash }
+PUT    /docs/:id/source               { source }   # If-Match: <hash>; runs reconcile
+POST   /docs/:id/source/revert        { toVersion? }   # rolls back to a stored prior version
 DELETE /docs/:id
 
 # mechanical detection
 POST   /docs/:id/run-detectors        -> emits flag-added events; returns flag list
 
-# flag walking
-GET    /docs/:id/flags?rung=N&status=open
-POST   /docs/:id/flags/:fid/suggestions          { text, prompt?, modelTag } -> Suggestion
-POST   /docs/:id/flags/:fid/suggestions/:sid/verdict { verdict: better|worse|close }
-POST   /docs/:id/flags/:fid/resolve              { suggestionId? | patch }
+# user side: every choice is a Response, fired immediately
+POST   /docs/:id/responses            { flagId, body, kind: 'shortcut'|'free'|'let-me-try'|'skip'|'keep' }
+                                      -> Response (status=pending). Server self-resolves
+                                      skip/keep/let-me-try without agent involvement.
+POST   /docs/:id/responses/:rid/cancel
+GET    /docs/:id/responses            # agent pulls work, with catalogue filters
+                                      ?status=pending
+                                      &rung=1[,2,3]
+                                      &category=lexical[,structural,argumentative]
+                                      &severity=primary[,high,medium,low]
+                                      &patternId=tier1-lexicon[,...]
+                                      &limit=N
+POST   /docs/:id/responses/:rid/punt  { reason }     # agent gave up; status=stuck
+
+# user-set agent direction (advisory; agent honours by convention)
+GET    /docs/:id/agent-hints          -> { rungs?, categories?, severities?, patternIds?, paused? }
+PUT    /docs/:id/agent-hints          { rungs?, categories?, severities?, patternIds?, paused? }
+
+# agent side: post resolutions (one of the two paths per fix)
+POST   /docs/:id/resolutions          { patches: [...], fullSource?: {...}, modelTag, notes? }
+                                      # If-Match: <hash>; transactional batch.
+                                      # Per-flag patch fields: { respondedTo, flagId,
+                                      #   anchor: {start, end, replacementText} }.
+                                      # FullSource fields: { respondedTo: [rid,...], source }.
+                                      # Single fullSource per batch (multiples redundant).
+                                      # Patches must lie within their flag's anchor window
+                                      # or the call rejects 422.
+
+# user side: act on awaiting-accept candidates
+POST   /docs/:id/flags/:fid/accept    # apply the per-flag patch, mutate source, close flag
+POST   /docs/:id/flags/:fid/discard   # drop the awaiting-accept candidate, flag stays open
 POST   /docs/:id/flags/:fid/skip
 POST   /docs/:id/flags/:fid/keep-deliberate
-POST   /docs/:id/flags/:fid/comments             { body, author? }
+POST   /docs/:id/flags/:fid/comments  { body, author? }
+
+# read-only / context
+GET    /docs/:id/voice-samples?n=20   # derived from accepted suggestions; agent fetches as
+                                      # few-shot voice calibration on each work cycle
+GET    /docs/:id/companion            # resolution log + final source
+GET    /catalogue                     # patterns + categories (no auth)
+GET    /health
 
 # event stream
-GET    /docs/:id/events               # SSE primary; supports Last-Event-ID / ?since=N
-GET    /docs/:id/events/poll?since=N&timeout=30000   # long-poll fallback
-
-# read-only
-GET    /docs/:id/companion            # resolution log + final source
-GET    /catalogue                     # patterns + categories (no auth; read-only)
-GET    /health
+GET    /docs/:id/events               # SSE; supports Last-Event-ID / ?since=N
+GET    /docs/:id/events/poll?since=N&timeout=30000
 ```
 
-Every state-changing endpoint appends a `ResolutionEvent` to the doc's events log and bumps `doc.version`. Subscribers on the SSE stream get the event in <100ms (in-memory pub/sub via `server/bus.ts`). Anchor relocation runs on every source mutation; flags whose anchors fail to relocate flip to `status: 'stale'` and emit a `flag-stale` event.
+Every state-changing endpoint appends a `ResolutionEvent` to the doc's events log and bumps `doc.version`. Subscribers on the SSE stream get the event in <100ms (in-memory pub/sub via `server/bus.ts`).
+
+**Hash-based concurrency.** Every source-mutating call (`PUT /source`, `POST /resolutions`) requires `If-Match: <sha-256-of-current-source>`. Server returns 412 if the hash has moved. Standard ETag pattern; prevents agents from clobbering user edits made in the interim.
+
+**Reconciliation is uniform.** Every source mutation, regardless of trigger (agent fullSource push, user accept of a per-flag patch, user paste-edit, revert), runs the same pass: re-anchor every open flag; mark relocated-with-changed-text flags as resolved (auto-resolves any pending response on them with `respondedBy: source-edit`); mark unrelocatable flags stale (cancels pending responses on them); re-run Rung 1 detectors on changed regions to emit any new flags.
+
+**The two resolution paths.** The agent picks per fix:
+- *Per-flag patch* (Rung 1/2, common case): edit fits within the flag's anchor window. Server stores the candidate as a Suggestion, flag goes to `awaiting-accept`, source is unchanged. Browser renders as inline overlay; user accepts or re-directs.
+- *Full-source push* (Rung 3 editorial): edit needs to span beyond a single anchor. Agent pushes the full updated markdown. Source mutates immediately, reconcile runs, prior version retained for revert. Browser surfaces the new doc with a "revert last push" affordance.
+
+**API is indifferent on multi-agent.** The recommended workflow is one agent at a time, but the API doesn't enforce it. Two agents racing on resolutions just lose to each other on the `If-Match` check; the loser refetches and tries again.
 
 The API is the contract; the browser UI and any agent skill (Claude Code, Codex, opencode, custom scripts) are all clients of it. Anything one can do, the other can do.
 

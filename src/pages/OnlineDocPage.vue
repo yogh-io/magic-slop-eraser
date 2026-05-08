@@ -159,6 +159,57 @@ function flagClicked(id: string): void {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 }
+
+// --- share banner -----------------------------------------------------------
+
+const SHARE_DISMISS_KEY = 'mse.share.dismissed'
+
+const shareDismissed = ref<Record<string, boolean>>({})
+if (typeof window !== 'undefined') {
+  try {
+    shareDismissed.value = JSON.parse(localStorage.getItem(SHARE_DISMISS_KEY) ?? '{}')
+  } catch {
+    /* ignore */
+  }
+}
+
+const shareUrl = computed(() => {
+  if (typeof window === 'undefined' || !docId || !tokenStr) return ''
+  return `${window.location.origin}/d/${docId}#t=${tokenStr}`
+})
+
+const agentPrompt = computed(() => {
+  if (!shareUrl.value) return ''
+  return `Open the eraser session at ${shareUrl.value} and walk it through the deslop loop. Pull pending responses, draft candidates, post resolutions; punt anything you can't handle. The site has the SKILL.md if you don't have it installed yet.`
+})
+
+const shareVisible = computed(() => {
+  if (!docId) return false
+  return !shareDismissed.value[docId]
+})
+
+const copyState = ref<'url' | 'prompt' | null>(null)
+function copyText(kind: 'url' | 'prompt', text: string): void {
+  if (typeof navigator === 'undefined') return
+  navigator.clipboard?.writeText(text).then(() => {
+    copyState.value = kind
+    setTimeout(() => {
+      if (copyState.value === kind) copyState.value = null
+    }, 1800)
+  })
+}
+
+function dismissShare(): void {
+  if (!docId) return
+  shareDismissed.value = { ...shareDismissed.value, [docId]: true }
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(SHARE_DISMISS_KEY, JSON.stringify(shareDismissed.value))
+    } catch {
+      /* ignore */
+    }
+  }
+}
 </script>
 
 <template>
@@ -170,6 +221,24 @@ function flagClicked(id: string): void {
     </div>
 
     <template v-else-if="session">
+      <section v-if="shareVisible && shareUrl" class="share">
+        <div class="share-row">
+          <span class="share-lbl">session URL</span>
+          <code class="share-val">{{ shareUrl }}</code>
+          <button type="button" class="share-copy" @click="copyText('url', shareUrl)">
+            {{ copyState === 'url' ? 'copied' : 'copy' }}
+          </button>
+        </div>
+        <div class="share-row">
+          <span class="share-lbl">for your agent</span>
+          <code class="share-val truncate">{{ agentPrompt }}</code>
+          <button type="button" class="share-copy" @click="copyText('prompt', agentPrompt)">
+            {{ copyState === 'prompt' ? 'copied' : 'copy' }}
+          </button>
+        </div>
+        <button type="button" class="share-dismiss" @click="dismissShare" title="dismiss for this session">×</button>
+      </section>
+
       <header class="topbar">
         <div class="title-block">
           <p class="kicker">eraser session</p>
@@ -369,6 +438,75 @@ function flagClicked(id: string): void {
   padding: 1.4rem 1.6rem 4rem;
   color: var(--text);
 }
+
+.share {
+  position: relative;
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 2.2rem 0.7rem 0.9rem;
+  margin: 0 0 1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.share-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  gap: 0.7rem;
+  align-items: center;
+}
+.share-lbl {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.share-val {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.25rem 0.55rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  min-width: 0;
+}
+.share-val.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.share-copy {
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.share-copy:hover { background: var(--text); color: var(--bg); border-color: var(--text); }
+.share-dismiss {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+}
+.share-dismiss:hover { color: var(--text); }
 
 .topbar {
   display: flex;

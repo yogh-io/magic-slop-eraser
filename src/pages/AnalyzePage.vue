@@ -1,77 +1,27 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useDocStore } from '../state/doc'
-import ArticleView from '../components/ArticleView.vue'
-import FlagsPanel from '../components/FlagsPanel.vue'
-import UserHighlightDialog from '../components/UserHighlightDialog.vue'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import LockedNotice from '../components/LockedNotice.vue'
 import { isUnlocked } from '../state/guard'
 import { useOgHead } from '../composables/useOgHead'
-import type { CategoryId } from '../types'
 
 useOgHead(() => ({
   title: 'Magic Slop Eraser',
   description:
-    'Paste prose, see flagged AI-slop, walk through fixes one at a time. A hosted detector and guided fixer driven by your own agent (Claude Code, Codex, opencode) over a steering API.',
+    'Paste prose, get a session URL. Hand it to your agent (Claude Code, Codex, opencode) - they steer it through the deslop loop, you direct fixes from the browser.',
   path: '/',
   ogType: 'website',
 }))
 
 const unlocked = isUnlocked()
+const router = useRouter()
 
-const store = useDocStore()
-const showEditor = ref(false)
-const editBuffer = ref('')
+const title = ref('')
+const source = ref('')
+const submitting = ref(false)
+const errorMsg = ref<string | null>(null)
 
-const selection = ref<{ start: number; end: number; text: string } | null>(null)
-const dialogOpen = ref(false)
-
-function openEditor(): void {
-  editBuffer.value = store.source
-  showEditor.value = true
-}
-function saveEditor(): void {
-  store.setSource(editBuffer.value)
-  showEditor.value = false
-}
-function loadSample(): void {
-  editBuffer.value = SAMPLE
-  showEditor.value = true
-}
-
-function handleSelection(s: { start: number; end: number; text: string } | null): void {
-  selection.value = s
-}
-
-function flagSelection(): void {
-  if (!selection.value) return
-  dialogOpen.value = true
-}
-
-function handleSubmit(payload: { patternId: string; category: CategoryId; note: string }): void {
-  if (!selection.value || selection.value.start < 0) return
-  store.addUserFlag({
-    patternId: payload.patternId,
-    category: payload.category,
-    start: selection.value.start,
-    end: selection.value.end,
-    note: payload.note,
-  })
-  dialogOpen.value = false
-  selection.value = null
-  window.getSelection()?.removeAllRanges()
-}
-
-function exportCompanion(): void {
-  const data = store.exportCompanion()
-  const blob = new Blob([data], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `companion-${Date.now()}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-}
+const canSubmit = computed(() => source.value.trim().length > 20 && !submitting.value)
 
 const SAMPLE = `# The shape of the deal
 
@@ -85,170 +35,258 @@ The challenge raises important questions about the future of the alliance. Gener
 
 In conclusion, the situation reflects broader dynamics at play. I hope this helps clarify the issues.
 `
+
+function loadSample(): void {
+  source.value = SAMPLE
+  if (!title.value) title.value = 'Sample slop article'
+}
+
+function deriveTitle(s: string): string {
+  const m = /^#\s+(.+)$/m.exec(s)
+  if (m) return m[1].trim().slice(0, 120)
+  const firstLine = s.split('\n').find((l) => l.trim().length > 0)
+  if (firstLine) return firstLine.trim().slice(0, 80)
+  return 'Untitled'
+}
+
+async function createSession(): Promise<void> {
+  if (!canSubmit.value) return
+  submitting.value = true
+  errorMsg.value = null
+  try {
+    const body = {
+      source: source.value,
+      title: title.value.trim() || deriveTitle(source.value),
+    }
+    const r = await fetch('/docs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!r.ok) {
+      throw new Error(`${r.status}: ${await r.text()}`)
+    }
+    const created = (await r.json()) as { id: string; token: string }
+    // Auto-run detectors so flags exist when the user lands on the doc page.
+    await fetch(`/docs/${created.id}/run-detectors`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${created.token}` },
+    })
+    await router.push({
+      path: `/d/${created.id}`,
+      hash: `#t=${created.token}`,
+    })
+  } catch (e) {
+    errorMsg.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    submitting.value = false
+  }
+}
 </script>
 
 <template>
-  <LockedNotice v-if="!unlocked" what="The analyse view" />
-  <div v-else class="analyze">
-    <div class="layout">
-      <main class="article-pane">
-        <div class="toolbar">
-          <button @click="openEditor">{{ store.source.trim() ? 'Edit source' : 'Paste markdown' }}</button>
-          <button @click="loadSample">Load sample</button>
-          <div class="spacer" />
-          <button v-if="selection && selection.start >= 0" class="primary" @click="flagSelection">
-            Flag selection
-          </button>
-          <button @click="exportCompanion">Export companion</button>
-        </div>
+  <LockedNotice v-if="!unlocked" what="The session creator" />
+  <article v-else class="create">
+    <header class="hd">
+      <p class="kicker">start a session</p>
+      <h1>Paste an article. Get a steering URL.</h1>
+      <p class="lede">
+        Drop prose in below. We mint a private session, run the mechanical detectors, and
+        hand back a URL with a token. Open it yourself, or hand it to an agent
+        (Claude Code, Codex, opencode, our hosted reviewer) - they pull directives, you
+        direct fixes. Either side can drive; the document is the source of truth.
+      </p>
+    </header>
 
-        <div v-if="!store.source.trim()" class="placeholder">
-          <p>
-            A scratchpad for the Rung 1 detector. Paste a markdown article and the mechanical
-            patterns light up against the rendered prose, one underline per match. The full agent
-            loop - flags walked one at a time, suggestions, resolution history - lives at the
-            document URLs and is wired up as the API stabilises.
-          </p>
-          <button class="primary" @click="loadSample">Load a sample slop article</button>
-        </div>
-
-        <ArticleView
-          v-else
-          :source="store.source"
-          :flags="store.visibleFlags"
-          :selected-flag-id="store.selectedFlagId"
-          @flag-click="store.selectFlag($event)"
-          @selection-change="handleSelection"
+    <form class="form" @submit.prevent="createSession">
+      <label class="field">
+        <span class="lbl">Title</span>
+        <input
+          v-model="title"
+          type="text"
+          placeholder="optional - we'll derive one from the first heading"
+          :disabled="submitting"
         />
-      </main>
+      </label>
 
-      <FlagsPanel
-        :flags="store.visibleFlags"
-        :selected-flag-id="store.selectedFlagId"
-        :active-categories="store.filter.categories"
-        @select="store.selectFlag($event)"
-        @toggle-category="store.toggleCategoryFilter($event)"
-        @remove-user-flag="store.removeUserFlag($event)"
-      />
-    </div>
+      <label class="field">
+        <span class="lbl">Source markdown</span>
+        <textarea
+          v-model="source"
+          spellcheck="false"
+          rows="18"
+          :placeholder="'# Title\n\nPaste the article you want to deslop.'"
+          :disabled="submitting"
+        />
+      </label>
 
-    <div v-if="showEditor" class="editor-modal" @click.self="showEditor = false">
-      <div class="editor">
-        <header>
-          <h3>Source markdown</h3>
-          <button class="close" @click="showEditor = false">close</button>
-        </header>
-        <textarea v-model="editBuffer" spellcheck="false" />
-        <footer>
-          <span class="muted">Pasted text never leaves your browser. Stored in localStorage on this device.</span>
-          <button @click="showEditor = false">Cancel</button>
-          <button class="primary" @click="saveEditor">Analyse</button>
-        </footer>
+      <div v-if="errorMsg" class="err">error: {{ errorMsg }}</div>
+
+      <div class="actions">
+        <button type="submit" class="primary" :disabled="!canSubmit">
+          {{ submitting ? 'creating session…' : 'Create session' }}
+        </button>
+        <button type="button" class="quiet" @click="loadSample" :disabled="submitting">
+          load a sample
+        </button>
+        <span class="spacer" />
+        <router-link to="/local" class="alt">…or analyse locally without a session</router-link>
       </div>
-    </div>
+    </form>
 
-    <UserHighlightDialog
-      :open="dialogOpen"
-      :selection-text="selection?.text ?? ''"
-      :resolvable="!!selection && selection.start >= 0"
-      @submit="handleSubmit"
-      @cancel="dialogOpen = false"
-    />
-  </div>
+    <aside class="rationale">
+      <h2>How sessions work</h2>
+      <p>
+        Each session gets its own UUID and bearer token. The URL fragment carries the
+        token (<code>#t=…</code>) so it never lands in server logs or referrers. Anyone
+        with the URL can drive the session - that's intentional, it's how an agent
+        latches on.
+      </p>
+      <p>
+        Sessions are independent: you can run as many as you want, each with its own
+        document, its own queue, its own agent. Nothing leaks between them.
+      </p>
+    </aside>
+  </article>
 </template>
 
 <style scoped>
-.analyze { height: 100%; }
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-  height: calc(100vh - var(--header-height));
-}
-.article-pane {
-  overflow-y: auto;
-  padding: 2rem 2.5rem 5rem;
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: -0.5rem auto 1.5rem;
-  max-width: 68ch;
-  font-size: 0.9rem;
-}
-.toolbar button {
-  background: var(--bg);
+.create {
+  max-width: 78ch;
+  margin: 2rem auto 5rem;
+  padding: 0 2rem;
   color: var(--text);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  padding: 0.35rem 0.75rem;
-  font: inherit;
-  cursor: pointer;
+  line-height: 1.65;
 }
-.toolbar button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-.toolbar .spacer { flex: 1; }
-.muted { color: var(--muted); }
 
-.placeholder {
-  max-width: 68ch;
-  margin: 4rem auto;
-  text-align: center;
+.hd { margin-bottom: 2rem; }
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 0.4rem;
+}
+.hd h1 {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  margin: 0 0 0.7rem;
+  letter-spacing: var(--heading-tracking, normal);
+  line-height: 1.15;
+}
+.lede {
+  font-size: 1.05rem;
+  color: var(--text);
+  margin: 0;
+}
+
+.form {
+  display: grid;
+  gap: 1.2rem;
+  margin: 2rem 0 2.5rem;
+}
+.field {
+  display: grid;
+  gap: 0.4rem;
+}
+.lbl {
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--muted);
 }
-.placeholder button { margin-top: 1rem; }
-
-.editor-modal {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: grid;
-  place-items: stretch center;
-  padding: 4rem 2rem;
-  z-index: 40;
-}
-.editor {
+.field input,
+.field textarea {
+  font-family: var(--font-ui);
+  font-size: 0.96rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
   background: var(--bg);
   color: var(--text);
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  width: min(900px, 100%);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  width: 100%;
+  resize: vertical;
 }
-.editor header { display: flex; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid var(--rule); }
-.editor h3 { margin: 0; font-family: var(--font-display); }
-.editor .close { margin-left: auto; background: transparent; border: 0; color: var(--muted); cursor: pointer; font: inherit; }
-.editor textarea {
-  flex: 1;
+.field textarea {
   font-family: var(--font-mono);
   font-size: 0.92rem;
   line-height: 1.5;
-  border: 0;
-  padding: 1rem;
+  min-height: 22rem;
   background: var(--code-bg);
-  color: var(--text);
-  resize: none;
 }
-.editor textarea:focus { outline: 0; }
-.editor footer {
-  display: flex; gap: 0.5rem; align-items: center;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--rule);
+.field input:focus,
+.field textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--text) 30%, transparent);
+  outline-offset: -1px;
 }
-.editor footer .muted { flex: 1; font-size: 0.86em; }
-.editor footer button {
-  background: var(--bg);
-  color: var(--text);
+
+.err {
+  color: #b8472d;
+  font-size: 0.9rem;
+  font-family: var(--font-mono);
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.actions button {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
   border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text);
   border-radius: 4px;
-  padding: 0.45rem 0.95rem;
-  font: inherit;
   cursor: pointer;
 }
-.editor footer button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.actions button:not(:disabled):hover { border-color: var(--text); }
+.actions button.primary {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+  font-weight: 600;
+}
+.actions button.primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--text) 80%, var(--bg));
+}
+.actions button.quiet { color: var(--muted); }
+.actions .spacer { flex: 1; }
+.actions .alt {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule);
+}
+.actions .alt:hover {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
 
-@media (max-width: 920px) {
-  .layout { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+.rationale {
+  border-top: 1px solid var(--rule);
+  padding-top: 1.5rem;
+  font-size: 0.93rem;
+  color: var(--text);
+}
+.rationale h2 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
+}
+.rationale p { margin: 0 0 0.7rem; }
+.rationale code {
+  font-family: var(--font-mono);
+  background: var(--code-bg);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  font-size: 0.88em;
 }
 </style>

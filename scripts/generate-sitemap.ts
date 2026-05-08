@@ -9,7 +9,7 @@ import { patterns } from '../src/catalog/patterns'
 import { categories } from '../src/catalog/categories'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const ORIGIN = 'https://magicsloperaser.com'
+const ORIGIN = 'https://slopmop.io'
 
 interface Entry {
   loc: string
@@ -19,6 +19,7 @@ interface Entry {
 
 const entries: Entry[] = [
   { loc: '/', changefreq: 'monthly', priority: '0.8' },
+  { loc: '/local', changefreq: 'monthly', priority: '0.5' },
   { loc: '/about', changefreq: 'monthly', priority: '0.9' },
   { loc: '/rungs', changefreq: 'monthly', priority: '0.9' },
   { loc: '/categories', changefreq: 'weekly', priority: '0.9' },

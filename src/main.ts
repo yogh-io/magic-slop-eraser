@@ -42,6 +42,7 @@ export const createApp = ViteSSG(
 export function includedRoutes(): string[] {
   const staticRoutes = [
     '/',
+    '/local',
     '/categories',
     '/rungs',
     '/about',

@@ -3,7 +3,7 @@ import { useHead } from '@unhead/vue'
 
 const SITE_NAME = 'Magic Slop Eraser'
 const SITE_TAGLINE = 'AI slop detector and guided fixer'
-const ORIGIN = 'https://magicsloperaser.com'
+const ORIGIN = 'https://slopmop.io'
 
 export interface PageMeta {
   title: string

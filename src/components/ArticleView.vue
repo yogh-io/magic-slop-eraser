@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { highlightFlagsInDom } from '../anchoring/domHighlight'
+import { segmentSource, type Segment } from '../markdown/segments'
 import type { Flag } from '../types'
 
 const props = defineProps<{
@@ -18,12 +19,16 @@ const emit = defineEmits<{
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false })
 const containerRef = ref<HTMLElement | null>(null)
 
-const html = computed(() => md.render(props.source))
+const segments = computed<Segment[]>(() => segmentSource(props.source))
+
+function renderProse(text: string): string {
+  return md.render(text)
+}
 
 async function applyHighlights(): Promise<void> {
   await nextTick()
   if (!containerRef.value) return
-  highlightFlagsInDom(containerRef.value, props.flags)
+  highlightFlagsInDom(containerRef.value, props.flags, '.md-prose')
 }
 
 onMounted(applyHighlights)
@@ -83,10 +88,31 @@ function onMouseUp(): void {
     ref="containerRef"
     class="article-view"
     :class="{ 'has-selection': selectedFlagId !== null }"
-    v-html="html"
     @click="onClick"
     @mouseup="onMouseUp"
-  />
+  >
+    <template v-for="(seg, idx) in segments" :key="idx">
+      <aside v-if="seg.kind === 'frontmatter'" class="md-aside md-frontmatter">
+        <div class="md-aside-label">frontmatter <span class="muted">· not edited</span></div>
+        <pre>{{ seg.body }}</pre>
+      </aside>
+
+      <aside v-else-if="seg.kind === 'html-comment'" class="md-aside md-comment">
+        <div class="md-aside-label">comment <span class="muted">· not edited</span></div>
+        <p>{{ seg.body }}</p>
+      </aside>
+
+      <aside v-else-if="seg.kind === 'html-block'" class="md-aside md-html">
+        <div class="md-aside-label">
+          embedded html <code class="tag">&lt;{{ seg.tag }}&gt;</code>
+          <span class="muted">· not edited</span>
+        </div>
+        <pre>{{ seg.raw }}</pre>
+      </aside>
+
+      <div v-else class="md-prose" v-html="renderProse(seg.text)" />
+    </template>
+  </div>
 </template>
 
 <style scoped>
@@ -143,4 +169,51 @@ function onMouseUp(): void {
 .article-view :deep(mark.slop-flag.is-selected) {
   background: color-mix(in srgb, var(--flag-color, var(--accent)) 18%, transparent);
 }
+
+/* Embedded, set-aside blocks: hidden in plain sight, not edit targets. */
+.md-aside {
+  border-left: 3px solid var(--rule);
+  background: color-mix(in srgb, var(--muted) 6%, transparent);
+  color: var(--muted);
+  margin: 1.1em 0;
+  padding: 0.55em 1em 0.65em;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.92em;
+  user-select: text;
+}
+.md-aside-label {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.4em;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.md-aside-label .muted { opacity: 0.7; text-transform: none; letter-spacing: 0; }
+.md-aside-label .tag {
+  background: transparent;
+  padding: 0;
+  font-size: 1em;
+  color: var(--muted);
+}
+.md-aside pre {
+  margin: 0;
+  background: transparent;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--muted);
+  overflow-x: auto;
+}
+.md-aside p {
+  margin: 0;
+  font-style: italic;
+  color: var(--muted);
+}
+.md-comment p::before { content: '- '; opacity: 0.6; }
 </style>

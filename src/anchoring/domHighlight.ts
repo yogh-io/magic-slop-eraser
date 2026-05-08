@@ -6,7 +6,11 @@ interface Segment {
   end: number
 }
 
-export function highlightFlagsInDom(root: HTMLElement, flags: Flag[]): void {
+export function highlightFlagsInDom(
+  root: HTMLElement,
+  flags: Flag[],
+  scopeSelector?: string,
+): void {
   for (const mark of Array.from(root.querySelectorAll('mark.slop-flag'))) {
     const parent = mark.parentNode
     if (!parent) continue
@@ -15,8 +19,13 @@ export function highlightFlagsInDom(root: HTMLElement, flags: Flag[]): void {
     parent.normalize()
   }
 
+  const scopes: HTMLElement[] = scopeSelector
+    ? Array.from(root.querySelectorAll<HTMLElement>(scopeSelector))
+    : [root]
+  if (scopes.length === 0) return
+
   for (const flag of flags) {
-    const segments = collectSegments(root)
+    const segments = collectSegments(scopes)
     const fullText = segments.map((s) => s.node.data).join('')
     const probe = flag.anchor.prefix + flag.anchor.text + flag.anchor.suffix
     let idx = -1
@@ -35,16 +44,18 @@ export function highlightFlagsInDom(root: HTMLElement, flags: Flag[]): void {
   }
 }
 
-function collectSegments(root: HTMLElement): Segment[] {
+function collectSegments(roots: HTMLElement[]): Segment[] {
   const segments: Segment[] = []
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let cursor = 0
-  let node = walker.nextNode() as Text | null
-  while (node) {
-    const len = node.data.length
-    segments.push({ node, start: cursor, end: cursor + len })
-    cursor += len
-    node = walker.nextNode() as Text | null
+  for (const root of roots) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let node = walker.nextNode() as Text | null
+    while (node) {
+      const len = node.data.length
+      segments.push({ node, start: cursor, end: cursor + len })
+      cursor += len
+      node = walker.nextNode() as Text | null
+    }
   }
   return segments
 }

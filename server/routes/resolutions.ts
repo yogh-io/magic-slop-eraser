@@ -4,7 +4,7 @@ import type { ResolutionEvent, Suggestion } from '../../src/types'
 import type { DocStore } from '../store'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
-import { authorize, fail } from '../auth'
+import { fail } from '../auth'
 import { sha256Hex } from '../hash'
 import { reconcile } from '../reconcile'
 import { relocateAnchor } from '../../src/anchoring/textAnchor'
@@ -61,8 +61,6 @@ export async function handleResolutions(
   if (req.method !== 'POST') return fail(405, 'method not allowed')
   const state = await store.readState(docId)
   if (!state) return notFound()
-  const authErr = authorize(req, state.doc.token)
-  if (authErr) return authErr
 
   const ifMatch = req.headers.get('if-match') ?? ''
   if (ifMatch && ifMatch !== state.doc.sourceHash) {

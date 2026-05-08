@@ -1,3 +1,5 @@
+import { embeddedRanges, segmentSource } from '../markdown/segments'
+
 export interface Range {
   start: number
   end: number
@@ -5,6 +7,10 @@ export interface Range {
 
 export function extractSkipZones(source: string): Range[] {
   const zones: Range[] = []
+
+  for (const r of embeddedRanges(segmentSource(source))) {
+    zones.push(r)
+  }
 
   const fence = /^```[\s\S]*?^```/gm
   for (const m of source.matchAll(fence)) {

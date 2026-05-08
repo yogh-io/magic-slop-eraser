@@ -6,7 +6,7 @@ import { runDetectors, scoreFromFlags } from '../../src/detectors'
 import { extractSkipZones, approximateProseWordCount } from '../../src/detectors/skipZones'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
-import { authorize, fail } from '../auth'
+import { fail } from '../auth'
 import { sha256Hex } from '../hash'
 import { reconcile } from '../reconcile'
 
@@ -32,7 +32,6 @@ export async function handleDocs(
     const body = (await req.json()) as NewDocInput
     if (!body || typeof body.source !== 'string') return fail(400, 'source required')
     const id = crypto.randomUUID()
-    const token = crypto.randomUUID().replace(/-/g, '')
     const ts = nowIso()
     const hash = sha256Hex(body.source)
     const initial: SourceVersion = {
@@ -45,7 +44,6 @@ export async function handleDocs(
     const state: DocState = {
       doc: {
         id,
-        token,
         title: body.title ?? 'Untitled',
         source: body.source,
         sourceHash: hash,
@@ -61,7 +59,7 @@ export async function handleDocs(
       agentHints: {},
     }
     await store.writeState(id, state)
-    return json({ id, token, sourceHash: hash, eventsUrl: `/docs/${id}/events` })
+    return json({ id, sourceHash: hash, eventsUrl: `/docs/${id}/events` })
   }
 
   if (docId === null) return fail(405, 'method not allowed')
@@ -69,9 +67,6 @@ export async function handleDocs(
   const state = await store.readState(docId)
   if (!state) return notFound()
   ensureSchema(state)
-
-  const authErr = authorize(req, state.doc.token)
-  if (authErr) return authErr
 
   // GET /docs/:id
   if (verb === null && req.method === 'GET') {

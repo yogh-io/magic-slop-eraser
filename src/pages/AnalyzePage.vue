@@ -6,7 +6,7 @@ import { isUnlocked } from '../state/guard'
 import { useOgHead } from '../composables/useOgHead'
 
 useOgHead(() => ({
-  title: 'Magic Slop Eraser',
+  title: 'slopmop',
   description:
     'Paste prose, get a session URL. Hand it to your agent (Claude Code, Codex, opencode) - they steer it through the deslop loop, you direct fixes from the browser.',
   path: '/',
@@ -66,16 +66,10 @@ async function createSession(): Promise<void> {
     if (!r.ok) {
       throw new Error(`${r.status}: ${await r.text()}`)
     }
-    const created = (await r.json()) as { id: string; token: string }
+    const created = (await r.json()) as { id: string }
     // Auto-run detectors so flags exist when the user lands on the doc page.
-    await fetch(`/docs/${created.id}/run-detectors`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${created.token}` },
-    })
-    await router.push({
-      path: `/d/${created.id}`,
-      hash: `#t=${created.token}`,
-    })
+    await fetch(`/docs/${created.id}/run-detectors`, { method: 'POST' })
+    await router.push({ path: `/d/${created.id}` })
   } catch (e) {
     errorMsg.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -92,9 +86,9 @@ async function createSession(): Promise<void> {
       <h1>Paste an article. Get a steering URL.</h1>
       <p class="lede">
         Drop prose in below. We mint a private session, run the mechanical detectors, and
-        hand back a URL with a token. Open it yourself, or hand it to an agent
-        (Claude Code, Codex, opencode, our hosted reviewer) - they pull directives, you
-        direct fixes. Either side can drive; the document is the source of truth.
+        hand back a URL. Open it yourself, or hand it to an agent (Claude Code, Codex,
+        opencode, our hosted reviewer) - they pull directives, you direct fixes. Either
+        side can drive; the document is the source of truth.
       </p>
     </header>
 
@@ -137,10 +131,9 @@ async function createSession(): Promise<void> {
     <aside class="rationale">
       <h2>How sessions work</h2>
       <p>
-        Each session gets its own UUID and bearer token. The URL fragment carries the
-        token (<code>#t=…</code>) so it never lands in server logs or referrers. Anyone
-        with the URL can drive the session - that's intentional, it's how an agent
-        latches on.
+        Each session gets its own UUID. The UUID is the capability - 122 bits of entropy
+        is sufficient to keep an unguessable session unguessable. Anyone with the URL
+        can drive the session - that's intentional, it's how an agent latches on.
       </p>
       <p>
         Sessions are independent: you can run as many as you want, each with its own

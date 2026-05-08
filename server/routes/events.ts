@@ -1,7 +1,7 @@
 import type { DocStore } from '../store'
 import type { ResolutionEvent } from '../../src/types'
 import { bus } from '../bus'
-import { authorize, fail } from '../auth'
+import { fail } from '../auth'
 import { json, notFound } from '../shared'
 
 export async function handleEvents(
@@ -12,8 +12,6 @@ export async function handleEvents(
 ): Promise<Response> {
   const state = await store.readState(docId)
   if (!state) return notFound()
-  const authErr = authorize(req, state.doc.token)
-  if (authErr) return authErr
 
   // GET /docs/:id/events  -> SSE
   if (sub === null && req.method === 'GET') {

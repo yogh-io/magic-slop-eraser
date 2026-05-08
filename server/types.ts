@@ -2,7 +2,6 @@ import type { AgentHints, Comment, DocResponse, Flag, Suggestion } from '../src/
 
 export interface DocRecord {
   id: string
-  token: string
   title: string
   source: string
   /** sha-256 of the current source. Used by `If-Match` for optimistic concurrency. */

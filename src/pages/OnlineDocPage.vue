@@ -9,7 +9,7 @@ import type { DocResponse, Flag, Suggestion } from '../types'
 
 const unlocked = isUnlocked()
 const route = useRoute()
-const tokenError = ref<string | null>(null)
+const fatalError = ref<string | null>(null)
 const selectedFlagId = ref<string | null>(null)
 const peekFlagId = ref<string | null>(null)
 const directiveInput = ref<Record<string, string>>({})
@@ -23,25 +23,16 @@ const SHORTCUTS = [
   'cut to the verb',
 ]
 
-function tokenFromHash(): string | null {
-  if (typeof window === 'undefined') return null
-  const h = window.location.hash.replace(/^#/, '')
-  const params = new URLSearchParams(h)
-  return params.get('t')
-}
-
 const docId = String(route.params.id ?? '')
-const tokenStr = tokenFromHash()
 
 let session: OnlineSession | null = null
 if (unlocked) {
-  if (!docId) tokenError.value = 'no document id'
-  else if (!tokenStr) tokenError.value = 'no token in URL fragment (expected #t=...)'
-  else session = createOnlineSession(docId, tokenStr)
+  if (!docId) fatalError.value = 'no document id'
+  else session = createOnlineSession(docId)
 }
 
 // Bind the session's refs at top level so the template auto-unwraps them.
-// When the session can't be created (gated, missing token, etc.) we use empty
+// When the session can't be created (gated, missing id) we use empty
 // stand-ins so the template still binds.
 const loading = session?.loading ?? ref(false)
 const errorRef = session?.error ?? ref<string | null>(null)
@@ -174,14 +165,14 @@ if (typeof window !== 'undefined') {
 }
 
 const shareUrl = computed(() => {
-  if (typeof window === 'undefined' || !docId || !tokenStr) return ''
-  return `${window.location.origin}/d/${docId}#t=${tokenStr}`
+  if (typeof window === 'undefined' || !docId) return ''
+  return `${window.location.origin}/d/${docId}`
 })
 
 const agentPrompt = computed(() => {
   if (!shareUrl.value) return ''
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  return `Open the eraser session at ${shareUrl.value} and drive its deslop loop. If the slopmop skill isn't installed, fetch ${origin}/slopmop.md and save it to .claude/skills/slopmop/SKILL.md. Then pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
+  return `Open the slopmop session at ${shareUrl.value} and drive its deslop loop. If the slopmop skill isn't installed, fetch ${origin}/slopmop.md and save it to .claude/skills/slopmop/SKILL.md. Then pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
 })
 
 const shareVisible = computed(() => {
@@ -216,9 +207,9 @@ function dismissShare(): void {
 <template>
   <LockedNotice v-if="!unlocked" what="The document viewer" />
   <div v-else class="layout">
-    <div v-if="tokenError" class="err">
+    <div v-if="fatalError" class="err">
       <h1>Cannot open document</h1>
-      <p>{{ tokenError }}</p>
+      <p>{{ fatalError }}</p>
     </div>
 
     <template v-else-if="session">
@@ -242,7 +233,7 @@ function dismissShare(): void {
 
       <header class="topbar">
         <div class="title-block">
-          <p class="kicker">eraser session</p>
+          <p class="kicker">slopmop session</p>
           <h1>{{ doc?.title ?? 'Loading…' }}</h1>
         </div>
         <div v-if="doc" class="counts">

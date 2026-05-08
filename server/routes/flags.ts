@@ -4,7 +4,7 @@ import type { Comment, ResolutionEvent } from '../../src/types'
 import { relocateAnchor } from '../../src/anchoring/textAnchor'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
-import { authorize, fail } from '../auth'
+import { fail } from '../auth'
 import { sha256Hex } from '../hash'
 import { reconcile } from '../reconcile'
 
@@ -32,8 +32,6 @@ export async function handleFlags(
 ): Promise<Response> {
   const state = await store.readState(docId)
   if (!state) return notFound()
-  const authErr = authorize(req, state.doc.token)
-  if (authErr) return authErr
 
   // GET /docs/:id/flags?rung=N&status=open
   if (segs.length === 0 && req.method === 'GET') {

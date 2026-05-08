@@ -3,7 +3,6 @@ import type { AgentHints, DocResponse, Flag, ResolutionEvent, ResponseKind, Sugg
 
 interface DocSummary {
   id: string
-  token: string
   title: string
   source: string
   sourceHash: string
@@ -21,7 +20,6 @@ interface FetchedDoc {
 
 export interface OnlineSession {
   id: string
-  token: string
   loading: Ref<boolean>
   error: Ref<string | null>
   doc: Ref<DocSummary | null>
@@ -46,7 +44,7 @@ export interface OnlineSession {
   disconnect(): void
 }
 
-export function createOnlineSession(id: string, token: string): OnlineSession {
+export function createOnlineSession(id: string): OnlineSession {
   const loading = ref(true)
   const error = ref<string | null>(null)
   const doc = ref<DocSummary | null>(null)
@@ -57,8 +55,6 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
   const agentHints = ref<AgentHints>({})
   let cursor = 0
   let eventSource: EventSource | null = null
-
-  const auth = { authorization: `Bearer ${token}` }
 
   const candidateByFlag = computed<Record<string, Suggestion | undefined>>(() => {
     // Latest unaccepted suggestion per flag is the running best (the
@@ -115,9 +111,9 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
   async function bootstrap(): Promise<void> {
     try {
       const [docRes, respRes, compRes] = await Promise.all([
-        fetch(`/docs/${id}`, { headers: auth }),
-        fetch(`/docs/${id}/responses`, { headers: auth }),
-        fetch(`/docs/${id}/companion`, { headers: auth }),
+        fetch(`/docs/${id}`),
+        fetch(`/docs/${id}/responses`),
+        fetch(`/docs/${id}/companion`),
       ])
       if (!docRes.ok) throw new Error(`${docRes.status}: ${await docRes.text()}`)
       const data = (await docRes.json()) as FetchedDoc
@@ -145,8 +141,7 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
   }
 
   function subscribe(): void {
-    const url = `/docs/${id}/events?since=${cursor}`
-    eventSource = new EventSource(`${url}&token=${encodeURIComponent(token)}`)
+    eventSource = new EventSource(`/docs/${id}/events?since=${cursor}`)
     eventSource.onmessage = (msg) => handleEvent(JSON.parse(msg.data) as ResolutionEvent)
     const namedEvents = [
       'flag-added',
@@ -178,7 +173,7 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
   }
 
   async function refreshDoc(): Promise<void> {
-    const r = await fetch(`/docs/${id}`, { headers: auth })
+    const r = await fetch(`/docs/${id}`)
     if (!r.ok) return
     const data = (await r.json()) as FetchedDoc
     doc.value = data.doc
@@ -188,7 +183,7 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
   }
 
   async function refreshResponses(): Promise<void> {
-    const r = await fetch(`/docs/${id}/responses`, { headers: auth })
+    const r = await fetch(`/docs/${id}/responses`)
     if (!r.ok) return
     const data = (await r.json()) as { responses: DocResponse[] }
     responses.value = data.responses
@@ -240,7 +235,7 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
   async function refreshSuggestionsLazy(ev: ResolutionEvent): Promise<void> {
     // Pull from the companion endpoint when a new suggestion arrives. The
     // payload doesn't carry the full text; companion gives us pre/post.
-    const r = await fetch(`/docs/${id}/companion`, { headers: auth })
+    const r = await fetch(`/docs/${id}/companion`)
     if (!r.ok) return
     const data = (await r.json()) as { suggestions: Suggestion[] }
     suggestions.value = data.suggestions
@@ -250,7 +245,7 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
     try {
       const r = await fetch(path, {
         method: 'POST',
-        headers: { ...auth, 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       })
       if (!r.ok) {
@@ -304,7 +299,7 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
     try {
       const r = await fetch(`/docs/${id}/agent-hints`, {
         method: 'PUT',
-        headers: { ...auth, 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify(hints),
       })
       if (r.ok) {
@@ -325,7 +320,6 @@ export function createOnlineSession(id: string, token: string): OnlineSession {
 
   return {
     id,
-    token,
     loading,
     error,
     doc,

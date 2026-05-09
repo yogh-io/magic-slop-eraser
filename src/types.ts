@@ -176,6 +176,7 @@ export type EventType =
   | 'source-reverted'
   | 'agent-hints-updated'
   | 'document-replaced'
+  | 'density-updated'
 
 export interface ResolutionEvent {
   cursor: number

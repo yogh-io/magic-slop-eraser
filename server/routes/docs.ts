@@ -9,6 +9,7 @@ import { json, notFound } from '../shared'
 import { fail } from '../auth'
 import { sha256Hex } from '../hash'
 import { reconcile } from '../reconcile'
+import { computeParagraphInfo } from '../density'
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -57,6 +58,7 @@ export async function handleDocs(
       comments: {},
       history: [initial],
       agentHints: {},
+      density: {},
     }
     await store.writeState(id, state)
     return json({ id, sourceHash: hash, eventsUrl: `/docs/${id}/events` })
@@ -79,6 +81,7 @@ export async function handleDocs(
     })
     const wordCount = approximateProseWordCount(state.doc.source, extractSkipZones(state.doc.source))
     const score = scoreFromFlags(live, wordCount)
+    const paragraphs = computeParagraphInfo(state.doc.source)
     return json({
       doc: state.doc,
       sourceHash: state.doc.sourceHash,
@@ -86,6 +89,8 @@ export async function handleDocs(
       score,
       flags,
       agentHints: state.agentHints,
+      paragraphs,
+      density: state.density,
     })
   }
 
@@ -277,5 +282,6 @@ function ensureSchema(state: DocState): void {
   if (!s.responses) s.responses = {}
   if (!s.history) s.history = []
   if (!s.agentHints) s.agentHints = {}
+  if (!s.density) s.density = {}
   if (typeof s.doc.sourceHash !== 'string') s.doc.sourceHash = sha256Hex(s.doc.source)
 }

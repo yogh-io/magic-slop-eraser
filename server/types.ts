@@ -21,6 +21,14 @@ export interface SourceVersion {
   ts: string
 }
 
+/**
+ * Per-paragraph density scores keyed by the paragraph's content hash. Axes
+ * are arbitrary strings - the agent posts whatever set it scored against,
+ * the client renders the union with known axes getting their canonical
+ * color and unknowns getting a neutral fallback.
+ */
+export type DensityAxes = Record<string, number>
+
 export interface DocState {
   doc: DocRecord
   flags: Record<string, Flag>
@@ -30,6 +38,9 @@ export interface DocState {
   /** Bounded ring buffer of prior source states for revert. Newest last. */
   history: SourceVersion[]
   agentHints: AgentHints
+  /** density[paragraphHash] = { axisName -> score (0-10) }. Cached across edits; */
+  /** entries whose hash is no longer present in the source are GC'd on reconcile. */
+  density: Record<string, DensityAxes>
 }
 
 export interface NewDocInput {

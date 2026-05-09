@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { createOnlineSession, type OnlineSession } from '../state/online'
 import LockedNotice from '../components/LockedNotice.vue'
@@ -14,6 +14,7 @@ const selectedFlagId = ref<string | null>(null)
 const peekFlagId = ref<string | null>(null)
 const directiveInput = ref<Record<string, string>>({})
 const letMeTryInput = ref<Record<string, string>>({})
+const letMeTryOpen = ref<Record<string, boolean>>({})
 
 const SHORTCUTS = [
   'more committal',
@@ -31,15 +32,14 @@ if (unlocked) {
   else session = createOnlineSession(docId)
 }
 
-// Bind the session's refs at top level so the template auto-unwraps them.
-// When the session can't be created (gated, missing id) we use empty
-// stand-ins so the template still binds.
 const loading = session?.loading ?? ref(false)
 const errorRef = session?.error ?? ref<string | null>(null)
 const doc = session?.doc ?? ref(null)
 const flags = session?.flags ?? ref<Flag[]>([])
 const responses = session?.responses ?? ref<DocResponse[]>([])
 const score = session?.score ?? ref(null)
+const paragraphs = session?.paragraphs ?? ref([])
+const density = session?.density ?? ref({})
 const scoreValue = computed(() => score.value?.value ?? null)
 const scoreOpen = ref(false)
 function toggleScore(): void { scoreOpen.value = !scoreOpen.value }
@@ -84,7 +84,54 @@ const orderedFlags = computed<FlagView[]>(() => {
   return out
 })
 
-const visibleFlags = computed(() => orderedFlags.value.filter((v) => v.state !== 'closed'))
+/**
+ * Two-phase workflow: in 'shape' pass we surface only Rung 3 (structural)
+ * flags, so the writer doesn't polish prose that's about to be cut. Once
+ * R3 settles, the toggle (or the auto-fallback) flips to 'prose' and
+ * Rung 1 + Rung 2 become visible. The user can override at any time.
+ */
+const userPhase = ref<'shape' | 'prose' | null>(null)
+
+function isLive(flag: Flag): boolean {
+  const s = flag.status ?? 'open'
+  return s === 'open' || s === 'awaiting-accept'
+}
+
+const r3LiveCount = computed(
+  () => flags.value.filter((f) => (f.rung ?? 1) === 3 && isLive(f)).length,
+)
+const lowerLiveCount = computed(
+  () => flags.value.filter((f) => (f.rung ?? 1) !== 3 && isLive(f)).length,
+)
+
+const phase = computed<'shape' | 'prose'>(() => {
+  if (userPhase.value) return userPhase.value
+  return r3LiveCount.value > 0 ? 'shape' : 'prose'
+})
+
+function isInPhase(rung: number | undefined): boolean {
+  const r = rung ?? 1
+  return phase.value === 'shape' ? r === 3 : r !== 3
+}
+
+function setPhase(p: 'shape' | 'prose'): void {
+  userPhase.value = p
+}
+
+const visibleFlags = computed(() =>
+  orderedFlags.value.filter((v) => v.state !== 'closed' && isInPhase(v.flag.rung)),
+)
+
+/** Flags passed to ArticleView; out-of-phase marks are suppressed entirely. */
+const articleFlags = computed(() => flags.value.filter((f) => isInPhase(f.rung)))
+
+const inlineCandidates = computed(() => {
+  const m = new Map<string, string>()
+  for (const v of visibleFlags.value) {
+    if (v.state === 'awaiting' && v.candidate) m.set(v.flag.id, v.candidate.post)
+  }
+  return m
+})
 
 function rungLabel(r: number | undefined): string {
   if (r === 1) return 'R1'
@@ -120,10 +167,12 @@ async function submitLetMeTry(flagId: string): Promise<void> {
   if (!text) return
   await session.postResponse(flagId, 'let-me-try', text)
   letMeTryInput.value[flagId] = ''
+  letMeTryOpen.value[flagId] = false
 }
 
 async function accept(flagId: string): Promise<void> {
   await session?.acceptFlag(flagId)
+  if (selectedFlagId.value === flagId) selectedFlagId.value = null
 }
 
 async function discard(flagId: string): Promise<void> {
@@ -142,7 +191,11 @@ async function cancelPending(rid: string): Promise<void> {
   await session?.cancelResponse(rid)
 }
 
-function startPeek(flagId: string): void {
+function startPeek(flagId: string, e: PointerEvent): void {
+  const target = e.currentTarget as HTMLElement | null
+  if (target?.setPointerCapture) {
+    try { target.setPointerCapture(e.pointerId) } catch { /* ignore */ }
+  }
   peekFlagId.value = flagId
 }
 
@@ -150,14 +203,80 @@ function endPeek(): void {
   peekFlagId.value = null
 }
 
-function flagClicked(id: string): void {
+function selectFlag(id: string): void {
   selectedFlagId.value = id
-  // scroll the panel item into view
-  const el = document.querySelector(`[data-panel-flag="${id}"]`)
-  if (el instanceof HTMLElement) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
 }
+
+function onFlagClick(id: string): void {
+  selectedFlagId.value = id
+  // Scroll its annotation into view too.
+  nextTick(() => {
+    const el = annotationRefs.value.get(id)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
+
+// --- annotation positioning (review-comment-style alignment) ----------------
+
+const articleViewRef = ref<InstanceType<typeof ArticleView> | null>(null)
+const annotationRefs = ref<Map<string, HTMLElement>>(new Map())
+const finalTops = ref<Map<string, number>>(new Map())
+const gutterMinHeight = ref(0)
+
+function setAnnotationRef(id: string, el: Element | null): void {
+  if (el instanceof HTMLElement) annotationRefs.value.set(id, el)
+  else annotationRefs.value.delete(id)
+}
+
+const ANNOTATION_GAP = 10
+
+async function recomputeLayout(): Promise<void> {
+  await nextTick()
+  if (!articleViewRef.value) return
+  const positions = articleViewRef.value.getMarkPositions()
+  const ordered = visibleFlags.value
+    .map((v) => ({ id: v.flag.id, rawTop: positions.get(v.flag.id) }))
+    .filter((o): o is { id: string; rawTop: number } => o.rawTop !== undefined)
+    .sort((a, b) => a.rawTop - b.rawTop)
+
+  const next = new Map<string, number>()
+  let cursor = 0
+  for (const o of ordered) {
+    const el = annotationRefs.value.get(o.id)
+    const h = el?.offsetHeight ?? 120
+    const top = Math.max(o.rawTop, cursor)
+    next.set(o.id, top)
+    cursor = top + h + ANNOTATION_GAP
+  }
+  finalTops.value = next
+  gutterMinHeight.value = cursor
+}
+
+function onLayoutReady(): void {
+  recomputeLayout()
+  // Re-measure once more after a frame, in case heights changed because the
+  // candidate text rendered with a different length.
+  nextTick(() => recomputeLayout())
+}
+
+watch(visibleFlags, () => {
+  // When flag list changes (resolved, added), positions change.
+  nextTick(() => recomputeLayout())
+})
+
+let resizeRaf = 0
+function onResize(): void {
+  if (resizeRaf) cancelAnimationFrame(resizeRaf)
+  resizeRaf = requestAnimationFrame(() => recomputeLayout())
+}
+
+onMounted(() => {
+  window.addEventListener('resize', onResize)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+  if (resizeRaf) cancelAnimationFrame(resizeRaf)
+})
 
 // --- share banner -----------------------------------------------------------
 
@@ -243,6 +362,36 @@ function dismissShare(): void {
         <div class="title-block">
           <p class="kicker">slopmop session</p>
           <h1>{{ doc?.title ?? 'Loading…' }}</h1>
+          <div v-if="doc" class="phase-toggle" role="radiogroup" aria-label="pass">
+            <button
+              type="button"
+              role="radio"
+              :aria-checked="phase === 'shape'"
+              :class="['phase-btn', { active: phase === 'shape' }]"
+              :disabled="r3LiveCount === 0 && phase !== 'shape'"
+              @click="setPhase('shape')"
+              title="Surface only Rung 3 (structural) flags. Settle the shape before polishing prose."
+            >
+              <span class="phase-name">shape pass</span>
+              <span class="phase-count">{{ r3LiveCount }}</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              :aria-checked="phase === 'prose'"
+              :class="['phase-btn', { active: phase === 'prose' }]"
+              @click="setPhase('prose')"
+              title="Surface Rung 1 and Rung 2 (prose-level) flags. Lexical and passage-level polish."
+            >
+              <span class="phase-name">prose pass</span>
+              <span class="phase-count">{{ lowerLiveCount }}</span>
+            </button>
+            <span
+              v-if="phase === 'shape' && lowerLiveCount > 0"
+              class="phase-hint"
+              :title="`${lowerLiveCount} prose-level flags hidden - settle the shape first`"
+            >shape first</span>
+          </div>
         </div>
         <div v-if="doc" class="counts">
           <button
@@ -304,169 +453,126 @@ function dismissShare(): void {
       <p v-if="loading" class="loading">connecting…</p>
       <p v-if="errorRef" class="err">error: {{ errorRef }}</p>
 
-      <main v-if="doc" class="grid">
+      <main v-if="doc" class="canvas">
         <section class="doc">
           <ArticleView
+            ref="articleViewRef"
             :source="doc.source"
-            :flags="flags"
+            :flags="articleFlags"
             :selected-flag-id="selectedFlagId"
-            @flag-click="flagClicked"
+            :candidates="inlineCandidates"
+            :peek-flag-id="peekFlagId"
+            :paragraphs="paragraphs"
+            :density="density"
+            @flag-click="onFlagClick"
+            @layout-ready="onLayoutReady"
           />
         </section>
 
-        <aside class="panel">
+        <aside class="gutter" :style="{ minHeight: gutterMinHeight + 'px' }">
           <p v-if="visibleFlags.length === 0" class="empty">
             No open flags. The document is clean (or the agent hasn't run detectors yet).
           </p>
 
-          <ul class="flags">
-            <li
-              v-for="v in visibleFlags"
-              :key="v.flag.id"
-              class="flag"
-              :data-panel-flag="v.flag.id"
-              :data-rung="v.flag.rung ?? 1"
-              :data-state="v.state"
-              :class="{ peeking: peekFlagId === v.flag.id }"
-            >
-              <header class="flag-head" @click="selectedFlagId = v.flag.id">
-                <span :class="['rung-pill', `rung-${v.flag.rung ?? 1}`]" :title="rungName(v.flag.rung)">{{ rungLabel(v.flag.rung) }}</span>
-                <span class="pattern">{{ v.flag.patternId }}</span>
-                <span :class="['state-badge', `state-${v.state}`]">{{ v.state }}</span>
-              </header>
+          <article
+            v-for="v in visibleFlags"
+            :key="v.flag.id"
+            :ref="(el) => setAnnotationRef(v.flag.id, el as Element | null)"
+            class="annot"
+            :data-flag-id="v.flag.id"
+            :data-state="v.state"
+            :data-rung="v.flag.rung ?? 1"
+            :class="{ selected: selectedFlagId === v.flag.id }"
+            :style="{ top: (finalTops.get(v.flag.id) ?? 0) + 'px' }"
+            @click="selectFlag(v.flag.id)"
+          >
+            <header class="ann-head">
+              <span :class="['rung-pill', `rung-${v.flag.rung ?? 1}`]" :title="rungName(v.flag.rung)">
+                {{ rungLabel(v.flag.rung) }}
+              </span>
+              <span class="pattern" :title="v.flag.patternId">{{ v.flag.patternId }}</span>
+              <span :class="['state-badge', `state-${v.state}`]">{{ v.state }}</span>
+            </header>
 
-              <p class="excerpt">
-                <mark>{{ v.flag.excerpt }}</mark>
-              </p>
-              <p v-if="v.flag.rationale" class="rationale">{{ v.flag.rationale }}</p>
+            <p v-if="v.flag.rationale" class="rationale">{{ v.flag.rationale }}</p>
 
-              <!-- OPEN: needs a directive -->
-              <div v-if="v.state === 'open'" class="actions">
-                <div class="chips">
-                  <button
-                    v-for="s in SHORTCUTS"
-                    :key="s"
-                    type="button"
-                    class="chip"
-                    @click="submitShortcut(v.flag.id, s)"
-                  >{{ s }}</button>
-                </div>
-                <form class="free" @submit.prevent="submitFreeDirective(v.flag.id)">
-                  <input
-                    v-model="directiveInput[v.flag.id]"
-                    type="text"
-                    placeholder="custom directive…"
-                  />
-                  <button type="submit" :disabled="!directiveInput[v.flag.id]?.trim()">send</button>
-                </form>
-                <details class="let-me-try">
-                  <summary>let me try…</summary>
-                  <form @submit.prevent="submitLetMeTry(v.flag.id)">
-                    <input
-                      v-model="letMeTryInput[v.flag.id]"
-                      type="text"
-                      placeholder="paste your replacement"
-                    />
-                    <button type="submit" :disabled="!letMeTryInput[v.flag.id]">apply</button>
-                  </form>
-                </details>
-                <div class="row">
-                  <button type="button" class="quiet" @click="skip(v.flag.id)">skip</button>
-                  <button type="button" class="quiet" @click="keep(v.flag.id)">keep deliberate</button>
-                </div>
+            <!-- AWAITING-ACCEPT: candidate-aware row -->
+            <div v-if="v.state === 'awaiting' && v.candidate" class="awaiting-row">
+              <button
+                type="button"
+                class="primary"
+                @click.stop="accept(v.flag.id)"
+              >accept</button>
+              <button
+                type="button"
+                class="peek"
+                @pointerdown.stop="startPeek(v.flag.id, $event)"
+                @pointerup.stop="endPeek()"
+                @pointercancel.stop="endPeek()"
+              >hold to see original</button>
+              <button type="button" class="quiet" @click.stop="discard(v.flag.id)">discard</button>
+              <span v-if="v.candidate.modelTag" class="model-tag">via {{ v.candidate.modelTag }}</span>
+            </div>
+
+            <!-- PENDING -->
+            <div v-else-if="v.state === 'pending' && v.pendingResponse" class="pending-row">
+              <span class="thinking"><span class="spinner" /> agent thinking…</span>
+              <span class="directive">
+                <span class="kind">{{ v.pendingResponse.kind }}</span>
+                <span v-if="v.pendingResponse.body">"{{ v.pendingResponse.body }}"</span>
+              </span>
+              <button type="button" class="quiet small" @click.stop="cancelPending(v.pendingResponse.id)">cancel</button>
+            </div>
+
+            <!-- STUCK -->
+            <p v-else-if="v.state === 'stuck' && v.stuckResponse" class="stuck-row">
+              <span class="lbl">agent stuck</span>
+              <span v-if="v.stuckResponse.stuckReason" class="reason">- {{ v.stuckResponse.stuckReason }}</span>
+            </p>
+
+            <!-- Universal directive UI: chips + free input + skip/keep/let-me-try -->
+            <div class="directive-ui" @click.stop>
+              <div class="chips">
+                <button
+                  v-for="s in SHORTCUTS"
+                  :key="s"
+                  type="button"
+                  class="chip"
+                  @click="submitShortcut(v.flag.id, s)"
+                >{{ s }}</button>
               </div>
-
-              <!-- PENDING: agent thinking -->
-              <div v-else-if="v.state === 'pending' && v.pendingResponse" class="pending-block">
-                <p class="thinking">
-                  <span class="spinner" />
-                  agent thinking…
-                </p>
-                <p class="directive">
-                  <span class="kind">{{ v.pendingResponse.kind }}</span>
-                  <span v-if="v.pendingResponse.body">"{{ v.pendingResponse.body }}"</span>
-                </p>
-                <button type="button" class="quiet small" @click="cancelPending(v.pendingResponse.id)">cancel</button>
+              <form class="free" @submit.prevent="submitFreeDirective(v.flag.id)">
+                <input
+                  v-model="directiveInput[v.flag.id]"
+                  type="text"
+                  :placeholder="v.state === 'awaiting' ? 'nudge…' : 'custom directive…'"
+                />
+                <button type="submit" :disabled="!directiveInput[v.flag.id]?.trim()">send</button>
+              </form>
+              <div class="meta-row">
+                <button
+                  type="button"
+                  class="link"
+                  @click="letMeTryOpen[v.flag.id] = !letMeTryOpen[v.flag.id]"
+                >{{ letMeTryOpen[v.flag.id] ? 'cancel' : 'let me try…' }}</button>
+                <span class="spacer" />
+                <button type="button" class="link" @click="skip(v.flag.id)">skip</button>
+                <button type="button" class="link" @click="keep(v.flag.id)">keep deliberate</button>
               </div>
-
-              <!-- AWAITING-ACCEPT: candidate ready -->
-              <div v-else-if="v.state === 'awaiting' && v.candidate" class="awaiting-block">
-                <div class="diff">
-                  <p class="diff-row">
-                    <span class="lbl">was</span>
-                    <span class="pre">{{ v.candidate.pre }}</span>
-                  </p>
-                  <p class="diff-row">
-                    <span class="lbl">now</span>
-                    <span class="post">{{ v.candidate.post }}</span>
-                  </p>
-                </div>
-                <p v-if="v.candidate.modelTag" class="model-tag">via {{ v.candidate.modelTag }}</p>
-                <div class="row">
-                  <button type="button" class="primary" @click="accept(v.flag.id)">accept</button>
-                  <button
-                    type="button"
-                    class="peek"
-                    @mousedown="startPeek(v.flag.id)"
-                    @mouseup="endPeek()"
-                    @mouseleave="endPeek()"
-                    @touchstart.prevent="startPeek(v.flag.id)"
-                    @touchend="endPeek()"
-                  >hold to compare</button>
-                  <button type="button" class="quiet" @click="discard(v.flag.id)">discard</button>
-                </div>
-                <details class="redirect">
-                  <summary>re-direct</summary>
-                  <div class="chips">
-                    <button
-                      v-for="s in SHORTCUTS"
-                      :key="s"
-                      type="button"
-                      class="chip"
-                      @click="submitShortcut(v.flag.id, s)"
-                    >{{ s }}</button>
-                  </div>
-                  <form class="free" @submit.prevent="submitFreeDirective(v.flag.id)">
-                    <input
-                      v-model="directiveInput[v.flag.id]"
-                      type="text"
-                      placeholder="nudge…"
-                    />
-                    <button type="submit" :disabled="!directiveInput[v.flag.id]?.trim()">send</button>
-                  </form>
-                </details>
-              </div>
-
-              <!-- STUCK: agent gave up -->
-              <div v-else-if="v.state === 'stuck' && v.stuckResponse" class="stuck-block">
-                <p class="stuck-msg">
-                  <span class="lbl">agent stuck</span>
-                  <span v-if="v.stuckResponse.stuckReason">- {{ v.stuckResponse.stuckReason }}</span>
-                </p>
-                <div class="chips">
-                  <button
-                    v-for="s in SHORTCUTS"
-                    :key="s"
-                    type="button"
-                    class="chip"
-                    @click="submitShortcut(v.flag.id, s)"
-                  >{{ s }}</button>
-                </div>
-                <form class="free" @submit.prevent="submitFreeDirective(v.flag.id)">
-                  <input
-                    v-model="directiveInput[v.flag.id]"
-                    type="text"
-                    placeholder="try a different angle…"
-                  />
-                  <button type="submit" :disabled="!directiveInput[v.flag.id]?.trim()">send</button>
-                </form>
-                <div class="row">
-                  <button type="button" class="quiet" @click="skip(v.flag.id)">skip</button>
-                  <button type="button" class="quiet" @click="keep(v.flag.id)">keep deliberate</button>
-                </div>
-              </div>
-            </li>
-          </ul>
+              <form
+                v-if="letMeTryOpen[v.flag.id]"
+                class="free let-me-try"
+                @submit.prevent="submitLetMeTry(v.flag.id)"
+              >
+                <input
+                  v-model="letMeTryInput[v.flag.id]"
+                  type="text"
+                  placeholder="paste your replacement"
+                />
+                <button type="submit" :disabled="!letMeTryInput[v.flag.id]">apply</button>
+              </form>
+            </div>
+          </article>
         </aside>
       </main>
     </template>
@@ -572,6 +678,49 @@ function dismissShare(): void {
   margin: 0;
   letter-spacing: var(--heading-tracking, normal);
 }
+
+.phase-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.phase-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.phase-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.phase-btn:not(:disabled):hover { color: var(--text); border-color: var(--text); }
+.phase-btn.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+  font-weight: 600;
+}
+.phase-btn .phase-count {
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  opacity: 0.85;
+}
+.phase-btn.active .phase-count { opacity: 0.85; }
+.phase-hint {
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-left: 0.2rem;
+  font-style: italic;
+}
 .counts {
   display: flex;
   gap: 0.5rem;
@@ -589,6 +738,9 @@ function dismissShare(): void {
   display: inline-block;
 }
 .counts .muted { color: var(--muted); }
+.counts .pending b { color: #b88f3e; }
+.counts .awaiting b { color: #2f8f6a; }
+.counts .stuck b { color: #b8472d; }
 
 .counts .score {
   display: inline-flex;
@@ -729,63 +881,75 @@ function dismissShare(): void {
 }
 .score-note { margin: 0.8rem 0 0; font-size: 0.8rem; }
 
-.counts .pending b { color: #b88f3e; }
-.counts .awaiting b { color: #2f8f6a; }
-.counts .stuck b { color: #b8472d; }
-
 .loading, .empty { color: var(--muted); }
 .err { color: #b8472d; }
 
-.grid {
+/* The canvas: article on the left, annotation gutter on the right.        */
+/* Both flow with page scroll. Annotations are absolutely positioned       */
+/* within .gutter, aligned to the y-offset of their flag mark in the doc.  */
+.canvas {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 26rem;
+  grid-template-columns: minmax(0, 1fr) 24rem;
   gap: 1.6rem;
   align-items: start;
 }
-
 .doc {
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 7rem);
-  overflow-y: auto;
-  padding-right: 0.5rem;
+  min-width: 0;
+}
+.gutter {
+  position: relative;
+  min-height: 200px;
+}
+.empty {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 2rem 1rem;
+  font-size: 0.9rem;
 }
 
-.panel {
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 7rem);
-  overflow-y: auto;
-}
-
-.flags { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.7rem; }
-
-.flag {
+/* An annotation is a self-contained card; it holds excerpt/rationale,     */
+/* state-specific affordances, and the universal directive UI.             */
+.annot {
+  position: absolute;
+  left: 0;
+  right: 0;
   border: 1px solid var(--rule);
   border-left-width: 3px;
   border-radius: 6px;
-  padding: 0.7rem 0.9rem 0.8rem;
+  padding: 0.65rem 0.8rem 0.75rem;
   background: var(--bg);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: top 180ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
-.flag[data-rung="1"] { border-left-color: #2f8f6a; }
-.flag[data-rung="2"] { border-left-color: #b88f3e; }
-.flag[data-rung="3"] { border-left-color: #b8472d; }
-.flag[data-state="awaiting"] { box-shadow: 0 0 0 2px color-mix(in srgb, #2f8f6a 25%, transparent); }
-.flag[data-state="stuck"] { box-shadow: 0 0 0 2px color-mix(in srgb, #b8472d 20%, transparent); }
-.flag[data-state="pending"] { opacity: 0.85; }
-.flag.peeking .post { display: none; }
-.flag.peeking .pre { font-weight: 600; color: var(--text); background: color-mix(in srgb, #b8472d 15%, transparent); }
+.annot[data-rung="1"] { border-left-color: #2f8f6a; }
+.annot[data-rung="2"] { border-left-color: #b88f3e; }
+.annot[data-rung="3"] { border-left-color: #b8472d; }
+.annot[data-state="awaiting"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #2f8f6a 20%, transparent);
+}
+.annot[data-state="stuck"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #b8472d 18%, transparent);
+}
+.annot[data-state="pending"] { opacity: 0.92; }
+.annot.selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 18%, transparent);
+}
 
-.flag-head {
+.ann-head {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-  cursor: pointer;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
 }
 .rung-pill {
   font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 0.1rem 0.4rem;
@@ -798,150 +962,63 @@ function dismissShare(): void {
 .rung-3 { background: #b8472d; }
 .pattern {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   color: var(--muted);
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .state-badge {
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0.1rem 0.45rem;
+  padding: 0.08rem 0.4rem;
   border-radius: 999px;
   border: 1px solid var(--rule);
   color: var(--muted);
 }
-.state-open { color: var(--muted); }
 .state-pending { color: #b88f3e; border-color: color-mix(in srgb, #b88f3e 50%, var(--rule)); }
 .state-awaiting { color: #2f8f6a; border-color: color-mix(in srgb, #2f8f6a 50%, var(--rule)); }
 .state-stuck { color: #b8472d; border-color: color-mix(in srgb, #b8472d 50%, var(--rule)); }
 
-.excerpt {
-  font-family: var(--font-prose);
-  margin: 0.2rem 0;
-  font-size: 0.93rem;
-  line-height: 1.45;
-}
-.excerpt mark {
-  background: color-mix(in srgb, var(--accent) 25%, transparent);
-  padding: 0 0.15em;
-}
 .rationale {
-  font-size: 0.84rem;
+  font-size: 0.83rem;
   color: var(--muted);
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.55rem;
   line-height: 1.4;
 }
 
-.chips {
+/* State rows: replace the WAS/NOW diff with a single accept-row, since   */
+/* the candidate is now visible inline in the article itself.             */
+.awaiting-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  margin: 0.4rem 0;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.55rem;
 }
-.chip {
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
-  border: 1px solid var(--rule);
-  background: transparent;
-  color: var(--text);
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
-}
-.chip:hover {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-}
-
-.free {
-  display: flex;
-  gap: 0.3rem;
-  margin: 0.4rem 0;
-}
-.free input {
-  flex: 1;
-  font-family: var(--font-ui);
-  font-size: 0.86rem;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
-  min-width: 0;
-}
-.free button {
-  font-family: var(--font-ui);
-  font-size: 0.82rem;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid var(--rule);
-  background: transparent;
-  color: var(--text);
-  border-radius: 4px;
-  cursor: pointer;
-}
-.free button:disabled { opacity: 0.4; cursor: not-allowed; }
-.free button:not(:disabled):hover { border-color: var(--text); }
-
-.let-me-try, .redirect {
-  font-size: 0.85rem;
-  margin: 0.5rem 0 0;
-}
-.let-me-try summary, .redirect summary {
-  cursor: pointer;
+.awaiting-row .model-tag {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   color: var(--muted);
-  user-select: none;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  margin-left: auto;
 }
-.let-me-try summary:hover, .redirect summary:hover { color: var(--text); }
 
-.row {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
-}
-.row button {
-  font-family: var(--font-ui);
-  font-size: 0.82rem;
-  padding: 0.32rem 0.75rem;
-  border: 1px solid var(--rule);
-  background: transparent;
-  color: var(--text);
-  border-radius: 4px;
-  cursor: pointer;
-}
-.row button.quiet { color: var(--muted); }
-.row button.quiet.small { padding: 0.15rem 0.5rem; font-size: 0.75rem; }
-.row button.primary {
-  background: #2f8f6a;
-  color: #fff;
-  border-color: #2f8f6a;
-  font-weight: 600;
-}
-.row button.peek {
-  background: var(--code-bg);
-  user-select: none;
-}
-.row button:not(:disabled):hover { border-color: var(--text); }
-.row button.primary:hover { background: #1f7058; border-color: #1f7058; }
-
-.pending-block {
-  display: grid;
-  gap: 0.4rem;
-}
-.thinking {
+.pending-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+}
+.pending-row .thinking {
   color: #b88f3e;
-  font-size: 0.86rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .spinner {
   width: 0.8rem;
@@ -952,18 +1029,18 @@ function dismissShare(): void {
   animation: spin 0.8s linear infinite;
   display: inline-block;
 }
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-.directive {
-  margin: 0;
-  font-size: 0.84rem;
+@keyframes spin { to { transform: rotate(360deg); } }
+.pending-row .directive {
   color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.directive .kind {
-  display: inline-block;
+.pending-row .kind {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   background: var(--code-bg);
   padding: 0.05em 0.35em;
   border-radius: 3px;
@@ -971,63 +1048,146 @@ function dismissShare(): void {
   text-transform: lowercase;
 }
 
-.awaiting-block { display: grid; gap: 0.4rem; }
-.diff {
-  display: grid;
-  gap: 0.2rem;
-  padding: 0.45rem 0.6rem;
-  background: var(--code-bg);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-}
-.diff-row {
-  margin: 0;
-  display: grid;
-  grid-template-columns: 2.4rem 1fr;
-  gap: 0.4rem;
-  align-items: baseline;
-  font-family: var(--font-prose);
-  font-size: 0.92rem;
-  line-height: 1.4;
-}
-.diff-row .lbl {
-  font-family: var(--font-display);
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-.diff-row .pre { color: var(--muted); text-decoration: line-through; }
-.diff-row .post { color: var(--text); font-weight: 500; }
-.model-tag {
-  margin: 0;
-  font-size: 0.74rem;
-  color: var(--muted);
-  font-family: var(--font-mono);
-}
-
-.stuck-block { display: grid; gap: 0.4rem; }
-.stuck-msg {
-  margin: 0;
-  font-size: 0.85rem;
+.stuck-row {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
   color: var(--text);
 }
-.stuck-msg .lbl {
+.stuck-row .lbl {
   font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #b8472d;
   margin-right: 0.3rem;
 }
+.stuck-row .reason { color: var(--muted); }
+
+/* Universal directive UI: same composition for every state.              */
+.directive-ui {
+  display: grid;
+  gap: 0.35rem;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.chip {
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text);
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.chip:hover {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.free {
+  display: flex;
+  gap: 0.3rem;
+}
+.free input {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 0.83rem;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  min-width: 0;
+}
+.free button {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.free button:disabled { opacity: 0.4; cursor: not-allowed; }
+.free button:not(:disabled):hover { border-color: var(--text); }
+.let-me-try { margin-top: 0.1rem; }
+
+.meta-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.78rem;
+}
+.meta-row .spacer { flex: 1; }
+.meta-row .link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 1px dotted transparent;
+}
+.meta-row .link:hover { color: var(--text); border-bottom-color: var(--rule); }
+
+/* The accept / hold-to-see-original / discard cluster. */
+.awaiting-row button {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  padding: 0.32rem 0.7rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.awaiting-row button.primary {
+  background: #2f8f6a;
+  color: #fff;
+  border-color: #2f8f6a;
+  font-weight: 600;
+}
+.awaiting-row button.primary:hover { background: #1f7058; border-color: #1f7058; }
+.awaiting-row button.peek {
+  background: var(--code-bg);
+  user-select: none;
+  touch-action: none;
+}
+.awaiting-row button.peek:active {
+  background: color-mix(in srgb, #b8472d 18%, var(--code-bg));
+}
+.awaiting-row button.quiet { color: var(--muted); }
+.awaiting-row button:not(:disabled):hover { border-color: var(--text); }
+
+.pending-row button.small {
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.pending-row button.small:hover { color: var(--text); border-color: var(--text); }
 
 @media (max-width: 960px) {
-  .grid {
+  .canvas {
     grid-template-columns: 1fr;
   }
-  .doc, .panel {
-    position: static;
-    max-height: none;
+  .gutter {
+    min-height: 0 !important;
+  }
+  .annot {
+    position: relative;
+    top: auto !important;
+    margin-bottom: 0.7rem;
   }
 }
 </style>

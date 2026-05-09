@@ -1,6 +1,6 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-08.8
+skillVersion: 2026-05-09.1
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -21,15 +21,15 @@ Two entry points:
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-08.8` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+This file declares `skillVersion: 2026-05-09.1` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
 
 ```
-X-Skill-Version: 2026-05-08.8
+X-Skill-Version: 2026-05-09.1
 ```
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The slopmop skill I have installed (v2026-05-08.8) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-09.1) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 
@@ -57,7 +57,7 @@ If the author asks you to check for slopmop updates ("check for updates", "is th
 
 5. **Overwrite** the file with the fetched content using `Write`. Replace the whole file so frontmatter and body stay in sync - do not edit selectively.
 
-6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-08.8 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
+6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-09.1 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
 
 Do not try to re-parse this file mid-session - the harness loaded it once at startup and will not re-read until the next session.
 
@@ -263,7 +263,53 @@ curl -s "$HOST/docs/$ID/voice-samples?n=20"
 
 Pack them into your prompt as few-shot examples. Voice converges over the session if you use them; stays generic if you don't.
 
-## 7. wrap up
+## 7. density scoring
+
+Slop catalogue tells the author what's *wrong* with a passage. Density is the other lens: per-paragraph numeric scores along a few axes, rendered as a thin gradient rail in the article margin so the author can see at a glance where the prose is alive vs dead. **Information**, **argument**, **impact**, **specificity**, **voice** are the canonical defaults; you can drop any that don't fit a piece, and you can add your own (e.g. *humour*, *tension*, *stakes*) when the work calls for it. The client renders the union it sees, with extras getting a neutral fallback color.
+
+**When to score:**
+- Once at session start, after you POST flags. Most paragraphs land their scores here.
+- After a fullSource push (Rung 3 editorial rewrite): every paragraph hash that doesn't already exist in the cache needs re-scoring. Per-flag patches that stay inside an anchor window don't change the paragraph hash, so existing scores carry over for free.
+- Whenever the author asks ("re-score density", "the scores are stale").
+
+**The flow:**
+
+```bash
+# Pull paragraph list and current density cache. Server hashes paragraphs for you.
+curl -s "$HOST/docs/$ID/density"
+# -> { paragraphs: [{ hash, start, end, text }], density: { hash: { axis: score } } }
+```
+
+For each paragraph whose `hash` is missing from `density`, score it. Use a single LLM call that takes the paragraph (with surrounding paragraph context for voice judgement) and returns the axis scores. Score 0..10:
+
+- **information**: density of facts, named entities, numbers. Hand-wavy abstractions = low; concrete claims = high.
+- **argument**: is a claim being made and supported here, or is the paragraph just sitting there? Inert connective tissue = low; load-bearing = high.
+- **impact**: does this hit. Punchline-quality, specific imagery, payoff. Filler = low; lands = high.
+- **specificity**: concrete nouns vs abstractions. "Three counties" beats "many areas." Specific = high.
+- **voice**: does this sound like the writer (per voice samples) or like a model. Signature voice = high; generic = low.
+
+Drop any axis that genuinely doesn't apply (e.g. voice=N/A on a piece with no voice samples yet). Add an axis if you've got a strong take ("Tension - is something at stake here").
+
+Post the batch back:
+
+```bash
+curl -s -X POST \
+  -H 'content-type: application/json' \
+  -d "{
+    \"modelTag\": \"$MODEL_TAG\",
+    \"scores\": [
+      {\"paragraphHash\": \"$H1\", \"axes\": {\"information\": 7.5, \"argument\": 4, \"impact\": 6.5, \"specificity\": 8, \"voice\": 5}},
+      {\"paragraphHash\": \"$H2\", \"axes\": {\"information\": 2, \"argument\": 1, \"impact\": 1.5, \"specificity\": 2, \"voice\": 3, \"tension\": 0.5}}
+    ]
+  }" \
+  "$HOST/docs/$ID/density"
+```
+
+Server stores by hash, so unchanged paragraphs keep their scores across edits forever - re-running density on a second pass only spends tokens on the paragraphs that drifted.
+
+The author can read the rail to decide where prose is dying ("this whole section is dim") - that's a higher-leverage signal than nudging individual lexical flags. Don't lecture about it; just score.
+
+## 8. wrap up
 
 When the author says `done`, or `responses?status=pending` returns empty repeatedly, fetch the companion:
 
@@ -288,10 +334,12 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `POST` | `/docs/:id/responses/:rid/punt` | Agent gives up on a directive |
 | `POST` | `/docs/:id/resolutions` | Batch resolution: patches + optional fullSource (If-Match) |
 | `GET` | `/docs/:id/voice-samples?n=N` | Few-shot voice calibration |
+| `GET` | `/docs/:id/density` | Paragraph list + current density score cache |
+| `POST` | `/docs/:id/density` | Submit per-paragraph density scores (canonical axes or your own) |
 | `GET` | `/docs/:id/companion` | Full state for wrap-up |
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
 
-The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-08.8` so the server can flag staleness.
+The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-09.1` so the server can flag staleness.
 
 ## constraints
 
@@ -307,3 +355,4 @@ The doc id from the URL is the capability - no separate auth header. All calls s
 - **Voice memory accumulates.** Pull voice samples regularly. The session converges on the writer's voice if you use them.
 - **Skip / keep / let-me-try are user-side.** Self-resolve server-side. You will never see those kinds in the queue.
 - **The score is Rung 1 only.** Rung 2 / Rung 3 are reported as counts, not folded into the headline. Don't try to "fix" Rung 2 hits to chase the score.
+- **Density is keyed by paragraph hash, not flag id.** Don't re-score paragraphs whose hash is already in the density cache - they haven't changed. Your token budget goes to the new and the drifted.

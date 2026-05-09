@@ -1,6 +1,7 @@
 import type { ResolutionEvent } from '../src/types'
 import type { DocState } from './types'
 import { relocateAnchor } from '../src/anchoring/textAnchor'
+import { pruneDensity } from './density'
 
 export interface ReconcileResult {
   events: ResolutionEvent[]
@@ -8,6 +9,7 @@ export interface ReconcileResult {
   flagsStale: number
   responsesResolved: number
   responsesCancelled: number
+  densityPruned: number
 }
 
 /**
@@ -41,6 +43,17 @@ export function reconcile(
     flagsStale: 0,
     responsesResolved: 0,
     responsesCancelled: 0,
+    densityPruned: 0,
+  }
+
+  out.densityPruned = pruneDensity(state)
+  if (out.densityPruned > 0) {
+    out.events.push({
+      cursor: allocCursor(),
+      type: 'density-updated',
+      payload: { dropped: out.densityPruned, cause: 'reconcile' },
+      ts: ts(),
+    })
   }
 
   for (const flag of Object.values(state.flags)) {

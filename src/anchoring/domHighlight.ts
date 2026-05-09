@@ -6,10 +6,25 @@ interface Segment {
   end: number
 }
 
+export interface HighlightOptions {
+  /**
+   * Map of flagId -> candidate replacement text. When a flag has a candidate,
+   * its rendered mark shows the candidate text instead of the original; the
+   * original is preserved on `data-pre` for hold-to-compare.
+   */
+  candidates?: Map<string, string>
+  /**
+   * If set, the flag with this id renders its `data-pre` (original) text even
+   * if it has a candidate. Used for the hold-to-see-original gesture.
+   */
+  peekFlagId?: string | null
+}
+
 export function highlightFlagsInDom(
   root: HTMLElement,
   flags: Flag[],
   scopeSelector?: string,
+  opts?: HighlightOptions,
 ): void {
   for (const mark of Array.from(root.querySelectorAll('mark.slop-flag'))) {
     const parent = mark.parentNode
@@ -41,6 +56,10 @@ export function highlightFlagsInDom(
       textIdx = fallback
     }
     wrapRange(segments, textIdx, textIdx + flag.anchor.text.length, flag)
+  }
+
+  if (opts?.candidates && opts.candidates.size > 0) {
+    applyCandidateOverrides(root, opts.candidates, opts.peekFlagId ?? null)
   }
 }
 
@@ -89,5 +108,41 @@ function wrapRange(segments: Segment[], start: number, end: number, flag: Flag):
     mark.style.setProperty('--flag-color', `var(--cat-${flag.category})`)
     target.parentNode?.insertBefore(mark, target)
     mark.appendChild(target)
+  }
+}
+
+/**
+ * Replace the rendered text of marks belonging to flags that have an
+ * awaiting-accept candidate. Multi-segment flags collapse into the first
+ * mark; the original text is preserved on data-pre so peek can restore it.
+ */
+function applyCandidateOverrides(
+  root: HTMLElement,
+  candidates: Map<string, string>,
+  peekFlagId: string | null,
+): void {
+  const groups = new Map<string, HTMLElement[]>()
+  for (const m of root.querySelectorAll<HTMLElement>('mark.slop-flag')) {
+    const id = m.dataset.flagId
+    if (!id) continue
+    if (!groups.has(id)) groups.set(id, [])
+    groups.get(id)!.push(m)
+  }
+  for (const [fid, marks] of groups) {
+    const post = candidates.get(fid)
+    if (post === undefined) continue
+    const pre = marks.map((m) => m.textContent ?? '').join('')
+    const first = marks[0]
+    first.dataset.pre = pre
+    first.dataset.post = post
+    if (peekFlagId === fid) {
+      first.textContent = pre
+      first.dataset.displaying = 'pre'
+    } else {
+      first.textContent = post
+      first.dataset.displaying = 'post'
+    }
+    first.classList.add('has-candidate')
+    for (let i = 1; i < marks.length; i++) marks[i].remove()
   }
 }

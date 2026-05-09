@@ -16,6 +16,15 @@ export interface ScoreInfo {
   byRung: Record<Rung, { count: number; weighted: number }>
 }
 
+export interface ParagraphInfo {
+  hash: string
+  start: number
+  end: number
+  text: string
+}
+
+export type DensityAxes = Record<string, number>
+
 interface FetchedDoc {
   doc: DocSummary
   sourceHash: string
@@ -23,6 +32,8 @@ interface FetchedDoc {
   score: ScoreInfo
   flags: Flag[]
   agentHints: AgentHints
+  paragraphs?: ParagraphInfo[]
+  density?: Record<string, DensityAxes>
 }
 
 export interface OnlineSession {
@@ -35,6 +46,8 @@ export interface OnlineSession {
   responses: Ref<DocResponse[]>
   score: Ref<ScoreInfo | null>
   agentHints: Ref<AgentHints>
+  paragraphs: Ref<ParagraphInfo[]>
+  density: Ref<Record<string, DensityAxes>>
   /** Per-flag awaiting candidate, if one exists. */
   candidateByFlag: ComputedRef<Record<string, Suggestion | undefined>>
   /** Per-flag pending response, if one exists. */
@@ -60,6 +73,8 @@ export function createOnlineSession(id: string): OnlineSession {
   const responses = ref<DocResponse[]>([])
   const score = ref<ScoreInfo | null>(null)
   const agentHints = ref<AgentHints>({})
+  const paragraphs = ref<ParagraphInfo[]>([])
+  const density = ref<Record<string, DensityAxes>>({})
   let cursor = 0
   let eventSource: EventSource | null = null
 
@@ -128,6 +143,8 @@ export function createOnlineSession(id: string): OnlineSession {
       flags.value = data.flags
       score.value = data.score ?? null
       agentHints.value = data.agentHints ?? {}
+      paragraphs.value = data.paragraphs ?? []
+      density.value = data.density ?? {}
       cursor = data.doc.version
 
       if (respRes.ok) {
@@ -168,6 +185,7 @@ export function createOnlineSession(id: string): OnlineSession {
       'source-reverted',
       'agent-hints-updated',
       'document-replaced',
+      'density-updated',
     ]
     for (const evtType of namedEvents) {
       eventSource.addEventListener(evtType, (msg: MessageEvent) =>
@@ -187,6 +205,8 @@ export function createOnlineSession(id: string): OnlineSession {
     flags.value = data.flags
     score.value = data.score ?? null
     agentHints.value = data.agentHints ?? {}
+    paragraphs.value = data.paragraphs ?? []
+    density.value = data.density ?? {}
   }
 
   async function refreshResponses(): Promise<void> {
@@ -229,6 +249,11 @@ export function createOnlineSession(id: string): OnlineSession {
       case 'response-cancelled':
         refreshResponses()
         break
+      case 'density-updated': {
+        // The full density map is small enough to refresh wholesale.
+        refreshDoc()
+        break
+      }
       case 'agent-hints-updated': {
         const hints = ev.payload?.hints as AgentHints | undefined
         if (hints) agentHints.value = hints
@@ -335,6 +360,8 @@ export function createOnlineSession(id: string): OnlineSession {
     responses,
     score,
     agentHints,
+    paragraphs,
+    density,
     candidateByFlag,
     pendingResponseByFlag,
     panelCounts,

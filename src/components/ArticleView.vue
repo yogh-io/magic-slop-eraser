@@ -3,17 +3,30 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { highlightFlagsInDom } from '../anchoring/domHighlight'
 import { segmentSource, type Segment } from '../markdown/segments'
+import { applyDensityRails, type DensityAxes, type ParagraphInfo } from '../markdown/densityRail'
 import type { Flag } from '../types'
 
-const props = defineProps<{
-  source: string
-  flags: Flag[]
-  selectedFlagId: string | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    source: string
+    flags: Flag[]
+    selectedFlagId: string | null
+    /** flagId -> candidate post text. Marks for these flags render the post inline. */
+    candidates?: Map<string, string>
+    /** While set, the flag with this id renders its original text instead of the candidate. */
+    peekFlagId?: string | null
+    /** Paragraph metadata (hash + offsets), aligned to the source. Used to attach density rails. */
+    paragraphs?: ParagraphInfo[]
+    /** density[paragraphHash] = { axisName -> 0..10 }. Drives the rail intensities. */
+    density?: Record<string, DensityAxes>
+  }>(),
+  { candidates: undefined, peekFlagId: null, paragraphs: () => [], density: () => ({}) },
+)
 
 const emit = defineEmits<{
   (e: 'flag-click', id: string): void
   (e: 'selection-change', sel: { start: number; end: number; text: string } | null): void
+  (e: 'layout-ready'): void
 }>()
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false })
@@ -28,19 +41,56 @@ function renderProse(text: string): string {
 async function applyHighlights(): Promise<void> {
   await nextTick()
   if (!containerRef.value) return
-  highlightFlagsInDom(containerRef.value, props.flags, '.md-prose')
+  highlightFlagsInDom(containerRef.value, props.flags, '.md-prose', {
+    candidates: props.candidates,
+    peekFlagId: props.peekFlagId,
+  })
+  applyDensityRails(containerRef.value, props.paragraphs, props.density)
+  // Let the next frame settle so layout/measurements are accurate.
+  requestAnimationFrame(() => emit('layout-ready'))
 }
 
 onMounted(applyHighlights)
-watch(() => [props.source, props.flags], applyHighlights, { deep: true })
+watch(
+  () => [
+    props.source,
+    props.flags,
+    props.candidates,
+    props.peekFlagId,
+    props.paragraphs,
+    props.density,
+  ],
+  applyHighlights,
+  { deep: true },
+)
+
+defineExpose({
+  /** Returns flagId -> top offset (px) relative to the article container. */
+  getMarkPositions(): Map<string, number> {
+    const out = new Map<string, number>()
+    if (!containerRef.value) return out
+    const containerTop = containerRef.value.getBoundingClientRect().top
+    for (const m of containerRef.value.querySelectorAll<HTMLElement>('mark.slop-flag')) {
+      const fid = m.dataset.flagId
+      if (!fid || out.has(fid)) continue
+      out.set(fid, m.getBoundingClientRect().top - containerTop)
+    }
+    return out
+  },
+})
 
 watch(
   () => props.selectedFlagId,
   async (id) => {
     await nextTick()
-    if (!id || !containerRef.value) return
+    if (!containerRef.value) return
+    for (const m of containerRef.value.querySelectorAll<HTMLElement>('mark.slop-flag.is-selected')) {
+      m.classList.remove('is-selected')
+    }
+    if (!id) return
     const el = containerRef.value.querySelector(`[data-flag-id="${id}"]`)
     if (el instanceof HTMLElement) {
+      el.classList.add('is-selected')
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   },
@@ -168,6 +218,59 @@ function onMouseUp(): void {
 .article-view :deep(mark.slop-flag:hover),
 .article-view :deep(mark.slop-flag.is-selected) {
   background: color-mix(in srgb, var(--flag-color, var(--accent)) 18%, transparent);
+}
+.article-view :deep(mark.slop-flag.has-candidate[data-displaying="post"]) {
+  background: color-mix(in srgb, #2f8f6a 14%, transparent);
+  border-bottom-color: #2f8f6a;
+}
+.article-view :deep(mark.slop-flag.has-candidate[data-displaying="pre"]) {
+  background: color-mix(in srgb, #b8472d 14%, transparent);
+  border-bottom-color: #b8472d;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, #b8472d 60%, transparent);
+}
+.article-view :deep(mark.slop-flag.is-selected) {
+  outline: 2px solid color-mix(in srgb, var(--flag-color, var(--accent)) 50%, transparent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Density rail: a thin column of stripes hugging the left edge of each prose */
+/* paragraph. Stripes are absolutely positioned full-height on the paragraph, */
+/* tinted by axis color, opacity by score / 10. The host <p> reserves space   */
+/* via padding-left so prose stays at its normal start. */
+.article-view :deep(.md-prose p.has-density-rail) {
+  position: relative;
+  padding-left: 1.1rem;
+}
+.article-view :deep(p.has-density-rail .density-rail) {
+  position: absolute;
+  left: 0;
+  top: 0.18em;
+  bottom: 0.18em;
+  width: 0.7rem;
+  display: flex;
+  gap: 1px;
+  pointer-events: auto;
+  cursor: help;
+}
+.article-view :deep(p.has-density-rail .density-stripe) {
+  flex: 1;
+  border-radius: 1px;
+  background-color: color-mix(in srgb, var(--axis-color, #6b6b6b) 10%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+.article-view :deep(p.has-density-rail .density-stripe.has-score)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--axis-score, 0) * 100%);
+  background-color: var(--axis-color, #6b6b6b);
+  opacity: 0.85;
+  transition: height 200ms ease;
 }
 
 /* Embedded, set-aside blocks: hidden in plain sight, not edit targets. */

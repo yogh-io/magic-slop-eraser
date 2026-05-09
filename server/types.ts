@@ -4,6 +4,7 @@ import type {
   Comment,
   DocResponse,
   Flag,
+  ResolutionEvent,
   Suggestion,
 } from '../src/types'
 
@@ -50,6 +51,30 @@ export interface DocState {
   density: Record<string, DensityAxes>
   /** Drafter-reported activity: heartbeat, declared tasks, free-form notes. */
   agentActivity: AgentActivity
+  /** Append-only event log. Lives in-state because object stores can't append;
+   *  every mutation re-PUTs the whole blob anyway. SSE catch-up + companion
+   *  doc both read from here. Bounded at write time. */
+  events: ResolutionEvent[]
+}
+
+/**
+ * Cap on `state.events`. The newest N events are kept; older entries fall off.
+ * Sized so a 72-hour session of normal activity stays well under cap, while
+ * keeping the per-doc blob comfortably small for re-PUT on every mutation.
+ */
+export const EVENT_LOG_LIMIT = 2000
+
+/**
+ * Push events onto `state.events`, trimming the oldest if the cap is reached.
+ * Routes use this in place of the old `store.appendEvent` so all the events
+ * for a request ride along with the single `writeState` that follows.
+ */
+export function appendEvents(state: DocState, ...events: ResolutionEvent[]): void {
+  if (events.length === 0) return
+  state.events.push(...events)
+  if (state.events.length > EVENT_LOG_LIMIT) {
+    state.events.splice(0, state.events.length - EVENT_LOG_LIMIT)
+  }
 }
 
 export interface NewDocInput {

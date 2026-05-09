@@ -54,6 +54,10 @@ export interface OnlineSession {
   id: string
   loading: Ref<boolean>
   error: Ref<string | null>
+  /** True when the doc fetch returned 404. Means the session has either
+   *  expired (72h of inactivity) or the URL is wrong. The page should switch
+   *  to a dedicated empty state instead of showing a generic error. */
+  expired: Ref<boolean>
   doc: Ref<DocSummary | null>
   flags: Ref<Flag[]>
   suggestions: Ref<Suggestion[]>
@@ -94,6 +98,7 @@ export interface OnlineSession {
 export function createOnlineSession(id: string): OnlineSession {
   const loading = ref(true)
   const error = ref<string | null>(null)
+  const expired = ref(false)
   const doc = ref<DocSummary | null>(null)
   const flags = ref<Flag[]>([])
   const suggestions = ref<Suggestion[]>([])
@@ -200,6 +205,10 @@ export function createOnlineSession(id: string): OnlineSession {
         fetch(`/docs/${id}/responses`),
         fetch(`/docs/${id}/companion`),
       ])
+      if (docRes.status === 404) {
+        expired.value = true
+        return
+      }
       if (!docRes.ok) throw new Error(`${docRes.status}: ${await docRes.text()}`)
       const data = (await docRes.json()) as FetchedDoc
       doc.value = data.doc
@@ -494,6 +503,7 @@ export function createOnlineSession(id: string): OnlineSession {
     id,
     loading,
     error,
+    expired,
     doc,
     flags,
     suggestions,

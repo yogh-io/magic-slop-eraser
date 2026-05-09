@@ -1,5 +1,6 @@
 import type { DocStore } from '../store'
 import type { DocState } from '../types'
+import { appendEvents } from '../types'
 import type { Comment, Flag, FlagSource, ResolutionEvent, Suggestion, TextAnchor } from '../../src/types'
 import { makeAnchor, relocateAnchor } from '../../src/anchoring/textAnchor'
 import { patterns } from '../../src/catalog/patterns'
@@ -150,11 +151,9 @@ export async function handleFlags(
       created.push(stored)
     }
 
+    appendEvents(state, ...events)
     await store.writeState(docId, state)
-    for (const e of events) {
-      await store.appendEvent(docId, e)
-      bus.publish(docId, e)
-    }
+    for (const e of events) bus.publish(docId, e)
     return json({ added: created.length, flags: created, skipped })
   }
 
@@ -181,8 +180,8 @@ export async function handleFlags(
         payload: { flagId, cause: 'source-edit' },
         ts: nowIso(),
       }
+      appendEvents(state, stale)
       await store.writeState(docId, state)
-      await store.appendEvent(docId, stale)
       bus.publish(docId, stale)
       return fail(409, 'anchor stale at accept time')
     }
@@ -222,11 +221,9 @@ export async function handleFlags(
     const recon = reconcile(state, 'source-edit', () => bumpCursor(state), nowIso)
     events.push(...recon.events)
 
+    appendEvents(state, ...events)
     await store.writeState(docId, state)
-    for (const e of events) {
-      await store.appendEvent(docId, e)
-      bus.publish(docId, e)
-    }
+    for (const e of events) bus.publish(docId, e)
     return json({ ok: true, version: state.doc.version, sourceHash: state.doc.sourceHash })
   }
 
@@ -242,8 +239,8 @@ export async function handleFlags(
       payload: { suggestionId: candidate.id, flagId, reason: 'user-discard' },
       ts: nowIso(),
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ ok: true })
   }
@@ -257,8 +254,8 @@ export async function handleFlags(
       payload: { flagId },
       ts: nowIso(),
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ ok: true })
   }
@@ -272,8 +269,8 @@ export async function handleFlags(
       payload: { flagId },
       ts: nowIso(),
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ ok: true })
   }
@@ -298,8 +295,8 @@ export async function handleFlags(
       payload: { commentId: id, flagId, author: comment.author },
       ts: nowIso(),
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ comment })
   }

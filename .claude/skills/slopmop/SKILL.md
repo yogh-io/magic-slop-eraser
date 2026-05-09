@@ -1,6 +1,6 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-09.2
+skillVersion: 2026-05-09.5
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -21,17 +21,23 @@ Two entry points:
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-09.2` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+This file declares `skillVersion: 2026-05-09.5` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
 
 ```
-X-Skill-Version: 2026-05-09.2
+X-Skill-Version: 2026-05-09.5
 ```
+
+The curl examples below mostly omit this header for readability. Treat them as illustrative - the header is required on every call regardless.
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The slopmop skill I have installed (v2026-05-09.2) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-09.5) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
 
-The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
+The server flags two failure modes via response headers:
+- `X-Skill-Stale: true` - your declared version differs from the server's literal. Surface the upgrade hint above.
+- `X-Skill-Version-Missing: true` - your request omitted `X-Skill-Version` entirely. The staleness check is silently broken; start sending the header on every call.
+
+Either is enough to mention once and keep working; the API stays backward-compatible with one prior version.
 
 ## self-update
 
@@ -66,7 +72,7 @@ Do not try to re-parse this file mid-session - the harness loaded it once at sta
 The browser shows an "agent" pill that turns green the moment it hears from you. **Ping the server as the very first network call of the session** so the writer sees the pipeline is wired before any analysis arrives:
 
 ```bash
-curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" "$HOST/docs/$ID/agent/heartbeat"
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" "$HOST/docs/$ID/agent/heartbeat"
 ```
 
 That bumps `lastSeenAt` and emits an `agent-heartbeat` event. Subsequent flag posts, suggestions, notes, and task updates also bump it; the heartbeat is just the *first* sighting before there's anything to post.
@@ -82,27 +88,36 @@ The author is steering from the browser; they cannot see what your subagents are
 Declare the shape of the work with `POST /docs/$ID/agent/tasks`. Each task carries a stable `key` (drafter-set, e.g. `phase-a`), a `title`, an optional `detail`, and a `status` (`open` / `in-progress` / `done`). Upsert by key:
 
 ```bash
-curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
-  -d '{"key":"phase-a","title":"Phase A: pull catalogue and run flag analysis","status":"in-progress"}' \
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" -H 'content-type: application/json' \
+  -d '{"key":"phase-a","title":"Phase A: framing pass + catalogue walk","status":"in-progress"}' \
   "$HOST/docs/$ID/agent/tasks"
 ```
 
 When the task is done:
 
 ```bash
-curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
-  -d '{"key":"phase-a","title":"Phase A: pull catalogue and run flag analysis","status":"done"}' \
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" -H 'content-type: application/json' \
+  -d '{"key":"phase-a","title":"Phase A: framing pass + catalogue walk","status":"done"}' \
   "$HOST/docs/$ID/agent/tasks"
 ```
 
 Default starting set at session start: a `phase-a` task for analysis and a `phase-b` task for the steering loop, with phase-b `open` until you start it. Add finer-grained tasks during a long catalogue walk (e.g. `r1-walk`, `r2-walk`, `r3-walk`) so the author can see *which* slice you're on.
+
+If a declared task is no longer relevant (the author said "skip Rung 2 entirely", you took a different shape than planned), pull it out with `DELETE`:
+
+```bash
+curl -s -X DELETE -H "X-Skill-Version: 2026-05-09.5" \
+  "$HOST/docs/$ID/agent/tasks/r2-walk"
+```
+
+The task disappears from the live list; the `agent-task-upserted` events for it stay in the timeline as history. Don't mark abandoned work `done` - that's a lie the writer will read off the panel.
 
 ### notes (free-form, timestamped)
 
 Drop a note when you have something the writer should hear: a finding, a concern, or a heads-up that changes how they should think about the session. `POST /docs/$ID/agent/notes`:
 
 ```bash
-curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" -H 'content-type: application/json' \
   -d '{"kind":"finding","body":"Walked the catalogue. The piece is unusually committal - most slop categories don'"'"'t bite. Strongest hits: allusive constructs (bare references to prior project work a cold reader cannot parse), one absent-actor, one antithesis-shaped pivot."}' \
   "$HOST/docs/$ID/agent/notes"
 ```
@@ -125,7 +140,7 @@ Don't spam. One note per real beat is the right cadence. The activity panel is t
 
 Two phases. The first runs once at session start; the second runs on a loop.
 
-**Phase A - analysis (once, at start).** Bring-your-own-model: all detection is yours. Read the source, walk the catalogue, post flags via `POST /flags`. Subagents (Task tool) parallelise this well; shape the dispatch as suits the prose.
+**Phase A - analysis (once, at start).** Two beats: a quick *framing pass* (is slopmop the right tool for this piece, or does it want `/distill` or `/compress` first?), then the catalogue walk - bring-your-own-model, all detection is yours. Subagents (Task tool) parallelise the catalogue walk well; shape the dispatch as suits the prose.
 
 **Phase B - the steering loop (until the author says done).**
 
@@ -134,7 +149,9 @@ Two phases. The first runs once at session start; the second runs on a loop.
 3. **Post** the resolution: `POST /docs/$ID/resolutions` with patches and/or fullSource. `If-Match` the current source hash.
 4. **Pull** again. The author may have submitted new directives while you worked; pick them up. Loop.
 
-You don't *have* to subscribe to events. The pull is sufficient. Subscribing to the SSE stream is a wake-up optimisation; skip it if your runtime doesn't keep long-lived connections cheap.
+**When the queue empties, hand the loop back to the author.** Don't spin or poll silently - the author is the wheel; if they have nothing in flight, you have nothing to do. Post a short `progress` note ("queue clear; ping me when you have more directives") and stop. They re-engage by sweeping more flags in the browser, or by prompting you in the terminal to pull again. Either way, the next move is theirs.
+
+If you're mid-sweep and a pull happens to come back empty for a moment (the author is typing the next directive), one or two short re-pulls (~5-10s apart) is fine before falling back to the handoff above. SSE is the wake-up optimisation - subscribe if your runtime keeps long-lived connections cheap, skip it otherwise. Pulling alone is sufficient; don't lean on event subscription as the primary trigger.
 
 ## 0. bootstrap
 
@@ -163,11 +180,11 @@ The doc id is the capability - anyone with the URL can drive the session, that's
 **Right after the bootstrap fetch**, send a heartbeat and declare the initial task list (see "tell the author you are alive" / "report tasks and observations" below). Skipping this is a regression - the writer is staring at a blank pill wondering whether anything is wired.
 
 ```bash
-curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" "$HOST/docs/$ID/agent/heartbeat"
-curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
-  -d '{"key":"phase-a","title":"Phase A: pull catalogue and run flag analysis","status":"in-progress"}' \
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" "$HOST/docs/$ID/agent/heartbeat"
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" -H 'content-type: application/json' \
+  -d '{"key":"phase-a","title":"Phase A: framing pass + catalogue walk","status":"in-progress"}' \
   "$HOST/docs/$ID/agent/tasks"
-curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" -H 'content-type: application/json' \
   -d '{"key":"phase-b","title":"Phase B: drive steering loop","status":"open"}' \
   "$HOST/docs/$ID/agent/tasks"
 ```
@@ -176,7 +193,30 @@ curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application
 
 You are the **drafter**. All detection - Rung 1 (lexical), Rung 2 (judgment), Rung 3 (editorial) - is yours. The server stores the catalogue, the docs, the flags, and orchestrates the steering loop, but it does not read prose. That's you.
 
-### 1a. pull the catalogue
+### 1a. framing pass
+
+Before the catalogue walk, take one read for *what kind of fix this piece needs*. Not every piece needs slopmop. Some need to be shorter. Some need a structural argument before any prose polish makes sense. Slopmop's loop is most useful on prose that is roughly the right shape and length - if the piece is bloated or in the wrong format, polishing it is sanding a board you're about to throw out.
+
+One LLM read of the source. Note:
+
+- **Word count** (raw - source split on whitespace).
+- **Stage** - rough draft (argument still settling), polished (argument settled, prose loose), near-ship (would survive light edits and you're looking for the last 10%).
+- **Length-fit** - is the piece earning its words? A 5400-word piece arguing at 2500-word density should be 2500. If you can name the cuts, name them.
+- **Format-fit** - is the shape right? Essay-as-bullets, reference-as-essay, a thread that should be three pieces.
+
+Post one `observation` note. If the framing assessment is mild (length is earned, shape is right), say so briefly and proceed to 1b. If it surfaces something - bloat, structural drift, wrong shape - lay out the options:
+
+```bash
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" -H 'content-type: application/json' \
+  -d '{"kind":"observation","body":"5400 words, polished. Argues at ~2500-word density - the third section restates the second. Three options before slopmop: (1) /distill - a clean ~2400-word version that loses nothing essential; (2) /compress - keep structure, trim repetition (~15%); (3) proceed and slopmop the piece as-is. /distill and /compress are Claude Code commands you run yourself from the terminal; I cannot trigger them. I default to (3) unless you tell me to wait."}' \
+  "$HOST/docs/$ID/agent/notes"
+```
+
+You do not run `/distill` or `/compress` - those are sibling Claude Code commands the author invokes from the terminal. You're surfacing the option. Then proceed to the catalogue walk; the author decides whether to interrupt and take a different path first. If they do, they'll tell you to pause; otherwise, your work continues to be useful even if they later run `/compress` (anchored flags relocate against minor edits) - it's only a wholesale `/distill` that would moot the catalogue walk.
+
+The framing pass is a one-time read at session start. Don't re-do it on subsequent passes - the author owns the structural-vs-polish decision once the session is running.
+
+### 1b. pull the catalogue
 
 ```bash
 curl -s "$HOST/catalogue" > /tmp/slopmop-catalogue.json
@@ -184,9 +224,11 @@ curl -s "$HOST/catalogue" > /tmp/slopmop-catalogue.json
 
 `{ categories, patterns }`. Each pattern carries `whyItsSlop`, `fix`, `examples` (sloppy / better pairs), `skipRule`, and often a long-form `essay`. That's your detection spec; the `skipRule` is your preservation rule.
 
-### 1b. detect
+### 1c. detect
 
 Walk the catalogue against the source. Subagents parallelise this - shape the dispatch as fits the prose. A useful pattern: a quick voice-memo subagent first (register, formal devices the piece is using deliberately, passages that look like slop but aren't), then a detection subagent per rung seeded with the memo. But the dispatch is yours to choose; the prose tells you what shape works.
+
+**When Phase A is done.** Walk the catalogue *once* - every pattern considered against the source at least once, even when the verdict is "doesn't bite here." Flag the matches; for non-matches the *decision* is what counts (don't quietly drop patterns from the walk and don't post no-op flags either - it's a private completeness check). Per-rung subagent dispatch is the sweet spot for most pieces: three or four calls (voice memo + one per rung) of ~8-10 patterns each, source loaded once per call. Per-pattern dispatch is overkill; single-call whole-catalogue walks only fit for short pieces (under ~1000 words) where source + catalogue + reasoning fit comfortably in one context. You're done when each rung has been walked once and the Phase A summary `finding` note is posted - then flip `phase-b` to in-progress and start the loop. Don't re-walk to second-guess yourself; the catalogue is incremental, and if the author wants another pass on a section they'll ask.
 
 What each detected flag should carry:
 
@@ -197,7 +239,7 @@ What each detected flag should carry:
 - `severity` - **your subjective weight, 0 to 1.** This is the scoring mechanism: the server aggregates per-flag severity into the overall score and per-rung breakdown. The catalogue's `severity` (`primary` / `high` / `medium` / `low`) is a starting point, not a verdict. Adjust per instance: a deliberate move named in the voice memo gets a low number even if it matches a pattern; an egregious instance of a usually-mild pattern gets a high one. Voice memo informs every weight. Omit only if you genuinely can't weigh - the server falls back to a per-pattern default.
 - `suggestion` - optional inline candidate. Include when the fix is mechanical and short (a substitute, a cut, a clear active-voice rewrite). Omit when the rewrite needs the author's voice or judgment, and leave those for the steering loop.
 
-### 1c. submit
+### 1d. submit
 
 ```bash
 curl -s -X POST -H "If-Match: $HASH" -H 'content-type: application/json' \
@@ -326,6 +368,32 @@ curl -s -X POST \
 
 Status flips to `stuck`. The author sees it in the panel, gives a different directive or closes the flag manually.
 
+## start over (the reset signal)
+
+The author may, at any point, decide your read of the piece is wrong. "This is all garbage, do it again." "Start over, look at it through the lens of an angry literary critic." "Forget all that, the real problem is the second half." When that happens, scrap your in-flight hypotheses and re-walk - don't try to patch the existing flag set into the new framing.
+
+Call:
+
+```bash
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.5" -H 'content-type: application/json' \
+  -d "{\"reason\": \"angry literary critic lens; the piece sounds eager\"}" \
+  "$HOST/docs/$ID/reset"
+```
+
+Server-side this drops your `open` and `awaiting-accept` flags, the unaccepted suggestions tied to them, the comments anchored to them, all your tasks, all your notes, and cancels any pending responses. Source, accepted suggestions, resolved/skipped/kept flags, density scores, and agent-hints survive - the *durable* record of decisions the author already landed stays put. A `drafter-reset` event with the reason hits the activity timeline so the writer sees the breadcrumb.
+
+Then re-run Phase A. Heartbeat, declare fresh `phase-a` / `phase-b` tasks, walk the catalogue with the new lens folded in, post the new flag set. The author's voice samples (from accepted rewrites) are still there - keep using them.
+
+What this is *not*: a source revert. If the author wants the prose itself rolled back (undo a Rung 3 push), that's `POST /docs/$ID/source/revert` - a separate call. Reset is purely about your analysis hypothesis.
+
+When to use it (the trigger phrases vary; the shape is the same):
+- "start over", "reset", "do it again", "scrap that"
+- "this is garbage, redo"
+- "look at it through the lens of X" / "from Y's eyes" / "as if Z"
+- "forget that, the real issue is..."
+
+When *not*: incremental redirection on a single flag is a directive, not a reset. "More committal on this one" stays in the response loop. Reset is for "throw out the map and re-draw it".
+
 ## 6. voice samples
 
 The author's accepted rewrites are the calibration samples for their voice. Pull a batch on session start, and again every dozen resolutions or so:
@@ -363,6 +431,8 @@ For each paragraph whose `hash` is missing from `density`, score it. Use a singl
 - **voice**: does this sound like the writer (per voice samples) or like a model. Signature voice = high; generic = low.
 
 Drop any axis that genuinely doesn't apply (e.g. voice=N/A on a piece with no voice samples yet). Add an axis if you've got a strong take ("Tension - is something at stake here").
+
+**Score for contrast, not calibration.** There is no objectively correct number for "information=6.5" - the scale is subjective and that's fine. The signal the author wants is *relative*: which paragraphs are alive vs dim along each axis, where the prose dies and where it carries weight. Use the full 0-10 range across the piece. If your scores all cluster between 6 and 8, the rail looks uniform and tells the author nothing - rescore with sharper contrast: pin the weakest paragraph low and the strongest high, then place the rest between them. Embrace the subjectivity; the rail is a *visual diff* against the writer's own piece, not an absolute grade.
 
 Post the batch back:
 
@@ -414,9 +484,11 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
 | `POST` | `/docs/:id/agent/heartbeat` | "Pipeline works" ping; emit at session start |
 | `POST` | `/docs/:id/agent/tasks` | Upsert a structured task by `key` (status: open / in-progress / done) |
+| `DELETE` | `/docs/:id/agent/tasks/:key` | Remove a task that's no longer relevant (history events stay in timeline) |
 | `POST` | `/docs/:id/agent/notes` | Free-form heads-up note (kind: observation / finding / progress / concern) |
+| `POST` | `/docs/:id/reset` | Drafter-initiated soft reset: clear in-flight flags/suggestions/responses/tasks/notes; source untouched |
 
-The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-09.2` so the server can flag staleness.
+The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-09.5` so the server can flag staleness; if you forget, the response carries `X-Skill-Version-Missing: true` to remind you.
 
 ## constraints
 

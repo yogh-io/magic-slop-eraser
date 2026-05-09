@@ -1,6 +1,7 @@
 import type { ResolutionEvent } from '../../src/types'
 import type { DocStore } from '../store'
 import type { DensityAxes } from '../types'
+import { appendEvents } from '../types'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
 import { fail } from '../auth'
@@ -66,8 +67,8 @@ export async function handleDensity(
       ts: nowIso(),
     }
 
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
 
     return json({

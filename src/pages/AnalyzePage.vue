@@ -138,6 +138,12 @@ async function createSession(): Promise<void> {
         Sessions are independent: you can run as many as you want, each with its own
         document, its own queue, its own agent. Nothing leaks between them.
       </p>
+      <p>
+        Sessions disappear after <strong>72 hours of inactivity</strong> - any
+        flag, directive, or accept resets the clock. Don't bookmark a URL and
+        come back next week expecting the doc to still be there. Save what you
+        want to keep.
+      </p>
     </aside>
   </article>
 </template>

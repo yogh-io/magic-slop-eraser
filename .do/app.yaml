@@ -26,6 +26,34 @@ services:
       - key: STATIC_DIR
         scope: RUN_TIME
         value: /app/dist
-      - key: STORAGE_DIR
-        scope: RUN_TIME
-        value: /app/data
+
+      # Persistence: any S3-compatible store (DigitalOcean Spaces, R2, B2, AWS).
+      # When S3_BUCKET is set the server uses the object store and ignores
+      # STORAGE_DIR; the App Platform filesystem is ephemeral so this is the
+      # only way to survive redeploys.
+      #
+      # Bucket policy: configure a lifecycle rule on the bucket to delete
+      # objects untouched for 72 hours - that is the session-expiry mechanism.
+      # Slopmop does not run a sweeper. Object keys are `<S3_PREFIX>/<docId>.json`
+      # (default prefix "docs"); every mutation re-PUTs the blob so an active
+      # session keeps resetting its last-modified timestamp.
+      #
+      # The four secret values below should be set as encrypted env vars in
+      # the DO App Platform console (Settings -> App-Level Environment
+      # Variables) rather than committed to this file.
+      #
+      # - key: S3_BUCKET
+      #   scope: RUN_TIME
+      #   value: slopmop-sessions
+      # - key: S3_ENDPOINT
+      #   scope: RUN_TIME
+      #   value: https://ams3.digitaloceanspaces.com
+      # - key: S3_REGION
+      #   scope: RUN_TIME
+      #   value: ams3
+      # - key: S3_ACCESS_KEY_ID
+      #   scope: RUN_TIME
+      #   type: SECRET
+      # - key: S3_SECRET_ACCESS_KEY
+      #   scope: RUN_TIME
+      #   type: SECRET

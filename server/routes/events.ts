@@ -1,4 +1,5 @@
 import type { DocStore } from '../store'
+import type { DocState } from '../types'
 import type { ResolutionEvent } from '../../src/types'
 import { bus } from '../bus'
 import { fail } from '../auth'
@@ -15,25 +16,29 @@ export async function handleEvents(
 
   // GET /docs/:id/events  -> SSE
   if (sub === null && req.method === 'GET') {
-    return sseStream(store, docId, req)
+    return sseStream(state, docId, req)
   }
 
   // GET /docs/:id/events/poll?since=N  -> long-poll
   if (sub === 'poll' && req.method === 'GET') {
-    return longPoll(store, docId, req)
+    return longPoll(state, docId, req)
   }
 
   return fail(405, 'method not allowed')
 }
 
-function sseStream(store: DocStore, docId: string, req: Request): Response {
+function eventsSince(state: DocState, cursor: number): ResolutionEvent[] {
+  return state.events.filter((e) => e.cursor > cursor)
+}
+
+function sseStream(state: DocState, docId: string, req: Request): Response {
   const url = new URL(req.url)
   const lastEventId = req.headers.get('last-event-id')
   const sinceParam = url.searchParams.get('since')
   const since = lastEventId ? Number(lastEventId) : sinceParam ? Number(sinceParam) : 0
 
   const stream = new ReadableStream({
-    async start(controller) {
+    start(controller) {
       const enc = new TextEncoder()
       const send = (event: ResolutionEvent): void => {
         const data = `id: ${event.cursor}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`
@@ -44,9 +49,8 @@ function sseStream(store: DocStore, docId: string, req: Request): Response {
         }
       }
 
-      // 1. Replay missed events
-      const missed = await store.readEventsSince(docId, since)
-      for (const e of missed) send(e)
+      // 1. Replay missed events from the in-state log.
+      for (const e of eventsSince(state, since)) send(e)
 
       // 2. Subscribe for live events
       const unsubscribe = bus.subscribe(docId, send)
@@ -84,13 +88,13 @@ function sseStream(store: DocStore, docId: string, req: Request): Response {
   })
 }
 
-async function longPoll(store: DocStore, docId: string, req: Request): Promise<Response> {
+async function longPoll(state: DocState, docId: string, req: Request): Promise<Response> {
   const url = new URL(req.url)
   const since = Number(url.searchParams.get('since') ?? '0')
   const timeoutMs = Math.min(60000, Number(url.searchParams.get('timeout') ?? '30000'))
 
   // Immediate replay if anything is buffered past the cursor
-  const missed = await store.readEventsSince(docId, since)
+  const missed = eventsSince(state, since)
   if (missed.length > 0) return json({ events: missed })
 
   // Wait for the next event or timeout

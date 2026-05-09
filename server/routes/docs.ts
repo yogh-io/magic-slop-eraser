@@ -1,6 +1,6 @@
 import type { DocStore } from '../store'
 import type { DocState, NewDocInput, SourceVersion } from '../types'
-import { SOURCE_HISTORY_LIMIT } from '../types'
+import { SOURCE_HISTORY_LIMIT, appendEvents } from '../types'
 import type { AgentHints, Flag, ResolutionEvent } from '../../src/types'
 import { scoreFromFlags } from '../../src/detectors'
 import { extractSkipZones, approximateProseWordCount } from '../../src/detectors/skipZones'
@@ -60,6 +60,7 @@ export async function handleDocs(
       agentHints: {},
       density: {},
       agentActivity: { tasks: {}, notes: {} },
+      events: [],
     }
     await store.writeState(id, state)
     return json({ id, sourceHash: hash, eventsUrl: `/docs/${id}/events` })
@@ -120,11 +121,9 @@ export async function handleDocs(
     const recon = reconcile(state, 'source-edit', () => bumpCursor(state), nowIso)
     events.push(...recon.events)
 
+    appendEvents(state, ...events)
     await store.writeState(docId, state)
-    for (const e of events) {
-      await store.appendEvent(docId, e)
-      bus.publish(docId, e)
-    }
+    for (const e of events) bus.publish(docId, e)
     return json({ ok: true, version: state.doc.version, sourceHash: state.doc.sourceHash })
   }
 
@@ -149,11 +148,9 @@ export async function handleDocs(
     const recon = reconcile(state, 'source-edit', () => bumpCursor(state), nowIso)
     events.push(...recon.events)
 
+    appendEvents(state, ...events)
     await store.writeState(docId, state)
-    for (const e of events) {
-      await store.appendEvent(docId, e)
-      bus.publish(docId, e)
-    }
+    for (const e of events) bus.publish(docId, e)
     return json({ ok: true, version: state.doc.version, sourceHash: state.doc.sourceHash })
   }
 
@@ -169,8 +166,8 @@ export async function handleDocs(
         payload: { hints: state.agentHints },
         ts: nowIso(),
       }
+      appendEvents(state, event)
       await store.writeState(docId, state)
-      await store.appendEvent(docId, event)
       bus.publish(docId, event)
       return json({ agentHints: state.agentHints })
     }
@@ -187,7 +184,6 @@ export async function handleDocs(
 
   // GET /docs/:id/companion
   if (verb === 'companion' && req.method === 'GET') {
-    const events = await store.readEventsSince(docId, 0)
     return json({
       version: 1 as const,
       generatedAt: nowIso(),
@@ -196,7 +192,7 @@ export async function handleDocs(
       suggestions: Object.values(state.suggestions),
       responses: Object.values(state.responses),
       comments: Object.values(state.comments),
-      events,
+      events: state.events.slice(),
     })
   }
 
@@ -288,5 +284,6 @@ function ensureSchema(state: DocState): void {
   if (!s.agentActivity) s.agentActivity = { tasks: {}, notes: {} }
   if (!s.agentActivity.tasks) s.agentActivity.tasks = {}
   if (!s.agentActivity.notes) s.agentActivity.notes = {}
+  if (!Array.isArray(s.events)) s.events = []
   if (typeof s.doc.sourceHash !== 'string') s.doc.sourceHash = sha256Hex(s.doc.source)
 }

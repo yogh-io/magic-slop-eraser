@@ -1,5 +1,6 @@
 import type { DocStore } from '../store'
 import type { DocState } from '../types'
+import { appendEvents } from '../types'
 import type {
   AgentNote,
   AgentNoteKind,
@@ -66,8 +67,8 @@ export async function handleAgent(
       payload: { lastSeenAt: ts },
       ts,
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ ok: true, lastSeenAt: ts })
   }
@@ -98,10 +99,33 @@ export async function handleAgent(
       payload: { noteId: note.id, kind, body: note.body },
       ts,
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ note })
+  }
+
+  // DELETE /docs/:id/agent/tasks/:key  - drop a task the drafter no longer
+  // wants in the live list. Event history (`agent-task-upserted` entries)
+  // stays in the timeline; the task object itself is removed so the panel
+  // shows only what the drafter is currently working on.
+  if (verb === 'tasks' && segs.length === 2 && req.method === 'DELETE') {
+    const key = segs[1]
+    const existing = state.agentActivity.tasks[key]
+    if (!existing) return notFound()
+    delete state.agentActivity.tasks[key]
+    const ts = nowIso()
+    state.agentActivity.lastSeenAt = ts
+    const event: ResolutionEvent = {
+      cursor: bumpCursor(state),
+      type: 'agent-task-removed',
+      payload: { key, title: existing.title, previousStatus: existing.status },
+      ts,
+    }
+    appendEvents(state, event)
+    await store.writeState(docId, state)
+    bus.publish(docId, event)
+    return json({ ok: true, removed: existing })
   }
 
   if (verb === 'tasks' && req.method === 'POST') {
@@ -145,8 +169,8 @@ export async function handleAgent(
       },
       ts,
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ task })
   }

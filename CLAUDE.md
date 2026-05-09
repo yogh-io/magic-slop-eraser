@@ -95,7 +95,7 @@ The existing client-side `doc.ts` reactive store and `textAnchor.ts` anchor sche
 
 ## API surface
 
-Bun-based HTTP server in `server/`. File-based persistence via `DiskStore` (per-doc `state.json` + `events.ndjson`). The doc UUID is the capability - anyone with the URL can drive the session, no separate auth header. SSE primary listen channel; long-poll fallback.
+Bun-based HTTP server in `server/`. Persistence is one JSON blob per doc holding the entire `DocState` (source, flags, suggestions, responses, comments, history, agent activity, event log). Two interchangeable backends: `DiskStore` for local dev (writes to `STORAGE_DIR`) and `S3Store` for production (any S3-compatible store - DigitalOcean Spaces, Cloudflare R2, Backblaze B2, AWS - selected when `S3_BUCKET` is set). Sessions expire purely via the bucket's own lifecycle policy: configure "delete objects untouched for 72 hours". No sweeper code. The doc UUID is the capability - anyone with the URL can drive the session, no separate auth header. SSE primary listen channel; long-poll fallback.
 
 ```
 # document lifecycle
@@ -263,10 +263,11 @@ server/                 # Bun-based API. Imports src/anchoring + src/detectors d
   shared.ts             # json/notFound helpers
   auth.ts               # fail() helper (no auth - doc UUID is the capability)
   bus.ts                # in-memory per-doc pub/sub for SSE
-  types.ts              # DocState, DocRecord, NewDocInput
+  types.ts              # DocState, DocRecord, NewDocInput, appendEvents helper
   store/
-    index.ts            # DocStore interface + factory
-    disk.ts             # DiskStore: state.json + events.ndjson
+    index.ts            # DocStore interface + factory (S3 if S3_BUCKET, else Disk)
+    disk.ts             # DiskStore: one state.json blob per doc on local fs
+    s3.ts               # S3Store: one JSON blob per doc on any S3-compatible bucket
   routes/
     docs.ts             # /docs, /docs/:id, source, companion, agent-hints, voice-samples
     flags.ts            # /docs/:id/flags (POST: drafter-side detection) + per-flag actions

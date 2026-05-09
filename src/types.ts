@@ -180,6 +180,8 @@ export type EventType =
   | 'agent-heartbeat'
   | 'agent-note-added'
   | 'agent-task-upserted'
+  | 'agent-task-removed'
+  | 'drafter-reset'
 
 /**
  * Drafter-declared task. Stable across the session via `key` (drafter-set

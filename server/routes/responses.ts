@@ -1,4 +1,5 @@
 import type { DocState } from '../types'
+import { appendEvents } from '../types'
 import type {
   CategoryId,
   DocResponse,
@@ -135,11 +136,9 @@ export async function handleResponses(
       events.push(...recon.events)
     }
 
+    appendEvents(state, ...events)
     await store.writeState(docId, state)
-    for (const e of events) {
-      await store.appendEvent(docId, e)
-      bus.publish(docId, e)
-    }
+    for (const e of events) bus.publish(docId, e)
     return json({ response: resp })
   }
 
@@ -162,8 +161,8 @@ export async function handleResponses(
       payload: { responseId: rid, flagId: resp.flagId, reason: 'user-rescind' },
       ts: nowIso(),
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ response: resp })
   }
@@ -181,8 +180,8 @@ export async function handleResponses(
       payload: { responseId: rid, flagId: resp.flagId, reason: resp.stuckReason },
       ts: nowIso(),
     }
+    appendEvents(state, event)
     await store.writeState(docId, state)
-    await store.appendEvent(docId, event)
     bus.publish(docId, event)
     return json({ response: resp })
   }

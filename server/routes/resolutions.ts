@@ -1,5 +1,5 @@
 import type { DocState, SourceVersion } from '../types'
-import { SOURCE_HISTORY_LIMIT } from '../types'
+import { SOURCE_HISTORY_LIMIT, appendEvents } from '../types'
 import type { ResolutionEvent, Suggestion } from '../../src/types'
 import type { DocStore } from '../store'
 import { bus } from '../bus'
@@ -88,11 +88,9 @@ export async function handleResolutions(
 
   if (events.length === 0) return fail(400, 'empty resolution batch')
 
+  appendEvents(state, ...events)
   await store.writeState(docId, state)
-  for (const e of events) {
-    await store.appendEvent(docId, e)
-    bus.publish(docId, e)
-  }
+  for (const e of events) bus.publish(docId, e)
   return json({ ok: true, version: state.doc.version, sourceHash: state.doc.sourceHash })
 }
 

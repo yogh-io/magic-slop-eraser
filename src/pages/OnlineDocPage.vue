@@ -29,6 +29,7 @@ else session = createOnlineSession(docId)
 
 const loading = session?.loading ?? ref(false)
 const errorRef = session?.error ?? ref<string | null>(null)
+const expired = session?.expired ?? ref(false)
 const doc = session?.doc ?? ref(null)
 const flags = session?.flags ?? ref<Flag[]>([])
 const responses = session?.responses ?? ref<DocResponse[]>([])
@@ -332,11 +333,8 @@ const shareUrl = computed(() => {
 const agentPrompt = computed(() => {
   if (!shareUrl.value) return ''
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  return `Drive the slopmop session at ${shareUrl.value} through its deslop loop.
-
-If the slopmop skill isn't already available, install it first: fetch ${origin}/slopmop.md and save it to .claude/skills/slopmop/SKILL.md in this repo (or ~/.claude/skills/slopmop/SKILL.md to install globally). Then proceed.
-
-Run the loop: walk the catalogue, post flags, pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
+  return `Drive ${shareUrl.value} through its slopmop deslop loop.
+If the slopmop skill isn't installed: curl -fsSL ${origin}/slopmop.md --create-dirs -o ~/.claude/skills/slopmop/SKILL.md - then read it and follow it.`
 })
 
 const shareVisible = computed(() => {
@@ -375,6 +373,24 @@ function dismissShare(): void {
       <p>{{ fatalError }}</p>
     </div>
 
+    <section v-else-if="expired" class="expired">
+      <p class="kicker">session not found</p>
+      <h1>This session does not exist or has expired.</h1>
+      <p class="lede">
+        Sessions disappear after <strong>72 hours of inactivity</strong> - the
+        document, its flags, and the resolution log are gone for good. If you
+        had a session URL bookmarked from earlier in the week, this is probably
+        why.
+      </p>
+      <p class="lede muted">
+        Double-check the URL too. Anything after <code>/d/</code> is the session
+        id; one wrong character and you'll land here.
+      </p>
+      <p class="actions">
+        <RouterLink to="/" class="primary">Start a new session</RouterLink>
+      </p>
+    </section>
+
     <template v-else-if="session">
       <section v-if="shareVisible && shareUrl" class="share">
         <div class="share-row">
@@ -390,7 +406,7 @@ function dismissShare(): void {
             class="share-prompt"
             readonly
             spellcheck="false"
-            rows="9"
+            rows="3"
             :value="agentPrompt"
             @focus="(e) => (e.target as HTMLTextAreaElement).select()"
           />
@@ -751,7 +767,7 @@ function dismissShare(): void {
   border-radius: 4px;
   padding: 0.45rem 0.6rem;
   resize: vertical;
-  min-height: 5.4rem;
+  min-height: 3.6rem;
   width: 100%;
   min-width: 0;
 }
@@ -1220,6 +1236,59 @@ function dismissShare(): void {
 
 .loading, .empty { color: var(--muted); }
 .err { color: #b8472d; }
+
+.expired {
+  max-width: 60ch;
+  margin: 4rem auto;
+  padding: 0 1.5rem;
+  text-align: center;
+}
+.expired .kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+.expired h1 {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  margin: 0 0 1rem;
+  letter-spacing: var(--heading-tracking, normal);
+  line-height: 1.2;
+}
+.expired .lede {
+  font-size: 1rem;
+  color: var(--text);
+  margin: 0 0 0.9rem;
+  line-height: 1.6;
+}
+.expired .lede.muted { color: var(--muted); font-size: 0.92rem; }
+.expired code {
+  font-family: var(--font-mono);
+  background: var(--code-bg);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+.expired .actions {
+  margin-top: 1.6rem;
+}
+.expired .primary {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: var(--bg);
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 600;
+}
+.expired .primary:hover {
+  background: color-mix(in srgb, var(--text) 80%, var(--bg));
+}
 
 /* The canvas: article on the left, annotation gutter on the right.        */
 /* Both flow with page scroll. Annotations are absolutely positioned       */

@@ -9,6 +9,7 @@ import { handleEvents } from './routes/events'
 import { handleCatalogue } from './routes/catalogue'
 import { handleDensity } from './routes/density'
 import { handleAgent } from './routes/agent'
+import { handleReset } from './routes/reset'
 import { json, notFound } from './shared'
 import { SKILL_VERSION } from './skillVersion'
 
@@ -46,14 +47,21 @@ async function serveStatic(pathname: string): Promise<Response | null> {
  * Wrap a route response so every reply (including errors and SSE streams)
  * carries the current SKILL.md version. Agents send their own
  * `X-Skill-Version` request header; if it lags the server's literal, we
- * also flip `X-Skill-Stale: true` so the agent surfaces an upgrade hint
- * to the user.
+ * flip `X-Skill-Stale: true` so the agent surfaces an upgrade hint. If
+ * the request is missing the header entirely, we flip
+ * `X-Skill-Version-Missing: true` so the agent learns it has been
+ * silently breaking the staleness signal and can start sending it.
+ *
+ * Browser fetches don't read these headers, so setting them on every
+ * response is harmless - only agent clients act on them.
  */
 function withSkillHeaders(req: Request, response: Response): Response {
   const headers = new Headers(response.headers)
   headers.set('X-Skill-Latest-Version', SKILL_VERSION)
   const reqVersion = req.headers.get('x-skill-version')
-  if (reqVersion && reqVersion !== SKILL_VERSION) {
+  if (reqVersion === null) {
+    headers.set('X-Skill-Version-Missing', 'true')
+  } else if (reqVersion !== SKILL_VERSION) {
     headers.set('X-Skill-Stale', 'true')
   }
   return new Response(response.body, {
@@ -125,6 +133,11 @@ async function route(req: Request): Promise<Response> {
     // /docs/:id/agent/{heartbeat|notes|tasks}
     if (verb === 'agent') {
       return handleAgent(req, store, docId, segs.slice(3))
+    }
+
+    // /docs/:id/reset  (drafter-only soft reset)
+    if (verb === 'reset' && segs.length === 3) {
+      return handleReset(req, store, docId)
     }
   }
 

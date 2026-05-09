@@ -105,9 +105,12 @@ async function route(req: Request): Promise<Response> {
       if (segs.length <= 4) return handleDocs(req, store, docId, verb, subVerb)
     }
 
-    // /docs/:id/events  or /docs/:id/events/poll
+    // /docs/:id/events  -> SSE only (the long-poll fallback was dropped).
+    // Match any /events* sub-path so /events/poll returns 404 instead of
+    // falling through to the SPA static fallback.
     if (verb === 'events') {
-      return handleEvents(req, store, docId, subVerb)
+      if (segs.length === 3) return handleEvents(req, store, docId)
+      return notFound()
     }
 
     // /docs/:id/responses[/:rid[/punt|/cancel]]

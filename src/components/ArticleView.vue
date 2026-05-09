@@ -173,6 +173,7 @@ function onMouseUp(): void {
   color: var(--text);
   max-width: 68ch;
   margin: 0 auto;
+  position: relative;
 }
 .article-view :deep(h1),
 .article-view :deep(h2),
@@ -235,42 +236,20 @@ function onMouseUp(): void {
   border-radius: 2px;
 }
 
-/* Density rail: a thin column of stripes hugging the left edge of each prose */
-/* paragraph. Stripes are absolutely positioned full-height on the paragraph, */
-/* tinted by axis color, opacity by score / 10. The host <p> reserves space   */
-/* via padding-left so prose stays at its normal start. */
-.article-view :deep(.md-prose p.has-density-rail) {
-  position: relative;
-  padding-left: 1.1rem;
-}
-.article-view :deep(p.has-density-rail .density-rail) {
+/* Density spine: a single continuous vertical bar in the left gutter of the */
+/* article, painted as a vertical gradient whose stops correspond to each    */
+/* paragraph's aggregate score. Intense = high score, dim = low. The spine  */
+/* sits in the gutter so prose layout is unaffected.                        */
+.article-view :deep(.density-spine) {
   position: absolute;
-  left: 0;
-  top: 0.18em;
-  bottom: 0.18em;
-  width: 0.7rem;
-  display: flex;
-  gap: 1px;
-  pointer-events: auto;
+  left: -1.4rem;
+  width: 6px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 0;
+}
+.article-view :deep(p.has-density-rail) {
   cursor: help;
-}
-.article-view :deep(p.has-density-rail .density-stripe) {
-  flex: 1;
-  border-radius: 1px;
-  background-color: color-mix(in srgb, var(--axis-color, #6b6b6b) 10%, transparent);
-  position: relative;
-  overflow: hidden;
-}
-.article-view :deep(p.has-density-rail .density-stripe.has-score)::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: calc(var(--axis-score, 0) * 100%);
-  background-color: var(--axis-color, #6b6b6b);
-  opacity: 0.85;
-  transition: height 200ms ease;
 }
 
 /* Embedded, set-aside blocks: hidden in plain sight, not edit targets. */

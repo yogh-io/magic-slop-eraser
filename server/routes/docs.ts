@@ -258,7 +258,7 @@ function collectVoiceSamples(state: DocState, n: number): VoiceSample[] {
   for (const s of accepted) {
     const flag = state.flags[s.flagId]
     if (!flag) continue
-    const directive = state.responses[s.respondedTo]?.body ?? ''
+    const directive = s.respondedTo ? state.responses[s.respondedTo]?.body ?? '' : ''
     out.push({
       pre: s.pre,
       post: s.post,

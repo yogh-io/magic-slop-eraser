@@ -111,13 +111,20 @@ export interface Suggestion {
 
 export type ResponseStatus = 'pending' | 'resolved' | 'stuck' | 'cancelled'
 
-export type ResponseKind = 'shortcut' | 'free' | 'let-me-try' | 'skip' | 'keep'
+export type ResponseKind =
+  | 'shortcut'
+  | 'free'
+  | 'let-me-try'
+  | 'skip'
+  | 'keep'
+  | 'accept'
+  | 'discard'
 
 /**
  * An author-issued directive on a flag. Each user choice persists immediately;
  * the trail per flag is the steering history. Shortcut + free directives queue
- * for agent processing; let-me-try / skip / keep self-resolve without agent
- * involvement.
+ * for agent processing; let-me-try / skip / keep / accept / discard self-resolve
+ * without agent involvement.
  */
 export interface DocResponse {
   id: string

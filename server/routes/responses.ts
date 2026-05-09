@@ -3,6 +3,7 @@ import { appendEvents } from '../types'
 import type {
   CategoryId,
   DocResponse,
+  Flag,
   Rung,
   PatternMeta,
   ResolutionEvent,
@@ -27,7 +28,18 @@ function bumpCursor(state: DocState): number {
   return state.doc.version
 }
 
-const VALID_KINDS: ResponseKind[] = ['shortcut', 'free', 'let-me-try', 'skip', 'keep']
+const VALID_KINDS: ResponseKind[] = [
+  'shortcut',
+  'free',
+  'let-me-try',
+  'skip',
+  'keep',
+  'accept',
+  'discard',
+]
+
+const VALID_TRANSITIONS = ['stuck', 'cancelled'] as const
+type TransitionTo = (typeof VALID_TRANSITIONS)[number]
 
 interface PostResponseBody {
   flagId: string
@@ -97,11 +109,12 @@ export async function handleResponses(
         ts: nowIso(),
       })
     } else if (body.kind === 'let-me-try') {
-      if (typeof body.body !== 'string' || body.body.length === 0) {
+      const replacement = body.body
+      if (typeof replacement !== 'string' || replacement.length === 0) {
         return fail(400, 'let-me-try requires body text')
       }
-      const result = applyPerFlagPatch(state, flag.id, body.body, 'human', id)
-      if (!result.ok) return fail(409, result.reason)
+      const result = applyPerFlagPatch(state, flag.id, replacement, 'human', id)
+      if (!result.ok) return fail(409, result.reason ?? 'patch rejected')
       resp.status = 'resolved'
       resp.respondedBy = 'self'
       resp.resolvedSuggestionId = result.suggestionId
@@ -121,7 +134,7 @@ export async function handleResponses(
         {
           cursor: bumpCursor(state),
           type: 'flag-resolved',
-          payload: { flagId: flag.id, cause: 'self', replacementText: body.body },
+          payload: { flagId: flag.id, cause: 'self', replacementText: replacement },
           ts: nowIso(),
         },
         {
@@ -134,12 +147,87 @@ export async function handleResponses(
       // Re-anchor everything else
       const recon = reconcile(state, 'source-edit', () => bumpCursor(state), nowIso)
       events.push(...recon.events)
+    } else if (body.kind === 'accept') {
+      // Apply the flag's awaiting-accept candidate; mutates source, marks flag
+      // resolved, reconciles other anchors. The browser hits this path; the
+      // drafter never does (accept is user-side).
+      const candidate = pickAwaitingCandidate(state, flag.id)
+      if (!candidate) return fail(409, 'no candidate to accept')
+      const result = applyAcceptedCandidate(state, flag, candidate)
+      if (!result.ok) {
+        // Anchor stale: emit the stale event so the timeline reflects it,
+        // then surface 409 so the client knows.
+        events.push({
+          cursor: bumpCursor(state),
+          type: 'flag-stale',
+          payload: { flagId: flag.id, cause: 'source-edit' },
+          ts: nowIso(),
+        })
+        appendEvents(state, ...events)
+        await store.writeState(docId, state)
+        for (const e of events) bus.publish(docId, e)
+        return fail(409, result.reason ?? 'anchor stale at accept time')
+      }
+      resp.status = 'resolved'
+      resp.respondedBy = 'self'
+      resp.resolvedSuggestionId = candidate.id
+      resp.resolvedAt = nowIso()
+      events.push(
+        {
+          cursor: bumpCursor(state),
+          type: 'flag-resolved',
+          payload: {
+            flagId: flag.id,
+            cause: 'self',
+            replacementText: candidate.post,
+            suggestionId: candidate.id,
+          },
+          ts: nowIso(),
+        },
+        {
+          cursor: bumpCursor(state),
+          type: 'source-edited',
+          payload: { length: state.doc.source.length, cause: 'flag-accept' },
+          ts: nowIso(),
+        },
+        {
+          cursor: bumpCursor(state),
+          type: 'response-resolved',
+          payload: { responseId: id, flagId: flag.id, cause: 'self', suggestionId: candidate.id },
+          ts: nowIso(),
+        },
+      )
+      const recon = reconcile(state, 'source-edit', () => bumpCursor(state), nowIso)
+      events.push(...recon.events)
+    } else if (body.kind === 'discard') {
+      // Drop the awaiting-accept candidate; flag returns to open for redirection.
+      const candidate = pickAwaitingCandidate(state, flag.id)
+      if (!candidate) return fail(409, 'no candidate to discard')
+      delete state.suggestions[candidate.id]
+      flag.status = 'open'
+      resp.status = 'resolved'
+      resp.respondedBy = 'self'
+      resp.resolvedAt = nowIso()
+      events.push(
+        {
+          cursor: bumpCursor(state),
+          type: 'suggestion-discarded',
+          payload: { suggestionId: candidate.id, flagId: flag.id, reason: 'user-discard' },
+          ts: nowIso(),
+        },
+        {
+          cursor: bumpCursor(state),
+          type: 'response-resolved',
+          payload: { responseId: id, flagId: flag.id, cause: 'self' },
+          ts: nowIso(),
+        },
+      )
     }
 
     appendEvents(state, ...events)
     await store.writeState(docId, state)
     for (const e of events) bus.publish(docId, e)
-    return json({ response: resp })
+    return json({ response: resp, sourceHash: state.doc.sourceHash })
   }
 
   // /docs/:id/responses/:rid/...
@@ -149,35 +237,29 @@ export async function handleResponses(
   if (!resp) return notFound()
   const verb = segs[1] ?? null
 
-  // POST /docs/:id/responses/:rid/cancel  (user rescinds before agent acts)
-  if (verb === 'cancel' && req.method === 'POST') {
+  // POST /docs/:id/responses/:rid/transition  { to: 'stuck' | 'cancelled', reason? }
+  // Replaces the old /punt and /cancel sub-routes. `stuck` = drafter punted;
+  // `cancelled` = user rescinded.
+  if (verb === 'transition' && req.method === 'POST') {
     if (resp.status !== 'pending') return fail(409, 'response is not pending')
-    resp.status = 'cancelled'
+    const body = (await req.json().catch(() => ({}))) as { to?: string; reason?: string }
+    const to = body.to as TransitionTo | undefined
+    if (!to || !VALID_TRANSITIONS.includes(to)) {
+      return fail(400, "transition `to` must be 'stuck' or 'cancelled'")
+    }
+    const reason = typeof body.reason === 'string' ? body.reason : ''
+    resp.status = to
     resp.respondedBy = 'self'
     resp.resolvedAt = nowIso()
-    const event: ResolutionEvent = {
-      cursor: bumpCursor(state),
-      type: 'response-cancelled',
-      payload: { responseId: rid, flagId: resp.flagId, reason: 'user-rescind' },
-      ts: nowIso(),
-    }
-    appendEvents(state, event)
-    await store.writeState(docId, state)
-    bus.publish(docId, event)
-    return json({ response: resp })
-  }
+    if (to === 'stuck') resp.stuckReason = reason
 
-  // POST /docs/:id/responses/:rid/punt  (agent gave up)
-  if (verb === 'punt' && req.method === 'POST') {
-    if (resp.status !== 'pending') return fail(409, 'response is not pending')
-    const body = (await req.json().catch(() => ({}))) as { reason?: string }
-    resp.status = 'stuck'
-    resp.stuckReason = body.reason ?? ''
-    resp.resolvedAt = nowIso()
     const event: ResolutionEvent = {
       cursor: bumpCursor(state),
-      type: 'response-stuck',
-      payload: { responseId: rid, flagId: resp.flagId, reason: resp.stuckReason },
+      type: to === 'stuck' ? 'response-stuck' : 'response-cancelled',
+      payload:
+        to === 'stuck'
+          ? { responseId: rid, flagId: resp.flagId, reason }
+          : { responseId: rid, flagId: resp.flagId, reason: reason || 'user-rescind' },
       ts: nowIso(),
     }
     appendEvents(state, event)
@@ -199,8 +281,8 @@ interface PerFlagPatchResult {
  * Apply a per-flag patch: replace the flag's anchored span with `replacement`.
  * Mutates source, creates an accepted Suggestion, marks the flag resolved.
  *
- * Used by let-me-try directives and by the per-flag accept verb. The caller
- * runs reconcile() afterwards to relocate other open anchors.
+ * Used by let-me-try directives. The caller runs reconcile() afterwards to
+ * relocate other open anchors.
  */
 function applyPerFlagPatch(
   state: DocState,
@@ -241,6 +323,43 @@ function applyPerFlagPatch(
   }
   flag.excerpt = replacement
   return { ok: true, suggestionId }
+}
+
+/**
+ * Apply an existing awaiting-accept Suggestion: relocate the flag's anchor,
+ * splice the candidate text into source, mark candidate accepted + flag
+ * resolved. Used by `kind: 'accept'` responses.
+ */
+function applyAcceptedCandidate(
+  state: DocState,
+  flag: Flag,
+  candidate: Suggestion,
+): PerFlagPatchResult {
+  const r = relocateAnchor(state.doc.source, flag.anchor)
+  if (!r) {
+    flag.status = 'stale'
+    return { ok: false, reason: 'anchor stale at accept time' }
+  }
+  state.doc.source =
+    state.doc.source.slice(0, r.start) + candidate.post + state.doc.source.slice(r.end)
+  state.doc.sourceHash = sha256Hex(state.doc.source)
+  candidate.accepted = true
+  flag.status = 'resolved'
+  flag.anchor = {
+    ...flag.anchor,
+    start: r.start,
+    end: r.start + candidate.post.length,
+    text: candidate.post,
+  }
+  flag.excerpt = candidate.post
+  return { ok: true, suggestionId: candidate.id }
+}
+
+function pickAwaitingCandidate(state: DocState, flagId: string): Suggestion | null {
+  const list = Object.values(state.suggestions)
+    .filter((s) => s.flagId === flagId && !s.accepted)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  return list[0] ?? null
 }
 
 function filterResponses(state: DocState, url: URL): DocResponse[] {

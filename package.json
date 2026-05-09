@@ -3,12 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "slopmop": "./cli/main.ts"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && bun scripts/generate-sitemap.ts && bun scripts/copy-skill.ts && vite-ssg build",
+    "build": "vue-tsc --noEmit && bun scripts/generate-sitemap.ts && bun scripts/copy-skill.ts && vite-ssg build && bun scripts/build-cli.ts",
+    "build:cli": "bun scripts/build-cli.ts",
+    "typecheck:cli": "tsc --noEmit -p tsconfig.cli.json",
     "preview": "vite preview",
     "server": "bun run server/main.ts",
-    "server:dev": "bun run --watch server/main.ts"
+    "server:dev": "bun run --watch server/main.ts",
+    "test:cli": "bun test cli/test/"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",
@@ -20,6 +26,7 @@
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
     "@vitejs/plugin-vue": "^5.2.1",
+    "bun-types": "^1.3.13",
     "typescript": "^5.6.3",
     "vite": "^6.0.3",
     "vue-tsc": "^2.1.10"

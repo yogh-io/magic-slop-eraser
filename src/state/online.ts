@@ -451,20 +451,21 @@ export function createOnlineSession(id: string): OnlineSession {
   }
 
   async function cancelResponse(rid: string): Promise<void> {
-    await postJson(`/docs/${id}/responses/${rid}/cancel`, {})
+    await postJson(`/docs/${id}/responses/${rid}/transition`, { to: 'cancelled' })
   }
 
+  // Every user action on a flag is a Response with the matching kind. The
+  // server self-resolves accept/discard/skip/keep without a roundtrip to the
+  // drafter; SSE events drive the local refresh.
   async function acceptFlag(flagId: string): Promise<void> {
-    await postJson(`/docs/${id}/flags/${flagId}/accept`, {})
+    await postResponse(flagId, 'accept')
   }
 
   async function discardFlag(flagId: string): Promise<void> {
-    await postJson(`/docs/${id}/flags/${flagId}/discard`, {})
+    await postResponse(flagId, 'discard')
   }
 
   async function skipFlag(flagId: string): Promise<void> {
-    // Skip is a Response with kind='skip'; the server self-resolves and closes
-    // the flag. No need for a separate /flags/:fid/skip call.
     await postResponse(flagId, 'skip')
   }
 

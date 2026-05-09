@@ -340,6 +340,72 @@ The form announces "I have considered every relevant party" while delivering the
       },
     ],
   },
+  {
+    id: 'kicker-paraphrase',
+    category: 'structural',
+    name: 'Kicker paraphrase',
+    severity: 'high',
+    scope: 'paragraph',
+    rung: 3,
+    blurb:
+      'A section ends on a sharp line; the next paragraph opens by paraphrasing what just landed.',
+    essay: `The kicker lands. The reader feels it. Then the next paragraph opens with the same idea in slightly different drag - "in other words," or just the same shape recast - and the kicker turns from a thing that landed into one of two ways the writer happened to put it. The line that was sharp is now redundant; the next paragraph is doing remedial reading on something the reader already had.
+
+The model produces this because it has been trained that explanations require restatement and that paragraphs require topic sentences and that nothing should be left to the reader. So when a kicker actually lands, the model does not trust it - it offers a paraphrase as backup. The backup is the killer. A real next paragraph picks up from the kicker to extend it, contradict it, or pivot off it. The slop next paragraph re-explains it.`,
+    whyItsSlop:
+      'A kicker that lands wants air after it. Paraphrasing it in the next opening line defangs it - the line that was the form is now one of two forms, and neither carries the original weight. The model produces the restatement because its training rewarded "make the topic sentence carry the gist," even when the prior section already carried it.',
+    fix: 'Cut the restatement. The kicker sits at the end of its section and breathes; the next paragraph picks up from a different angle. If the next paragraph genuinely needs to refer back to the kicker, do it by extension or contradiction - not by paraphrase.',
+    examples: [
+      {
+        sloppy:
+          'The deal closes when the company decides it should, not before.\n\nIn other words, the timing of the deal is internal, not negotiated.',
+        better:
+          'The deal closes when the company decides it should, not before.\n\nThe quarterly deadline is the only fixed point in the calendar.',
+      },
+      {
+        sloppy:
+          "The CEO's job depends on the project continuing. He is not going to end it.\n\nThis means the project will continue regardless of the underlying merits.",
+        better:
+          "The CEO's job depends on the project continuing. He is not going to end it.\n\nThe board has known this since the second review.",
+      },
+    ],
+    skipRule:
+      'Legitimate when the next paragraph genuinely picks up from the kicker to extend it - introduces a new claim, a counter-example, a complication. The flag is the same idea in different drag, especially when the second version is more abstract or less specific than the kicker - that almost always means the model is restating, not advancing.',
+  },
+  {
+    id: 'abstract-actor',
+    category: 'structural',
+    name: 'Abstract actor',
+    severity: 'high',
+    scope: 'piece',
+    rung: 3,
+    blurb:
+      'An abstract noun - the architecture, the system, the dynamic - used as the grammatical agent of a sentence so the writer does not have to name who is doing what.',
+    essay: `The architecture rewards short-term thinking. The system tolerates the shortfall. The dynamic produces this outcome. Each sentence has a subject that is structurally correct, that registers as systems thinking, and that commits to nothing - because no actor is named. The writer has not had to say who built the architecture, who tolerates the shortfall, or whose interest the dynamic serves.
+
+When a piece has earned the personification - the abstract noun is genuinely the through-line and the surrounding prose has done the work of naming actors elsewhere - the construction is fine. The abstract noun has earned the right to act because the writer has already said who is behind it; the abstraction is then a productive shorthand. When the piece has not earned it, the personification is hiding the actors. The literary equivalent of "mistakes were made" - true at some level of abstraction, useless at the level where the question lives.
+
+The model loves this construction because it is grammatically clean, registers as analysis, and dodges the uncomfortable next step of naming names. Sustained, it becomes the through-line that keeps the question of agency entirely off the page.`,
+    whyItsSlop:
+      'An abstract noun as the agent of a sentence is doing two things at once: it produces the cadence of systems thinking, and it spares the writer from naming who is doing what. The model defaults to it because it is safe and reads like analysis. Sustained, it becomes the trick of the piece - structural facts everywhere, agents nowhere.',
+    fix: 'Name the actor. Who built the architecture? Who keeps it that way? Whose interest does it serve? Sometimes the answer is "no one in particular" and the abstract noun is genuinely the right level - but only after the question has been asked. Without that step, the abstraction is hiding it.',
+    examples: [
+      {
+        sloppy: 'The architecture rewards short-term thinking.',
+        better: 'The bonus structure rewards short-term thinking.',
+      },
+      {
+        sloppy: 'The system tolerates the shortfall.',
+        better: 'The board has tolerated the shortfall for three quarters.',
+      },
+      {
+        sloppy: 'The dynamic produces this outcome again and again.',
+        better: 'Procurement and engineering have run the same fight every year since 2019.',
+      },
+    ],
+    skipRule:
+      'Legitimate when the piece has earned the personification - the surrounding prose has named the actors and the abstract noun is a productive shorthand for a system that has already been populated. Also fine in technical/architectural prose where the noun is literally the system being discussed (a software architecture, a payment system). The flag is the reflexive use, where the abstract noun is doing the agent\'s work because the writer has not named one.',
+  },
 
   // ---- ARGUMENTATIVE ----
   {
@@ -445,6 +511,34 @@ The model is, by training, allergic to commitment - any side it picks could be t
   },
 
   // ---- RUNG 3: ANALYTICAL FRAMEWORKS ----
+  {
+    id: 'redundant-abstraction',
+    category: 'argumentative',
+    name: 'Redundant abstraction',
+    severity: 'high',
+    scope: 'sentence',
+    rung: 3,
+    blurb:
+      'A structural claim stated abstractly when the concrete version of the same claim is already on the page elsewhere.',
+    essay: `Two paragraphs upstream, the writer said the specific thing: "The minister phoned the embassy three times that week and asked the ambassador to delay the announcement." Concrete, dated, falsifiable, useful. Then later, in a different paragraph, the same content shows up in abstract drag: "There is no diplomatic position distinct from the political one." The reader registers the second line as a thesis. It is not. It is a paraphrase of evidence the piece has already delivered.
+
+This is what people sometimes call absent-actor and shrug at. It is not absent-actor. The actor is named upstream. The harm is the duplicate - the abstraction floating loose where the concrete version was already doing the work. A real abstract claim earns its abstraction by reaching further than the concrete instance: covering more cases, sharper category, cleaner reading. The slop abstraction reaches no further; it just sits at altitude where the concrete sits at street level.`,
+    whyItsSlop:
+      'The model is trained to vary phrasing and to summarise. When the concrete version is already in the piece, the abstract version is doing nothing - it reads like a thesis line because it has the shape of one, but the concrete version is the load-bearing claim. Two passes over the same content is one pass too many.',
+    fix: 'Cut the abstract version. Keep the concrete one. If the abstraction is genuinely a stronger claim - covers more cases, makes a cleaner category - keep the abstract version and use the concrete one as the example that anchors it. One of the two has to go.',
+    examples: [
+      {
+        sloppy: 'There is no American position distinct from the Israeli one.',
+        better: '',
+      },
+      {
+        sloppy: 'The system is structurally biased toward incumbents.',
+        better: '',
+      },
+    ],
+    skipRule:
+      'Legitimate when the abstract claim genuinely reaches further than the concrete one - covers more cases, cleaner category, or arrives at a structural reading that the concrete instance is then evidence for. The flag is the abstract version that is just the concrete one in vaguer drag, with the concrete one already doing the work elsewhere on the page.',
+  },
   {
     id: 'lens-fits-everything',
     category: 'argumentative',

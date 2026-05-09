@@ -1,0 +1,24 @@
+{
+  "flags": [
+    {
+      "patternId": "throat-clearing",
+      "text": "It's important to note that ",
+      "rationale": "Opens with a throat-clearing phrase asking for the reader's permission before the substance.",
+      "severity": 0.7,
+      "suggestion": ""
+    },
+    {
+      "patternId": "tier1-lexicon",
+      "text": "leverage synergies",
+      "rationale": "Two dead corporate tics in a row.",
+      "severity": 0.85
+    },
+    {
+      "patternId": "closers",
+      "text": "In conclusion, the new approach delivers transformative value to stakeholders.",
+      "rationale": "Vague-gravitas closer that synthesises nothing concrete.",
+      "severity": 0.6
+    }
+  ],
+  "modelTag": "test"
+}

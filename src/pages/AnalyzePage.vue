@@ -87,11 +87,14 @@ async function createSession(): Promise<void> {
     </header>
 
     <aside class="skill-notice">
-      <p>
+      <div class="skill-notice-text">
         <strong>First time?</strong> Your agent needs the slopmop skill installed
-        before it can drive a session. Have your Claude Code fetch it -
-        <RouterLink to="/skill">one prompt does it &rarr;</RouterLink>
-      </p>
+        before it can drive a session. Have your Claude Code fetch it - one prompt
+        does it.
+      </div>
+      <RouterLink to="/skill" class="skill-cta">
+        One prompt gets you started <span aria-hidden="true">&rarr;</span>
+      </RouterLink>
     </aside>
 
     <form class="form" @submit.prevent="createSession">
@@ -180,26 +183,44 @@ async function createSession(): Promise<void> {
 
 .skill-notice {
   margin: 1.6rem 0 0;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--rule);
   border-left: 3px solid var(--accent);
   background: color-mix(in srgb, var(--accent) 6%, transparent);
   border-radius: 4px;
   font-size: 0.92rem;
   line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
-.skill-notice p { margin: 0; }
+.skill-notice-text { flex: 1 1 22ch; min-width: 0; }
 .skill-notice strong {
   font-family: var(--font-display);
   letter-spacing: 0.02em;
 }
-.skill-notice a {
-  color: var(--text);
+.skill-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.5rem 0.9rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
   text-decoration: none;
-  border-bottom: 1px dotted var(--rule);
   white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease;
 }
-.skill-notice a:hover { border-bottom-color: var(--text); }
+.skill-cta:hover {
+  background: color-mix(in srgb, var(--accent) 80%, var(--text));
+  border-color: color-mix(in srgb, var(--accent) 80%, var(--text));
+}
 
 .form {
   display: grid;

@@ -8,8 +8,6 @@ import { severityFor } from '../../src/detectors'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
 import { fail } from '../auth'
-import { sha256Hex } from '../hash'
-import { reconcile } from '../reconcile'
 
 const patternMap = new Map(patterns.map((p) => [p.id, p]))
 
@@ -24,10 +22,15 @@ function bumpCursor(state: DocState): number {
 }
 
 /**
- * Flag-scoped verbs. The big agent-facing flow lives in `responses.ts` (queue)
- * and `resolutions.ts` (batch resolutions); this file is the user's per-flag
- * state actions: accept, discard, skip, keep-deliberate, comments. All emit
- * events through the same bus.
+ * Flag endpoints. The big agent-facing flow lives in `responses.ts` (queue,
+ * accept/discard/skip/keep, transitions) and `resolutions.ts` (batch
+ * resolutions). This file is now just two routes:
+ *  - GET / POST /docs/:id/flags  (list + drafter detection)
+ *  - POST /docs/:id/flags/:fid/comments  (free-form thread)
+ *
+ * The old per-flag verbs (accept, discard, skip, keep-deliberate) folded into
+ * `POST /responses { flagId, kind: 'accept' | ... }` so the response subsystem
+ * is the single home for user state-transitions on a flag.
  */
 export async function handleFlags(
   req: Request,
@@ -154,7 +157,7 @@ export async function handleFlags(
     appendEvents(state, ...events)
     await store.writeState(docId, state)
     for (const e of events) bus.publish(docId, e)
-    return json({ added: created.length, flags: created, skipped })
+    return json({ added: created.length, flags: created, skipped, sourceHash: state.doc.sourceHash })
   }
 
   if (segs.length < 1) return fail(404, 'flag id required')
@@ -162,118 +165,6 @@ export async function handleFlags(
   const flag = state.flags[flagId]
   if (!flag) return notFound()
   const verb = segs[1] ?? null
-
-  // POST /docs/:id/flags/:fid/accept  - apply the flag's awaiting candidate
-  if (verb === 'accept' && req.method === 'POST') {
-    if ((flag.status ?? 'open') !== 'awaiting-accept') {
-      return fail(409, 'flag has no awaiting candidate')
-    }
-    const candidate = pickAwaitingCandidate(state, flagId)
-    if (!candidate) return fail(409, 'no candidate to accept')
-
-    const r = relocateAnchor(state.doc.source, flag.anchor)
-    if (!r) {
-      flag.status = 'stale'
-      const stale: ResolutionEvent = {
-        cursor: bumpCursor(state),
-        type: 'flag-stale',
-        payload: { flagId, cause: 'source-edit' },
-        ts: nowIso(),
-      }
-      appendEvents(state, stale)
-      await store.writeState(docId, state)
-      bus.publish(docId, stale)
-      return fail(409, 'anchor stale at accept time')
-    }
-
-    state.doc.source =
-      state.doc.source.slice(0, r.start) + candidate.post + state.doc.source.slice(r.end)
-    state.doc.sourceHash = sha256Hex(state.doc.source)
-    candidate.accepted = true
-    flag.status = 'resolved'
-    flag.anchor = {
-      ...flag.anchor,
-      start: r.start,
-      end: r.start + candidate.post.length,
-      text: candidate.post,
-    }
-    flag.excerpt = candidate.post
-
-    const events: ResolutionEvent[] = [
-      {
-        cursor: bumpCursor(state),
-        type: 'flag-resolved',
-        payload: {
-          flagId,
-          cause: 'self',
-          replacementText: candidate.post,
-          suggestionId: candidate.id,
-        },
-        ts: nowIso(),
-      },
-      {
-        cursor: bumpCursor(state),
-        type: 'source-edited',
-        payload: { length: state.doc.source.length, cause: 'flag-accept' },
-        ts: nowIso(),
-      },
-    ]
-    const recon = reconcile(state, 'source-edit', () => bumpCursor(state), nowIso)
-    events.push(...recon.events)
-
-    appendEvents(state, ...events)
-    await store.writeState(docId, state)
-    for (const e of events) bus.publish(docId, e)
-    return json({ ok: true, version: state.doc.version, sourceHash: state.doc.sourceHash })
-  }
-
-  // POST /docs/:id/flags/:fid/discard  - drop awaiting candidate; flag returns to open
-  if (verb === 'discard' && req.method === 'POST') {
-    const candidate = pickAwaitingCandidate(state, flagId)
-    if (!candidate) return fail(409, 'no candidate to discard')
-    delete state.suggestions[candidate.id]
-    flag.status = 'open'
-    const event: ResolutionEvent = {
-      cursor: bumpCursor(state),
-      type: 'suggestion-discarded',
-      payload: { suggestionId: candidate.id, flagId, reason: 'user-discard' },
-      ts: nowIso(),
-    }
-    appendEvents(state, event)
-    await store.writeState(docId, state)
-    bus.publish(docId, event)
-    return json({ ok: true })
-  }
-
-  // POST /docs/:id/flags/:fid/skip
-  if (verb === 'skip' && req.method === 'POST') {
-    flag.status = 'skipped'
-    const event: ResolutionEvent = {
-      cursor: bumpCursor(state),
-      type: 'flag-skipped',
-      payload: { flagId },
-      ts: nowIso(),
-    }
-    appendEvents(state, event)
-    await store.writeState(docId, state)
-    bus.publish(docId, event)
-    return json({ ok: true })
-  }
-
-  // POST /docs/:id/flags/:fid/keep-deliberate
-  if (verb === 'keep-deliberate' && req.method === 'POST') {
-    flag.status = 'kept-deliberate'
-    const event: ResolutionEvent = {
-      cursor: bumpCursor(state),
-      type: 'flag-kept',
-      payload: { flagId },
-      ts: nowIso(),
-    }
-    appendEvents(state, event)
-    await store.writeState(docId, state)
-    bus.publish(docId, event)
-    return json({ ok: true })
-  }
 
   // POST /docs/:id/flags/:fid/comments
   if (verb === 'comments' && req.method === 'POST') {
@@ -301,15 +192,10 @@ export async function handleFlags(
     return json({ comment })
   }
 
+  // accept / discard / skip / keep-deliberate moved to POST /responses with
+  // the matching kind. We deliberately drop them here rather than aliasing,
+  // so any client still hitting them gets a clear 404 in the timeline.
   return fail(405, 'method not allowed')
-}
-
-function pickAwaitingCandidate(state: DocState, flagId: string) {
-  // Most recent unaccepted suggestion is the running best.
-  const list = Object.values(state.suggestions)
-    .filter((s) => s.flagId === flagId && !s.accepted)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  return list[0] ?? null
 }
 
 interface AgentFlagInput {

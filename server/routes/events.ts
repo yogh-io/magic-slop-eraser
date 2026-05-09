@@ -3,26 +3,14 @@ import type { DocState } from '../types'
 import type { ResolutionEvent } from '../../src/types'
 import { bus } from '../bus'
 import { fail } from '../auth'
-import { json, notFound } from '../shared'
+import { notFound } from '../shared'
 
-export async function handleEvents(
-  req: Request,
-  store: DocStore,
-  docId: string,
-  sub: string | null,
-): Promise<Response> {
+export async function handleEvents(req: Request, store: DocStore, docId: string): Promise<Response> {
   const state = await store.readState(docId)
   if (!state) return notFound()
 
   // GET /docs/:id/events  -> SSE
-  if (sub === null && req.method === 'GET') {
-    return sseStream(state, docId, req)
-  }
-
-  // GET /docs/:id/events/poll?since=N  -> long-poll
-  if (sub === 'poll' && req.method === 'GET') {
-    return longPoll(state, docId, req)
-  }
+  if (req.method === 'GET') return sseStream(state, docId, req)
 
   return fail(405, 'method not allowed')
 }
@@ -86,34 +74,4 @@ function sseStream(state: DocState, docId: string, req: Request): Response {
       connection: 'keep-alive',
     },
   })
-}
-
-async function longPoll(state: DocState, docId: string, req: Request): Promise<Response> {
-  const url = new URL(req.url)
-  const since = Number(url.searchParams.get('since') ?? '0')
-  const timeoutMs = Math.min(60000, Number(url.searchParams.get('timeout') ?? '30000'))
-
-  // Immediate replay if anything is buffered past the cursor
-  const missed = eventsSince(state, since)
-  if (missed.length > 0) return json({ events: missed })
-
-  // Wait for the next event or timeout
-  const event = await new Promise<ResolutionEvent | null>((resolve) => {
-    const timer = setTimeout(() => {
-      unsubscribe()
-      resolve(null)
-    }, timeoutMs)
-    const unsubscribe = bus.subscribe(docId, (e) => {
-      clearTimeout(timer)
-      unsubscribe()
-      resolve(e)
-    })
-    req.signal.addEventListener('abort', () => {
-      clearTimeout(timer)
-      unsubscribe()
-      resolve(null)
-    })
-  })
-
-  return json({ events: event ? [event] : [] })
 }

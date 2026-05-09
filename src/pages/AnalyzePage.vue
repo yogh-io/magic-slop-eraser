@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import LockedNotice from '../components/LockedNotice.vue'
-import { isUnlocked } from '../state/guard'
 import { useOgHead } from '../composables/useOgHead'
 
 useOgHead(() => ({
@@ -13,7 +11,6 @@ useOgHead(() => ({
   ogType: 'website',
 }))
 
-const unlocked = isUnlocked()
 const router = useRouter()
 
 const title = ref('')
@@ -77,8 +74,7 @@ async function createSession(): Promise<void> {
 </script>
 
 <template>
-  <LockedNotice v-if="!unlocked" what="The session creator" />
-  <article v-else class="create">
+  <article class="create">
     <header class="hd">
       <p class="kicker">start a session</p>
       <h1>Paste an article. Get a steering URL.</h1>
@@ -127,9 +123,8 @@ async function createSession(): Promise<void> {
     <aside class="rationale">
       <h2>How sessions work</h2>
       <p>
-        Each session gets its own UUID. The UUID is the capability - 122 bits of entropy
-        is sufficient to keep an unguessable session unguessable. Anyone with the URL
-        can drive the session - that's intentional, it's how an agent latches on.
+        Each session is its own URL. Anyone with the URL can drive the session -
+        that's intentional, it's how an agent latches on.
       </p>
       <p>
         Sessions are independent: you can run as many as you want, each with its own

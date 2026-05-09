@@ -211,16 +211,6 @@ When writing prose for this project (essays in `patterns.ts` and `categories.ts`
 
 The reference voice is the DESLOP-GUIDE itself in ``, plus the early ruminations on ``. When examples are sourced from real prose (the way several Rung 2 examples were), generalise so the source is unidentifiable.
 
-## Guard
-
-Live deploys ship the catalogue, the rungs page, and the about page open. The interactive surfaces - `/` (analyse) and `/d/:id` (online doc) - are gated behind a guard while the product is unfinished.
-
-`src/state/guard.ts` exposes `isUnlocked()`, true when:
-- The hostname is `localhost` / `127.0.0.1` / `*.localhost`, or
-- `sessionStorage.slopmop.work === '1'` (set the first time the user visits with `?work` in the URL; the param is stripped on bootstrap so it doesn't stick around in shared links)
-
-Gated pages (`AnalyzePage`, `OnlineDocPage`) render `LockedNotice` when locked and the full UI otherwise. Adding new gated surfaces: import `isUnlocked` and `LockedNotice`, render the notice on `!isUnlocked()`. Do not gate the catalogue, rungs, or about - those carry the methodology and stay public.
-
 ## What does NOT belong here
 
 - **No batch auto-fixing.** Every change is the author's. Even Rung 1 fixes are confirmed one at a time.

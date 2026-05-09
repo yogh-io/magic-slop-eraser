@@ -2,12 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { createOnlineSession, type OnlineSession } from '../state/online'
-import LockedNotice from '../components/LockedNotice.vue'
 import ArticleView from '../components/ArticleView.vue'
-import { isUnlocked } from '../state/guard'
 import type { DocResponse, Flag, Suggestion } from '../types'
 
-const unlocked = isUnlocked()
 const route = useRoute()
 const fatalError = ref<string | null>(null)
 const selectedFlagId = ref<string | null>(null)
@@ -27,10 +24,8 @@ const SHORTCUTS = [
 const docId = String(route.params.id ?? '')
 
 let session: OnlineSession | null = null
-if (unlocked) {
-  if (!docId) fatalError.value = 'no document id'
-  else session = createOnlineSession(docId)
-}
+if (!docId) fatalError.value = 'no document id'
+else session = createOnlineSession(docId)
 
 const loading = session?.loading ?? ref(false)
 const errorRef = session?.error ?? ref<string | null>(null)
@@ -332,8 +327,7 @@ function dismissShare(): void {
 </script>
 
 <template>
-  <LockedNotice v-if="!unlocked" what="The document viewer" />
-  <div v-else class="layout">
+  <div class="layout">
     <div v-if="fatalError" class="err">
       <h1>Cannot open document</h1>
       <p>{{ fatalError }}</p>

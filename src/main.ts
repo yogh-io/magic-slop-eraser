@@ -10,7 +10,6 @@ import './styles/themes/normal.css'
 import './styles/themes/magic.css'
 import './styles/themes/scholar.css'
 import { initTheme } from './state/theme'
-import { bootstrapGuard } from './state/guard'
 
 // vite-ssg installs @unhead/vue itself and provides the head instance via the
 // setup callback. Don't install our own - that wouldn't be picked up by the
@@ -26,19 +25,11 @@ export const createApp = ViteSSG(
   },
   ({ app, isClient }) => {
     app.use(createPinia())
-    if (isClient) {
-      bootstrapGuard()
-      initTheme()
-    }
+    if (isClient) initTheme()
   },
 )
 
-/**
- * Routes pre-rendered to static HTML at build time. Drives sitemap + crawler
- * indexing. The interactive surfaces (`/`, `/d/:id`) are gated behind the
- * unlock guard at runtime; they still pre-render the locked notice for SEO,
- * which is fine - the gated content is server-side state, not the page shell.
- */
+/** Routes pre-rendered to static HTML at build time. Drives sitemap + crawler indexing. */
 export function includedRoutes(): string[] {
   const staticRoutes = [
     '/',

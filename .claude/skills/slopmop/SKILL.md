@@ -1,6 +1,6 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-09.1
+skillVersion: 2026-05-09.2
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -21,15 +21,15 @@ Two entry points:
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-09.1` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
+This file declares `skillVersion: 2026-05-09.2` in its frontmatter. That literal is your version. Send it as a header on **every** API call:
 
 ```
-X-Skill-Version: 2026-05-09.1
+X-Skill-Version: 2026-05-09.2
 ```
 
 Every server response carries `X-Skill-Latest-Version`. If it differs from your literal, the skill is out of date - tell the author once at the start of the session:
 
-> "The slopmop skill I have installed (v2026-05-09.1) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
+> "The slopmop skill I have installed (v2026-05-09.2) is older than what the server expects (vX). Ask me to update it, or reinstall manually from `${HOST}/skill`."
 
 The server may also set `X-Skill-Stale: true` on responses to a request that sent a stale version. Either signal is enough to trigger the upgrade hint - mention it once and keep working; the API stays backward-compatible with one prior version.
 
@@ -60,6 +60,66 @@ If the author asks you to check for slopmop updates ("check for updates", "is th
 6. **Tell the author** what you did, e.g. "Updated slopmop skill from v2026-05-09.1 to vNEW at `<path>`. Reload this session to pick it up - skill files are read at session start, so the running session keeps the old behaviour until restart."
 
 Do not try to re-parse this file mid-session - the harness loaded it once at startup and will not re-read until the next session.
+
+## tell the author you are alive
+
+The browser shows an "agent" pill that turns green the moment it hears from you. **Ping the server as the very first network call of the session** so the writer sees the pipeline is wired before any analysis arrives:
+
+```bash
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" "$HOST/docs/$ID/agent/heartbeat"
+```
+
+That bumps `lastSeenAt` and emits an `agent-heartbeat` event. Subsequent flag posts, suggestions, notes, and task updates also bump it; the heartbeat is just the *first* sighting before there's anything to post.
+
+You don't need to heartbeat on a fixed interval - any activity counts. Send a fresh heartbeat only after long stretches of idle work (e.g. a multi-minute subagent dispatch where nothing else hits the API).
+
+## report tasks and observations
+
+The author is steering from the browser; they cannot see what your subagents are doing. Two channels close that gap:
+
+### tasks (structured, live)
+
+Declare the shape of the work with `POST /docs/$ID/agent/tasks`. Each task carries a stable `key` (drafter-set, e.g. `phase-a`), a `title`, an optional `detail`, and a `status` (`open` / `in-progress` / `done`). Upsert by key:
+
+```bash
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
+  -d '{"key":"phase-a","title":"Phase A: pull catalogue and run flag analysis","status":"in-progress"}' \
+  "$HOST/docs/$ID/agent/tasks"
+```
+
+When the task is done:
+
+```bash
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
+  -d '{"key":"phase-a","title":"Phase A: pull catalogue and run flag analysis","status":"done"}' \
+  "$HOST/docs/$ID/agent/tasks"
+```
+
+Default starting set at session start: a `phase-a` task for analysis and a `phase-b` task for the steering loop, with phase-b `open` until you start it. Add finer-grained tasks during a long catalogue walk (e.g. `r1-walk`, `r2-walk`, `r3-walk`) so the author can see *which* slice you're on.
+
+### notes (free-form, timestamped)
+
+Drop a note when you have something the writer should hear: a finding, a concern, or a heads-up that changes how they should think about the session. `POST /docs/$ID/agent/notes`:
+
+```bash
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
+  -d '{"kind":"finding","body":"Walked the catalogue. The piece is unusually committal - most slop categories don'"'"'t bite. Strongest hits: allusive constructs (bare references to prior project work a cold reader cannot parse), one absent-actor, one antithesis-shaped pivot."}' \
+  "$HOST/docs/$ID/agent/notes"
+```
+
+Kinds (free choice; pick the one that fits):
+- `observation` - "the piece reads as a working note, not a finished essay"
+- `finding` - "first batch posted: 5 absent-actor, 3 throat-clearing"
+- `progress` - "halfway through Rung 2; will batch the rest in the next ~30s"
+- `concern` - "anchor for the second pivot is ambiguous; flagged but the offsets may slide"
+
+When to post a note (use judgement, but these are good moments):
+1. **After Phase A**, summarise what the catalogue walk turned up. The writer cares about shape: which patterns dominate, which are absent, what surprised you. The example above is the canonical shape.
+2. **When you punt** something hard - explain in a note as well as on the response punt, so it shows up in the activity timeline next to other context.
+3. **When something is wrong** - 412 storms, source drifting under your edits, the catalogue sending you in circles. Don't silently retry; tell the author.
+4. **At the end** - one closing note ("done; companion at ...") so the author knows you stopped on purpose, not crashed.
+
+Don't spam. One note per real beat is the right cadence. The activity panel is the writer's window into your head; aim for the cadence of a colleague pinging Slack, not a verbose log.
 
 ## the shape of the work
 
@@ -99,6 +159,18 @@ HASH=$(echo "$DOC" | jq -r .sourceHash)
 ```
 
 The doc id is the capability - anyone with the URL can drive the session, that's intentional. Treat it like any unguessable share link. Track `HASH` across the session. Every call that mutates the source returns the new hash in the response body; update your local copy each time.
+
+**Right after the bootstrap fetch**, send a heartbeat and declare the initial task list (see "tell the author you are alive" / "report tasks and observations" below). Skipping this is a regression - the writer is staring at a blank pill wondering whether anything is wired.
+
+```bash
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" "$HOST/docs/$ID/agent/heartbeat"
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
+  -d '{"key":"phase-a","title":"Phase A: pull catalogue and run flag analysis","status":"in-progress"}' \
+  "$HOST/docs/$ID/agent/tasks"
+curl -s -X POST -H "X-Skill-Version: 2026-05-09.2" -H 'content-type: application/json' \
+  -d '{"key":"phase-b","title":"Phase B: drive steering loop","status":"open"}' \
+  "$HOST/docs/$ID/agent/tasks"
+```
 
 ## 1. analysis (BYOM)
 
@@ -147,6 +219,8 @@ curl -s -X POST -H "If-Match: $HASH" -H 'content-type: application/json' \
 Server validates against the catalogue, relocates anchors if the offsets don't fit, dedupes, and returns `{ added, flags, skipped }`. Skipped entries carry a `reason`; check them.
 
 Flags without `suggestion` go to `open` - the author sweeps and directs. Flags with `suggestion` go to `awaiting-accept` - the author takes or redirects. `POST /flags` is incremental: re-run later (after re-reading a section, after the author asks for another pass) and dedupe is automatic.
+
+After Phase A lands, mark its task done and post a `finding` note summarising what the catalogue walk turned up - what dominates, what's absent, what surprised you. The writer reads this in the agent panel; it's the first thing that orients them. Then flip `phase-b` to `in-progress` and start the loop.
 
 ## 2. honour agent-hints
 
@@ -338,8 +412,11 @@ Contains the full event log, the final source, every flag's resolution, every re
 | `POST` | `/docs/:id/density` | Submit per-paragraph density scores (canonical axes or your own) |
 | `GET` | `/docs/:id/companion` | Full state for wrap-up |
 | `GET` | `/docs/:id/events` | SSE event stream (optional wake-up) |
+| `POST` | `/docs/:id/agent/heartbeat` | "Pipeline works" ping; emit at session start |
+| `POST` | `/docs/:id/agent/tasks` | Upsert a structured task by `key` (status: open / in-progress / done) |
+| `POST` | `/docs/:id/agent/notes` | Free-form heads-up note (kind: observation / finding / progress / concern) |
 
-The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-09.1` so the server can flag staleness.
+The doc id from the URL is the capability - no separate auth header. All calls should send `X-Skill-Version: 2026-05-09.2` so the server can flag staleness.
 
 ## constraints
 

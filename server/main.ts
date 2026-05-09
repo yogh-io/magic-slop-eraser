@@ -8,6 +8,7 @@ import { handleResolutions } from './routes/resolutions'
 import { handleEvents } from './routes/events'
 import { handleCatalogue } from './routes/catalogue'
 import { handleDensity } from './routes/density'
+import { handleAgent } from './routes/agent'
 import { json, notFound } from './shared'
 import { SKILL_VERSION } from './skillVersion'
 
@@ -119,6 +120,11 @@ async function route(req: Request): Promise<Response> {
     // /docs/:id/density
     if (verb === 'density' && segs.length === 3) {
       return handleDensity(req, store, docId)
+    }
+
+    // /docs/:id/agent/{heartbeat|notes|tasks}
+    if (verb === 'agent') {
+      return handleAgent(req, store, docId, segs.slice(3))
     }
   }
 

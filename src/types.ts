@@ -177,6 +177,48 @@ export type EventType =
   | 'agent-hints-updated'
   | 'document-replaced'
   | 'density-updated'
+  | 'agent-heartbeat'
+  | 'agent-note-added'
+  | 'agent-task-upserted'
+
+/**
+ * Drafter-declared task. Stable across the session via `key` (drafter-set
+ * identifier like "phase-a"). Status moves open -> in-progress -> done.
+ * The latest upsert wins; the server emits an `agent-task-upserted` event
+ * for any change so the UI can re-render the task list and timeline.
+ */
+export type AgentTaskStatus = 'open' | 'in-progress' | 'done'
+export interface AgentTask {
+  key: string
+  title: string
+  detail?: string
+  status: AgentTaskStatus
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Free-form heads-up from the drafter. Surfaces in the agent-activity panel
+ * as a timestamped note; the kind drives a small visual badge.
+ *  - observation: "the piece is unusually committal..."
+ *  - finding:     "first batch posted: 5 absent-actor, 3 throat-clearing"
+ *  - progress:    "halfway through the catalogue walk"
+ *  - concern:     "I can't locate the anchor for X; skipping"
+ */
+export type AgentNoteKind = 'observation' | 'finding' | 'progress' | 'concern'
+export interface AgentNote {
+  id: string
+  body: string
+  kind: AgentNoteKind
+  createdAt: string
+}
+
+export interface AgentActivity {
+  /** ISO timestamp of the most recent drafter ping (any kind: heartbeat, note, task, flag, suggestion, resolution). */
+  lastSeenAt?: string
+  tasks: Record<string, AgentTask>
+  notes: Record<string, AgentNote>
+}
 
 export interface ResolutionEvent {
   cursor: number

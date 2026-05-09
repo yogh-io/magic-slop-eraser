@@ -59,6 +59,7 @@ export async function handleDocs(
       history: [initial],
       agentHints: {},
       density: {},
+      agentActivity: { tasks: {}, notes: {} },
     }
     await store.writeState(id, state)
     return json({ id, sourceHash: hash, eventsUrl: `/docs/${id}/events` })
@@ -91,6 +92,7 @@ export async function handleDocs(
       agentHints: state.agentHints,
       paragraphs,
       density: state.density,
+      agentActivity: state.agentActivity,
     })
   }
 
@@ -283,5 +285,8 @@ function ensureSchema(state: DocState): void {
   if (!s.history) s.history = []
   if (!s.agentHints) s.agentHints = {}
   if (!s.density) s.density = {}
+  if (!s.agentActivity) s.agentActivity = { tasks: {}, notes: {} }
+  if (!s.agentActivity.tasks) s.agentActivity.tasks = {}
+  if (!s.agentActivity.notes) s.agentActivity.notes = {}
   if (typeof s.doc.sourceHash !== 'string') s.doc.sourceHash = sha256Hex(s.doc.source)
 }

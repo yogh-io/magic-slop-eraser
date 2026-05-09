@@ -86,6 +86,14 @@ async function createSession(): Promise<void> {
       </p>
     </header>
 
+    <aside class="skill-notice">
+      <p>
+        <strong>First time?</strong> Your agent needs the slopmop skill installed
+        before it can drive a session. Have your Claude Code fetch it -
+        <RouterLink to="/skill">one prompt does it &rarr;</RouterLink>
+      </p>
+    </aside>
+
     <form class="form" @submit.prevent="createSession">
       <label class="field">
         <span class="lbl">Title</span>
@@ -163,6 +171,29 @@ async function createSession(): Promise<void> {
   color: var(--text);
   margin: 0;
 }
+
+.skill-notice {
+  margin: 1.6rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 4px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.skill-notice p { margin: 0; }
+.skill-notice strong {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+.skill-notice a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule);
+  white-space: nowrap;
+}
+.skill-notice a:hover { border-bottom-color: var(--text); }
 
 .form {
   display: grid;

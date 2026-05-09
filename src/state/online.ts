@@ -1,5 +1,18 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
-import type { AgentHints, DocResponse, Flag, Rung, ResolutionEvent, ResponseKind, Suggestion } from '../types'
+import type {
+  AgentActivity,
+  AgentHints,
+  AgentNote,
+  AgentNoteKind,
+  AgentTask,
+  AgentTaskStatus,
+  DocResponse,
+  Flag,
+  Rung,
+  ResolutionEvent,
+  ResponseKind,
+  Suggestion,
+} from '../types'
 
 interface DocSummary {
   id: string
@@ -34,6 +47,7 @@ interface FetchedDoc {
   agentHints: AgentHints
   paragraphs?: ParagraphInfo[]
   density?: Record<string, DensityAxes>
+  agentActivity?: AgentActivity
 }
 
 export interface OnlineSession {
@@ -48,6 +62,19 @@ export interface OnlineSession {
   agentHints: Ref<AgentHints>
   paragraphs: Ref<ParagraphInfo[]>
   density: Ref<Record<string, DensityAxes>>
+  agentActivity: Ref<AgentActivity>
+  /** Tasks ordered by createdAt (oldest first) for stable display. */
+  agentTasks: ComputedRef<AgentTask[]>
+  /** Notes ordered newest-first for the timeline. */
+  agentNotes: ComputedRef<AgentNote[]>
+  /** Task counts for the summary line. */
+  agentTaskCounts: ComputedRef<{ open: number; inProgress: number; done: number; total: number }>
+  /** ms since last agent activity, or null if never seen. Refreshes once a second. */
+  agentLastSeenAgo: ComputedRef<number | null>
+  /** Reactive `Date.now()`-style ms timestamp ticked every second. Use this as
+   *  the right-hand side for any `ms ago` display so per-note timestamps stay
+   *  live without each consumer wiring its own setInterval. */
+  nowMs: Ref<number>
   /** Per-flag awaiting candidate, if one exists. */
   candidateByFlag: ComputedRef<Record<string, Suggestion | undefined>>
   /** Per-flag pending response, if one exists. */
@@ -75,8 +102,14 @@ export function createOnlineSession(id: string): OnlineSession {
   const agentHints = ref<AgentHints>({})
   const paragraphs = ref<ParagraphInfo[]>([])
   const density = ref<Record<string, DensityAxes>>({})
+  const agentActivity = ref<AgentActivity>({ tasks: {}, notes: {} })
+  /** Reactive "now" used by `agentLastSeenAgo`. Ticked once a second so the
+   *  "37s ago" pill keeps counting without forcing the whole panel to re-render
+   *  on a higher cadence. */
+  const nowTick = ref(Date.now())
   let cursor = 0
   let eventSource: EventSource | null = null
+  let nowTimer: ReturnType<typeof setInterval> | null = null
 
   const candidateByFlag = computed<Record<string, Suggestion | undefined>>(() => {
     // Latest unaccepted suggestion per flag is the running best (the
@@ -101,6 +134,36 @@ export function createOnlineSession(id: string): OnlineSession {
       if (!out[r.flagId]) out[r.flagId] = r
     }
     return out
+  })
+
+  const agentTasks = computed<AgentTask[]>(() => {
+    const list = Object.values(agentActivity.value.tasks ?? {})
+    list.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+    return list
+  })
+
+  const agentNotes = computed<AgentNote[]>(() => {
+    const list = Object.values(agentActivity.value.notes ?? {})
+    list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    return list
+  })
+
+  const agentTaskCounts = computed(() => {
+    const out = { open: 0, inProgress: 0, done: 0, total: 0 }
+    for (const t of agentTasks.value) {
+      out.total++
+      if (t.status === 'open') out.open++
+      else if (t.status === 'in-progress') out.inProgress++
+      else if (t.status === 'done') out.done++
+    }
+    return out
+  })
+
+  const agentLastSeenAgo = computed<number | null>(() => {
+    const ts = agentActivity.value.lastSeenAt
+    if (!ts) return null
+    const ms = nowTick.value - new Date(ts).getTime()
+    return ms < 0 ? 0 : ms
   })
 
   const panelCounts = computed(() => {
@@ -145,6 +208,7 @@ export function createOnlineSession(id: string): OnlineSession {
       agentHints.value = data.agentHints ?? {}
       paragraphs.value = data.paragraphs ?? []
       density.value = data.density ?? {}
+      agentActivity.value = data.agentActivity ?? { tasks: {}, notes: {} }
       cursor = data.doc.version
 
       if (respRes.ok) {
@@ -156,6 +220,7 @@ export function createOnlineSession(id: string): OnlineSession {
         suggestions.value = c.suggestions ?? []
       }
 
+      startNowTicker()
       subscribe()
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
@@ -186,6 +251,9 @@ export function createOnlineSession(id: string): OnlineSession {
       'agent-hints-updated',
       'document-replaced',
       'density-updated',
+      'agent-heartbeat',
+      'agent-note-added',
+      'agent-task-upserted',
     ]
     for (const evtType of namedEvents) {
       eventSource.addEventListener(evtType, (msg: MessageEvent) =>
@@ -259,9 +327,77 @@ export function createOnlineSession(id: string): OnlineSession {
         if (hints) agentHints.value = hints
         break
       }
+      case 'agent-heartbeat': {
+        const ts = (ev.payload?.lastSeenAt as string | undefined) ?? ev.ts
+        agentActivity.value = { ...agentActivity.value, lastSeenAt: ts }
+        break
+      }
+      case 'agent-note-added': {
+        const noteId = ev.payload?.noteId as string | undefined
+        const body = ev.payload?.body as string | undefined
+        const kind = (ev.payload?.kind as AgentNoteKind | undefined) ?? 'observation'
+        if (!noteId || typeof body !== 'string') break
+        const next = { ...agentActivity.value }
+        next.notes = {
+          ...next.notes,
+          [noteId]: { id: noteId, body, kind, createdAt: ev.ts },
+        }
+        next.lastSeenAt = ev.ts
+        agentActivity.value = next
+        break
+      }
+      case 'agent-task-upserted': {
+        const key = ev.payload?.key as string | undefined
+        const title = ev.payload?.title as string | undefined
+        const status = (ev.payload?.status as AgentTaskStatus | undefined) ?? 'in-progress'
+        if (!key || typeof title !== 'string') break
+        const next = { ...agentActivity.value }
+        const prior = next.tasks[key]
+        next.tasks = {
+          ...next.tasks,
+          [key]: {
+            key,
+            title,
+            status,
+            detail: prior?.detail,
+            createdAt: prior?.createdAt ?? ev.ts,
+            updatedAt: ev.ts,
+          },
+        }
+        next.lastSeenAt = ev.ts
+        agentActivity.value = next
+        break
+      }
       default:
         break
     }
+    // Any drafter-attributable event (flag-added, suggestion-added,
+    // resolutions etc.) also bumps the last-seen pulse so the user sees the
+    // pipeline alive even if the skill forgets to heartbeat.
+    if (isAgentEvent(ev.type)) {
+      agentActivity.value = { ...agentActivity.value, lastSeenAt: ev.ts }
+    }
+  }
+
+  function isAgentEvent(type: ResolutionEvent['type']): boolean {
+    return (
+      type === 'flag-added' ||
+      type === 'suggestion-added' ||
+      type === 'response-resolved' ||
+      type === 'response-stuck' ||
+      type === 'density-updated' ||
+      type === 'document-replaced' ||
+      type === 'agent-heartbeat' ||
+      type === 'agent-note-added' ||
+      type === 'agent-task-upserted'
+    )
+  }
+
+  function startNowTicker(): void {
+    if (nowTimer) return
+    nowTimer = setInterval(() => {
+      nowTick.value = Date.now()
+    }, 1000)
   }
 
   async function refreshSuggestionsLazy(ev: ResolutionEvent): Promise<void> {
@@ -346,6 +482,10 @@ export function createOnlineSession(id: string): OnlineSession {
   function disconnect(): void {
     eventSource?.close()
     eventSource = null
+    if (nowTimer) {
+      clearInterval(nowTimer)
+      nowTimer = null
+    }
   }
 
   bootstrap()
@@ -362,6 +502,12 @@ export function createOnlineSession(id: string): OnlineSession {
     agentHints,
     paragraphs,
     density,
+    agentActivity,
+    agentTasks,
+    agentNotes,
+    agentTaskCounts,
+    agentLastSeenAgo,
+    nowMs: nowTick,
     candidateByFlag,
     pendingResponseByFlag,
     panelCounts,

@@ -1,4 +1,11 @@
-import type { AgentHints, Comment, DocResponse, Flag, Suggestion } from '../src/types'
+import type {
+  AgentActivity,
+  AgentHints,
+  Comment,
+  DocResponse,
+  Flag,
+  Suggestion,
+} from '../src/types'
 
 export interface DocRecord {
   id: string
@@ -41,6 +48,8 @@ export interface DocState {
   /** density[paragraphHash] = { axisName -> score (0-10) }. Cached across edits; */
   /** entries whose hash is no longer present in the source are GC'd on reconcile. */
   density: Record<string, DensityAxes>
+  /** Drafter-reported activity: heartbeat, declared tasks, free-form notes. */
+  agentActivity: AgentActivity
 }
 
 export interface NewDocInput {

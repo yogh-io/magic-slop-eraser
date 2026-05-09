@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { createOnlineSession, type OnlineSession } from '../state/online'
 import ArticleView from '../components/ArticleView.vue'
-import type { DocResponse, Flag, Suggestion } from '../types'
+import type { AgentNote, AgentTask, DocResponse, Flag, Suggestion } from '../types'
 
 const route = useRoute()
 const fatalError = ref<string | null>(null)
@@ -46,6 +46,44 @@ function barWidth(weighted: number): string {
 const candidateByFlag = session?.candidateByFlag ?? computed(() => ({}) as Record<string, Suggestion | undefined>)
 const pendingResponseByFlag = session?.pendingResponseByFlag ?? computed(() => ({}) as Record<string, DocResponse | undefined>)
 const panelCounts = session?.panelCounts ?? computed(() => ({ open: 0, pending: 0, awaiting: 0, stuck: 0, closed: 0 }))
+const agentTasks = session?.agentTasks ?? computed(() => [] as AgentTask[])
+const agentNotes = session?.agentNotes ?? computed(() => [] as AgentNote[])
+const agentTaskCounts = session?.agentTaskCounts ?? computed(() => ({ open: 0, inProgress: 0, done: 0, total: 0 }))
+const agentLastSeenAgo = session?.agentLastSeenAgo ?? computed<number | null>(() => null)
+const nowMs = session?.nowMs ?? ref(Date.now())
+const agentPanelOpen = ref(false)
+function toggleAgentPanel(): void { agentPanelOpen.value = !agentPanelOpen.value }
+
+function formatAgo(ms: number | null): string {
+  if (ms === null) return 'never'
+  const s = Math.floor(ms / 1000)
+  if (s < 5) return 'just now'
+  if (s < 60) return `${s}s ago`
+  const m = Math.floor(s / 60)
+  if (m < 60) {
+    const rem = s % 60
+    return rem > 0 && m < 5 ? `${m}m ${rem}s ago` : `${m}m ago`
+  }
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
+const agentLastSeenLabel = computed(() => formatAgo(agentLastSeenAgo.value))
+const agentLive = computed(() => {
+  const ms = agentLastSeenAgo.value
+  return ms !== null && ms < 30000
+})
+
+function taskGlyph(status: AgentTask['status']): string {
+  if (status === 'done') return '✔'
+  if (status === 'in-progress') return '◼'
+  return '○'
+}
+
+function noteKindLabel(kind: AgentNote['kind']): string {
+  return kind
+}
 
 onBeforeUnmount(() => session?.disconnect())
 
@@ -294,7 +332,11 @@ const shareUrl = computed(() => {
 const agentPrompt = computed(() => {
   if (!shareUrl.value) return ''
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  return `Open the slopmop session at ${shareUrl.value} and drive its deslop loop. If the slopmop skill isn't installed, fetch ${origin}/slopmop.md and save it to .claude/skills/slopmop/SKILL.md. Then pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
+  return `Drive the slopmop session at ${shareUrl.value} through its deslop loop.
+
+If the slopmop skill isn't already available, install it first: fetch ${origin}/slopmop.md and save it to .claude/skills/slopmop/SKILL.md in this repo (or ~/.claude/skills/slopmop/SKILL.md to install globally). Then proceed.
+
+Run the loop: walk the catalogue, post flags, pull pending responses, draft candidates, post resolutions; punt anything you can't address.`
 })
 
 const shareVisible = computed(() => {
@@ -342,13 +384,24 @@ function dismissShare(): void {
             {{ copyState === 'url' ? 'copied' : 'copy' }}
           </button>
         </div>
-        <div class="share-row">
+        <div class="share-row prompt-row">
           <span class="share-lbl">for your agent</span>
-          <code class="share-val truncate">{{ agentPrompt }}</code>
+          <textarea
+            class="share-prompt"
+            readonly
+            spellcheck="false"
+            rows="9"
+            :value="agentPrompt"
+            @focus="(e) => (e.target as HTMLTextAreaElement).select()"
+          />
           <button type="button" class="share-copy" @click="copyText('prompt', agentPrompt)">
             {{ copyState === 'prompt' ? 'copied' : 'copy' }}
           </button>
         </div>
+        <p class="share-hint">
+          Self-contained: handles skill install if needed, then drives the loop. No
+          slopmop skill yet? <RouterLink to="/skill">What's that?</RouterLink>
+        </p>
         <button type="button" class="share-dismiss" @click="dismissShare" title="dismiss for this session">×</button>
       </section>
 
@@ -388,6 +441,22 @@ function dismissShare(): void {
           </div>
         </div>
         <div v-if="doc" class="counts">
+          <button
+            type="button"
+            class="agent-pill"
+            :class="{ 'is-live': agentLive, 'is-cold': agentLastSeenAgo === null, 'is-open': agentPanelOpen }"
+            @click="toggleAgentPanel"
+            :title="agentLastSeenAgo === null ? 'no agent activity yet' : `agent last seen ${agentLastSeenLabel}`"
+          >
+            <span class="agent-dot" />
+            <span class="agent-lbl">agent</span>
+            <span class="agent-when">{{ agentLastSeenAgo === null ? 'no ping yet' : agentLastSeenLabel }}</span>
+            <span v-if="agentTaskCounts.total > 0" class="agent-tasks-mini">
+              <span v-if="agentTaskCounts.inProgress > 0" class="t-ip">{{ agentTaskCounts.inProgress }}◼</span>
+              <span v-if="agentTaskCounts.done > 0" class="t-done">{{ agentTaskCounts.done }}✔</span>
+            </span>
+          </button>
+          <span class="dot" />
           <button
             type="button"
             class="score"
@@ -441,6 +510,50 @@ function dismissShare(): void {
         <p class="score-note muted">
           Weights come from the drafter at flag-detection time, informed by the voice memo.
           Score is the aggregate. Resolved flags drop out; the score updates as you sweep.
+        </p>
+      </section>
+
+      <section v-if="doc && agentPanelOpen" class="agent-panel">
+        <div class="agent-panel-head">
+          <h2>Agent activity</h2>
+          <span class="agent-status">
+            <span class="agent-dot" :class="{ 'is-live': agentLive, 'is-cold': agentLastSeenAgo === null }" />
+            {{ agentLastSeenAgo === null ? 'no ping yet - has the drafter been pointed at this session?' : `last seen ${agentLastSeenLabel}` }}
+          </span>
+          <button type="button" class="close" @click="toggleAgentPanel" aria-label="close">×</button>
+        </div>
+
+        <div v-if="agentTaskCounts.total > 0" class="agent-tasks">
+          <p class="agent-tasks-summary">
+            {{ agentTaskCounts.total }} task{{ agentTaskCounts.total === 1 ? '' : 's' }}
+            ({{ agentTaskCounts.done }} done, {{ agentTaskCounts.inProgress }} in progress, {{ agentTaskCounts.open }} open)
+          </p>
+          <ul class="task-list">
+            <li v-for="t in agentTasks" :key="t.key" :class="['task', `is-${t.status}`]">
+              <span class="task-glyph" :title="t.status">{{ taskGlyph(t.status) }}</span>
+              <span class="task-title">{{ t.title }}</span>
+              <span v-if="t.detail" class="task-detail">- {{ t.detail }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="agentNotes.length > 0" class="agent-notes">
+          <h3>Notes from the drafter</h3>
+          <ol class="note-list">
+            <li v-for="n in agentNotes" :key="n.id" :class="['note', `kind-${n.kind}`]">
+              <span class="note-when" :title="n.createdAt">
+                {{ formatAgo(nowMs - new Date(n.createdAt).getTime()) }}
+              </span>
+              <span class="note-kind">{{ noteKindLabel(n.kind) }}</span>
+              <p class="note-body">{{ n.body }}</p>
+            </li>
+          </ol>
+        </div>
+
+        <p v-if="agentTaskCounts.total === 0 && agentNotes.length === 0" class="agent-empty muted">
+          The drafter hasn't reported any tasks or notes yet. The pill turns green
+          once it pings - that confirms the pipeline is wired and the agent has the
+          session URL.
         </p>
       </section>
 
@@ -622,6 +735,42 @@ function dismissShare(): void {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.share-row.prompt-row {
+  align-items: start;
+}
+.share-row.prompt-row .share-lbl {
+  padding-top: 0.4rem;
+}
+.share-prompt {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.45rem 0.6rem;
+  resize: vertical;
+  min-height: 5.4rem;
+  width: 100%;
+  min-width: 0;
+}
+.share-prompt:focus {
+  outline: 2px solid color-mix(in srgb, var(--text) 30%, transparent);
+  outline-offset: -1px;
+}
+.share-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding-left: 7.2rem;
+}
+.share-hint a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule);
+}
+.share-hint a:hover { border-bottom-color: var(--text); }
 .share-copy {
   font-family: var(--font-ui);
   font-size: 0.76rem;
@@ -767,6 +916,200 @@ function dismissShare(): void {
 .counts .score-rungs .r-1 { color: var(--cat-lexical, var(--accent)); }
 .counts .score-rungs .r-2 { color: var(--cat-structural, var(--accent)); }
 .counts .score-rungs .r-3 { color: var(--cat-argumentative, var(--accent)); }
+
+.counts .agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.counts .agent-pill:hover { border-color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.counts .agent-pill.is-open { background: var(--text); color: var(--bg); border-color: var(--text); }
+.counts .agent-pill.is-open .agent-when, .counts .agent-pill.is-open .agent-lbl { color: inherit; opacity: 0.85; }
+.counts .agent-pill .agent-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rule);
+  display: inline-block;
+}
+.counts .agent-pill.is-live .agent-dot {
+  background: #2f8f6a;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #2f8f6a 30%, transparent);
+  animation: agent-pulse 1.6s ease-out infinite;
+}
+.counts .agent-pill.is-cold .agent-dot { background: var(--rule); opacity: 0.5; }
+@keyframes agent-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, #2f8f6a 50%, transparent); }
+  100% { box-shadow: 0 0 0 6px color-mix(in srgb, #2f8f6a 0%, transparent); }
+}
+.counts .agent-pill .agent-lbl {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7em;
+  color: var(--muted);
+}
+.counts .agent-pill .agent-when {
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  color: var(--text);
+}
+.counts .agent-pill .agent-tasks-mini {
+  display: inline-flex;
+  gap: 0.3rem;
+  margin-left: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.74em;
+}
+.counts .agent-pill .t-ip { color: #b88f3e; }
+.counts .agent-pill .t-done { color: #2f8f6a; }
+
+.agent-panel {
+  margin: 1rem 0 1.2rem;
+  padding: 1rem 1.25rem 1.1rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.agent-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+.agent-panel h2 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.agent-panel .agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  flex: 1;
+}
+.agent-panel .agent-status .agent-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rule);
+  display: inline-block;
+}
+.agent-panel .agent-status .agent-dot.is-live { background: #2f8f6a; }
+.agent-panel .agent-status .agent-dot.is-cold { background: var(--rule); opacity: 0.5; }
+.agent-panel .close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0.3rem;
+}
+.agent-panel .close:hover { color: var(--text); }
+
+.agent-tasks-summary {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.task {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+.task.is-done { color: var(--muted); }
+.task.is-done .task-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+.task.is-in-progress { background: color-mix(in srgb, #b88f3e 8%, transparent); }
+.task-glyph {
+  font-family: var(--font-mono);
+  width: 1ch;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.task.is-done .task-glyph { color: #2f8f6a; }
+.task.is-in-progress .task-glyph { color: #b88f3e; }
+.task.is-open .task-glyph { color: var(--muted); }
+.task-title { flex: 1; }
+.task-detail { color: var(--muted); font-size: 0.88em; }
+
+.agent-notes h3 {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0.3rem 0 0.45rem;
+  color: var(--muted);
+}
+.note-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.note {
+  border-left: 2px solid var(--rule);
+  padding: 0.05rem 0.2rem 0.1rem 0.7rem;
+}
+.note.kind-finding { border-left-color: #2f8f6a; }
+.note.kind-progress { border-left-color: #b88f3e; }
+.note.kind-concern { border-left-color: #b8472d; }
+.note.kind-observation { border-left-color: var(--accent); }
+.note-when {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-right: 0.5rem;
+}
+.note-kind {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: 0.05em 0.4em;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+.note-body {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+.agent-empty { font-size: 0.88rem; margin: 0.4rem 0 0; }
 
 .score-panel {
   margin: 1rem 0 1.2rem;

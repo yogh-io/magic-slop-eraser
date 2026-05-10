@@ -75,7 +75,13 @@ async function route(req: Request): Promise<Response> {
   const url = new URL(req.url)
   const { pathname } = url
 
-  if (pathname === '/health') return json({ ok: true, skillVersion: SKILL_VERSION })
+  if (pathname === '/health') {
+    return json({
+      ok: true,
+      skillVersion: SKILL_VERSION,
+      storage: process.env.S3_BUCKET ? 's3' : 'disk',
+    })
+  }
 
   if (pathname === '/catalogue' && req.method === 'GET') {
     return handleCatalogue()

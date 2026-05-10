@@ -293,7 +293,11 @@ async function recomputeLayout(): Promise<void> {
   let cursor = 0
   for (const o of ordered) {
     const el = annotationRefs.value.get(o.id)
-    const h = el?.offsetHeight ?? 120
+    // Use || (not ??) so an offsetHeight of 0 (pre-layout) also falls back.
+    // 240 approximates a typical open-state card with rationale + chips +
+    // directive row; better to over-estimate and be corrected by the
+    // ResizeObserver than under-estimate and stack cards on top of each other.
+    const h = (el?.offsetHeight || 0) || 240
     const top = Math.max(o.rawTop, cursor)
     next.set(o.id, top)
     cursor = top + h + ANNOTATION_GAP
@@ -310,8 +314,13 @@ function onLayoutReady(): void {
 }
 
 watch(visibleFlags, () => {
-  // When flag list changes (resolved, added), positions change.
-  nextTick(() => recomputeLayout())
+  // When flag list changes (resolved, added), positions change. Two-pass
+  // matches onLayoutReady - the second pass catches measurements that
+  // settled after the first paint (chips reflowing, content streaming in).
+  nextTick(() => {
+    recomputeLayout()
+    nextTick(() => recomputeLayout())
+  })
 })
 
 let resizeRaf = 0
@@ -631,7 +640,10 @@ function dismissShare(): void {
             :data-state="v.state"
             :data-rung="v.flag.rung ?? 1"
             :class="{ selected: selectedFlagId === v.flag.id }"
-            :style="{ top: (finalTops.get(v.flag.id) ?? 0) + 'px' }"
+            :style="{
+              top: (finalTops.get(v.flag.id) ?? 0) + 'px',
+              visibility: finalTops.has(v.flag.id) ? 'visible' : 'hidden',
+            }"
             @click="selectFlag(v.flag.id)"
           >
             <header class="ann-head">
@@ -1347,6 +1359,7 @@ function dismissShare(): void {
   position: absolute;
   left: 0;
   right: 0;
+  min-height: 120px;
   border: 1px solid var(--rule);
   border-left-width: 3px;
   border-radius: 6px;

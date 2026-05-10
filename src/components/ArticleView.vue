@@ -236,17 +236,31 @@ function onMouseUp(): void {
   border-radius: 2px;
 }
 
-/* Density spine: a single continuous vertical bar in the left gutter of the */
-/* article, painted as a vertical gradient whose stops correspond to each    */
-/* paragraph's aggregate score. Intense = high score, dim = low. The spine  */
-/* sits in the gutter so prose layout is unaffected.                        */
-.article-view :deep(.density-spine) {
+/* Density rails: N parallel vertical tracks in the left gutter, one per     */
+/* axis. Each paragraph contributes a centered sliver per rail whose width   */
+/* scales with the axis score (thickness, not color, carries the signal -    */
+/* color is a constant accent across all rails). Unscored paragraphs leave   */
+/* gaps within the track rather than truncating it.                          */
+.article-view :deep(.density-rails) {
   position: absolute;
-  left: -1.4rem;
-  width: 6px;
-  border-radius: 2px;
+  left: -2.4rem;
+  display: flex;
+  gap: 3px;
   pointer-events: none;
   z-index: 0;
+}
+.article-view :deep(.density-rail) {
+  position: relative;
+  width: 6px;
+  height: 100%;
+  flex-shrink: 0;
+}
+.article-view :deep(.density-rail-seg) {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  border-radius: 1px;
 }
 .article-view :deep(p.has-density-rail) {
   cursor: help;

@@ -256,10 +256,26 @@ const articleViewRef = ref<InstanceType<typeof ArticleView> | null>(null)
 const annotationRefs = ref<Map<string, HTMLElement>>(new Map())
 const finalTops = ref<Map<string, number>>(new Map())
 const gutterMinHeight = ref(0)
+let cardResizeObserver: ResizeObserver | null = null
+let pendingRecomputeRaf = 0
+
+function scheduleRecompute(): void {
+  if (pendingRecomputeRaf) cancelAnimationFrame(pendingRecomputeRaf)
+  pendingRecomputeRaf = requestAnimationFrame(() => {
+    pendingRecomputeRaf = 0
+    recomputeLayout()
+  })
+}
 
 function setAnnotationRef(id: string, el: Element | null): void {
-  if (el instanceof HTMLElement) annotationRefs.value.set(id, el)
-  else annotationRefs.value.delete(id)
+  if (el instanceof HTMLElement) {
+    annotationRefs.value.set(id, el)
+    cardResizeObserver?.observe(el)
+  } else {
+    const prev = annotationRefs.value.get(id)
+    if (prev) cardResizeObserver?.unobserve(prev)
+    annotationRefs.value.delete(id)
+  }
 }
 
 const ANNOTATION_GAP = 10
@@ -306,10 +322,19 @@ function onResize(): void {
 
 onMounted(() => {
   window.addEventListener('resize', onResize)
+  if (typeof ResizeObserver !== 'undefined') {
+    cardResizeObserver = new ResizeObserver(() => scheduleRecompute())
+    for (const el of annotationRefs.value.values()) {
+      cardResizeObserver.observe(el)
+    }
+  }
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
   if (resizeRaf) cancelAnimationFrame(resizeRaf)
+  if (pendingRecomputeRaf) cancelAnimationFrame(pendingRecomputeRaf)
+  cardResizeObserver?.disconnect()
+  cardResizeObserver = null
 })
 
 // --- share banner -----------------------------------------------------------

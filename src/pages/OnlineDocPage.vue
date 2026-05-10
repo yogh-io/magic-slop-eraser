@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { createOnlineSession, type OnlineSession } from '../state/online'
 import ArticleView from '../components/ArticleView.vue'
+import { addRecent } from '../state/recents'
 import type { AgentNote, AgentTask, DocResponse, Flag, Suggestion } from '../types'
 
 const route = useRoute()
@@ -85,6 +86,17 @@ function taskGlyph(status: AgentTask['status']): string {
 function noteKindLabel(kind: AgentNote['kind']): string {
   return kind
 }
+
+// Record this session in the local recents list once the doc loads. The
+// title is server-derived (may differ from what the creator typed if they
+// left it blank), so we wait for it before persisting.
+watch(
+  () => doc.value,
+  (d) => {
+    if (d?.id) addRecent(d.id, d.title)
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => session?.disconnect())
 

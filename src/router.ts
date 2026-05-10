@@ -52,6 +52,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: 'Document' },
   },
   {
+    path: '/recents',
+    name: 'recents',
+    component: () => import('./pages/RecentsPage.vue'),
+    meta: { title: 'Recent sessions' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('./pages/NotFoundPage.vue'),

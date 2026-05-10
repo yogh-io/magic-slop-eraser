@@ -12,6 +12,7 @@ import ThemePicker from './components/ThemePicker.vue'
       </RouterLink>
       <nav class="nav">
         <RouterLink to="/">Analyse</RouterLink>
+        <RouterLink to="/recents">Recents</RouterLink>
         <RouterLink to="/categories">Catalogue</RouterLink>
         <RouterLink to="/rungs">Rungs</RouterLink>
         <RouterLink to="/about">Methodology</RouterLink>

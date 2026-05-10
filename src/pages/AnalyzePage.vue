@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOgHead } from '../composables/useOgHead'
+import { addRecent } from '../state/recents'
 
 useOgHead(() => ({
   title: 'slopmop',
@@ -64,6 +65,7 @@ async function createSession(): Promise<void> {
       throw new Error(`${r.status}: ${await r.text()}`)
     }
     const created = (await r.json()) as { id: string }
+    addRecent(created.id, body.title)
     await router.push({ path: `/d/${created.id}` })
   } catch (e) {
     errorMsg.value = e instanceof Error ? e.message : String(e)

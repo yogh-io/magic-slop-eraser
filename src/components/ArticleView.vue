@@ -11,16 +11,24 @@ const props = withDefaults(
     source: string
     flags: Flag[]
     selectedFlagId: string | null
-    /** flagId -> candidate post text. Marks for these flags render the post inline. */
+    /** flagId -> candidate post text. Marks for these flags get a `has-candidate` class; the post text only renders inline while previewFlagId points at them. */
     candidates?: Map<string, string>
-    /** While set, the flag with this id renders its original text instead of the candidate. */
-    peekFlagId?: string | null
+    /** While set, that flag's marks render the candidate (post) text inline instead of the original. */
+    previewFlagId?: string | null
+    /** While set, that flag's marks get a strong full-background highlight - used for hovering an annotation card. */
+    hoveredFlagId?: string | null
     /** Paragraph metadata (hash + offsets), aligned to the source. Used to attach density rails. */
     paragraphs?: ParagraphInfo[]
     /** density[paragraphHash] = { axisName -> 0..10 }. Drives the rail intensities. */
     density?: Record<string, DensityAxes>
   }>(),
-  { candidates: undefined, peekFlagId: null, paragraphs: () => [], density: () => ({}) },
+  {
+    candidates: undefined,
+    previewFlagId: null,
+    hoveredFlagId: null,
+    paragraphs: () => [],
+    density: () => ({}),
+  },
 )
 
 const emit = defineEmits<{
@@ -43,9 +51,10 @@ async function applyHighlights(): Promise<void> {
   if (!containerRef.value) return
   highlightFlagsInDom(containerRef.value, props.flags, '.md-prose', {
     candidates: props.candidates,
-    peekFlagId: props.peekFlagId,
+    previewFlagId: props.previewFlagId,
   })
   applyDensityRails(containerRef.value, props.paragraphs, props.density)
+  applyHoverClass(props.hoveredFlagId)
   // Let the next frame settle so layout/measurements are accurate.
   requestAnimationFrame(() => emit('layout-ready'))
 }
@@ -56,12 +65,33 @@ watch(
     props.source,
     props.flags,
     props.candidates,
-    props.peekFlagId,
+    props.previewFlagId,
     props.paragraphs,
     props.density,
   ],
   applyHighlights,
   { deep: true },
+)
+
+function applyHoverClass(id: string | null): void {
+  if (!containerRef.value) return
+  for (const m of containerRef.value.querySelectorAll<HTMLElement>('mark.slop-flag.is-hovered')) {
+    m.classList.remove('is-hovered')
+  }
+  if (!id) return
+  for (const el of containerRef.value.querySelectorAll<HTMLElement>(
+    `mark.slop-flag[data-flag-id="${id}"]`,
+  )) {
+    el.classList.add('is-hovered')
+  }
+}
+
+watch(
+  () => props.hoveredFlagId,
+  async (id) => {
+    await nextTick()
+    applyHoverClass(id)
+  },
 )
 
 defineExpose({
@@ -214,23 +244,39 @@ function onMouseUp(): void {
   border-bottom: 2px solid var(--flag-color, var(--accent));
   cursor: pointer;
   padding: 0 0.05em;
-  transition: background 120ms;
+  transition: background 120ms ease, color 120ms ease;
 }
-.article-view :deep(mark.slop-flag:hover),
-.article-view :deep(mark.slop-flag.is-selected) {
+.article-view :deep(mark.slop-flag:hover) {
   background: color-mix(in srgb, var(--flag-color, var(--accent)) 18%, transparent);
 }
-.article-view :deep(mark.slop-flag.has-candidate[data-displaying="post"]) {
-  background: color-mix(in srgb, #2f8f6a 14%, transparent);
+/* A second underline hints that the flag has a ready replacement on offer.
+ * The article itself stays the writer's prose - the candidate only renders
+ * when they hover the candidate block in the panel (see is-previewing). */
+.article-view :deep(mark.slop-flag.has-candidate) {
+  border-bottom-style: double;
+  border-bottom-width: 4px;
+}
+.article-view :deep(mark.slop-flag.is-previewing) {
+  background: color-mix(in srgb, #2f8f6a 18%, transparent);
+  border-bottom-color: #2f8f6a;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+}
+/* Hover-from-card: full opaque highlight in the flag's category color so the
+ * writer can immediately see which span the annotation refers to. */
+.article-view :deep(mark.slop-flag.is-hovered) {
+  background: var(--flag-color, var(--accent));
+  color: var(--bg);
+  border-bottom-color: var(--flag-color, var(--accent));
+  border-radius: 2px;
+}
+.article-view :deep(mark.slop-flag.is-hovered.is-previewing) {
+  background: #2f8f6a;
+  color: #fff;
   border-bottom-color: #2f8f6a;
 }
-.article-view :deep(mark.slop-flag.has-candidate[data-displaying="pre"]) {
-  background: color-mix(in srgb, #b8472d 14%, transparent);
-  border-bottom-color: #b8472d;
-  text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, #b8472d 60%, transparent);
-}
 .article-view :deep(mark.slop-flag.is-selected) {
+  background: color-mix(in srgb, var(--flag-color, var(--accent)) 18%, transparent);
   outline: 2px solid color-mix(in srgb, var(--flag-color, var(--accent)) 50%, transparent);
   outline-offset: 1px;
   border-radius: 2px;

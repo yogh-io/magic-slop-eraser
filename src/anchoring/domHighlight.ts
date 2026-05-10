@@ -8,16 +8,20 @@ interface Segment {
 
 export interface HighlightOptions {
   /**
-   * Map of flagId -> candidate replacement text. When a flag has a candidate,
-   * its rendered mark shows the candidate text instead of the original; the
-   * original is preserved on `data-pre` for hold-to-compare.
+   * Map of flagId -> candidate replacement text. By default the article shows
+   * the original anchored text; the candidate only renders inline while the
+   * user is actively previewing one (see `previewFlagId`). Marks for any flag
+   * that has a candidate available get a `has-candidate` class regardless, so
+   * the UI can hint that a replacement is on offer.
    */
   candidates?: Map<string, string>
   /**
-   * If set, the flag with this id renders its `data-pre` (original) text even
-   * if it has a candidate. Used for the hold-to-see-original gesture.
+   * If set, the flag with this id renders its candidate (post) text inline
+   * instead of the original. Drives the hover-to-preview gesture from the
+   * annotation panel: hover the candidate block, see how the replacement
+   * flows in context.
    */
-  peekFlagId?: string | null
+  previewFlagId?: string | null
 }
 
 export function highlightFlagsInDom(
@@ -59,7 +63,7 @@ export function highlightFlagsInDom(
   }
 
   if (opts?.candidates && opts.candidates.size > 0) {
-    applyCandidateOverrides(root, opts.candidates, opts.peekFlagId ?? null)
+    applyCandidateOverrides(root, opts.candidates, opts.previewFlagId ?? null)
   }
 }
 
@@ -112,14 +116,17 @@ function wrapRange(segments: Segment[], start: number, end: number, flag: Flag):
 }
 
 /**
- * Replace the rendered text of marks belonging to flags that have an
- * awaiting-accept candidate. Multi-segment flags collapse into the first
- * mark; the original text is preserved on data-pre so peek can restore it.
+ * Tag marks that have a candidate available, and (only when actively
+ * previewing one) swap the mark's rendered text to the candidate. Multi-
+ * segment flags collapse into the first mark while previewing; the rest
+ * are removed for the duration. The default is original-text-in-place,
+ * so the article never shows agent-proposed replacements until the writer
+ * hovers a candidate to preview it.
  */
 function applyCandidateOverrides(
   root: HTMLElement,
   candidates: Map<string, string>,
-  peekFlagId: string | null,
+  previewFlagId: string | null,
 ): void {
   const groups = new Map<string, HTMLElement[]>()
   for (const m of root.querySelectorAll<HTMLElement>('mark.slop-flag')) {
@@ -131,18 +138,14 @@ function applyCandidateOverrides(
   for (const [fid, marks] of groups) {
     const post = candidates.get(fid)
     if (post === undefined) continue
+    for (const m of marks) m.classList.add('has-candidate')
+    if (previewFlagId !== fid) continue
     const pre = marks.map((m) => m.textContent ?? '').join('')
     const first = marks[0]
     first.dataset.pre = pre
     first.dataset.post = post
-    if (peekFlagId === fid) {
-      first.textContent = pre
-      first.dataset.displaying = 'pre'
-    } else {
-      first.textContent = post
-      first.dataset.displaying = 'post'
-    }
-    first.classList.add('has-candidate')
+    first.textContent = post
+    first.classList.add('is-previewing')
     for (let i = 1; i < marks.length; i++) marks[i].remove()
   }
 }

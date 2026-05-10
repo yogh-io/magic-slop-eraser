@@ -9,7 +9,10 @@ import type { AgentNote, AgentTask, DocResponse, Flag, Suggestion } from '../typ
 const route = useRoute()
 const fatalError = ref<string | null>(null)
 const selectedFlagId = ref<string | null>(null)
-const peekFlagId = ref<string | null>(null)
+/** Card-hover: highlights the anchored span in the article so the writer can locate what the annotation refers to. */
+const hoveredFlagId = ref<string | null>(null)
+/** Suggestion-hover within a card: temporarily renders the candidate (post) text inside the article in place of the original. */
+const previewFlagId = ref<string | null>(null)
 const directiveInput = ref<Record<string, string>>({})
 const letMeTryInput = ref<Record<string, string>>({})
 const letMeTryOpen = ref<Record<string, boolean>>({})
@@ -171,6 +174,54 @@ const visibleFlags = computed(() =>
 /** Flags passed to ArticleView; out-of-phase marks are suppressed entirely. */
 const articleFlags = computed(() => flags.value.filter((f) => isInPhase(f.rung)))
 
+/**
+ * A bundle of one or more visible flag-views whose anchors overlap. The gutter
+ * renders one card per cluster; multi-flag clusters stack their per-flag
+ * panels inside a shared frame so the writer sees "this passage trips three
+ * patterns" in one read instead of three disconnected cards.
+ *
+ * Criterion: any anchor overlap (transitive). Flags on adjacent but
+ * non-overlapping sentences stay separate - we don't infer "same sentence"
+ * from proximity, only from overlap.
+ */
+interface FlagCluster {
+  id: string
+  flagViews: FlagView[]
+  spanStart: number
+  spanEnd: number
+}
+
+const clusters = computed<FlagCluster[]>(() => {
+  const out: FlagCluster[] = []
+  // visibleFlags inherits orderedFlags' anchor.start sort order.
+  for (const v of visibleFlags.value) {
+    const last = out[out.length - 1]
+    if (last && v.flag.anchor.start < last.spanEnd) {
+      last.flagViews.push(v)
+      last.spanEnd = Math.max(last.spanEnd, v.flag.anchor.end)
+      last.id = `${last.id}+${v.flag.id}`
+    } else {
+      out.push({
+        id: v.flag.id,
+        flagViews: [v],
+        spanStart: v.flag.anchor.start,
+        spanEnd: v.flag.anchor.end,
+      })
+    }
+  }
+  return out
+})
+
+/** Reverse index: which cluster does a flag belong to. Lets `onFlagClick`
+ *  scroll the right card into view when a mark in the article is clicked. */
+const clusterIdByFlag = computed(() => {
+  const m = new Map<string, string>()
+  for (const c of clusters.value) {
+    for (const v of c.flagViews) m.set(v.flag.id, c.id)
+  }
+  return m
+})
+
 const inlineCandidates = computed(() => {
   const m = new Map<string, string>()
   for (const v of visibleFlags.value) {
@@ -237,16 +288,21 @@ async function cancelPending(rid: string): Promise<void> {
   await session?.cancelResponse(rid)
 }
 
-function startPeek(flagId: string, e: PointerEvent): void {
-  const target = e.currentTarget as HTMLElement | null
-  if (target?.setPointerCapture) {
-    try { target.setPointerCapture(e.pointerId) } catch { /* ignore */ }
-  }
-  peekFlagId.value = flagId
+function hoverCard(flagId: string): void {
+  hoveredFlagId.value = flagId
 }
 
-function endPeek(): void {
-  peekFlagId.value = null
+function leaveCard(flagId: string): void {
+  if (hoveredFlagId.value === flagId) hoveredFlagId.value = null
+  if (previewFlagId.value === flagId) previewFlagId.value = null
+}
+
+function startPreview(flagId: string): void {
+  previewFlagId.value = flagId
+}
+
+function endPreview(flagId: string): void {
+  if (previewFlagId.value === flagId) previewFlagId.value = null
 }
 
 function selectFlag(id: string): void {
@@ -255,9 +311,10 @@ function selectFlag(id: string): void {
 
 function onFlagClick(id: string): void {
   selectedFlagId.value = id
-  // Scroll its annotation into view too.
+  // Scroll the cluster card containing this flag into view.
   nextTick(() => {
-    const el = annotationRefs.value.get(id)
+    const cid = clusterIdByFlag.value.get(id) ?? id
+    const el = annotationRefs.value.get(cid)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   })
 }
@@ -296,8 +353,20 @@ async function recomputeLayout(): Promise<void> {
   await nextTick()
   if (!articleViewRef.value) return
   const positions = articleViewRef.value.getMarkPositions()
-  const ordered = visibleFlags.value
-    .map((v) => ({ id: v.flag.id, rawTop: positions.get(v.flag.id) }))
+
+  // Position by cluster, not by individual flag. The cluster's anchor row
+  // is the topmost mark among its members (clusters are tiny - typically
+  // 2-3 flags - so a min-scan is cheap).
+  const ordered = clusters.value
+    .map((c) => {
+      let rawTop: number | undefined
+      for (const v of c.flagViews) {
+        const t = positions.get(v.flag.id)
+        if (t === undefined) continue
+        if (rawTop === undefined || t < rawTop) rawTop = t
+      }
+      return { id: c.id, rawTop }
+    })
     .filter((o): o is { id: string; rawTop: number } => o.rawTop !== undefined)
     .sort((a, b) => a.rawTop - b.rawTop)
 
@@ -325,10 +394,11 @@ function onLayoutReady(): void {
   nextTick(() => recomputeLayout())
 }
 
-watch(visibleFlags, () => {
-  // When flag list changes (resolved, added), positions change. Two-pass
-  // matches onLayoutReady - the second pass catches measurements that
-  // settled after the first paint (chips reflowing, content streaming in).
+watch(clusters, () => {
+  // When cluster list changes (flag added, resolved, regrouped), positions
+  // change. Two-pass matches onLayoutReady - the second pass catches
+  // measurements that settled after the first paint (chips reflowing,
+  // content streaming in).
   nextTick(() => {
     recomputeLayout()
     nextTick(() => recomputeLayout())
@@ -630,7 +700,8 @@ function dismissShare(): void {
             :flags="articleFlags"
             :selected-flag-id="selectedFlagId"
             :candidates="inlineCandidates"
-            :peek-flag-id="peekFlagId"
+            :preview-flag-id="previewFlagId"
+            :hovered-flag-id="hoveredFlagId"
             :paragraphs="paragraphs"
             :density="density"
             @flag-click="onFlagClick"
@@ -644,106 +715,135 @@ function dismissShare(): void {
           </p>
 
           <article
-            v-for="v in visibleFlags"
-            :key="v.flag.id"
-            :ref="(el) => setAnnotationRef(v.flag.id, el as Element | null)"
+            v-for="c in clusters"
+            :key="c.id"
+            :ref="(el) => setAnnotationRef(c.id, el as Element | null)"
             class="annot"
-            :data-flag-id="v.flag.id"
-            :data-state="v.state"
-            :data-rung="v.flag.rung ?? 1"
-            :class="{ selected: selectedFlagId === v.flag.id }"
-            :style="{
-              top: (finalTops.get(v.flag.id) ?? 0) + 'px',
-              visibility: finalTops.has(v.flag.id) ? 'visible' : 'hidden',
+            :class="{
+              cluster: c.flagViews.length > 1,
+              'has-selected': selectedFlagId !== null && c.flagViews.some((v) => v.flag.id === selectedFlagId),
             }"
-            @click="selectFlag(v.flag.id)"
+            :data-cluster-id="c.id"
+            :data-cluster-size="c.flagViews.length"
+            :style="{
+              top: (finalTops.get(c.id) ?? 0) + 'px',
+              visibility: finalTops.has(c.id) ? 'visible' : 'hidden',
+            }"
           >
-            <header class="ann-head">
-              <span :class="['rung-pill', `rung-${v.flag.rung ?? 1}`]" :title="rungName(v.flag.rung)">
-                {{ rungLabel(v.flag.rung) }}
-              </span>
-              <span class="pattern" :title="v.flag.patternId">{{ v.flag.patternId }}</span>
-              <span :class="['state-badge', `state-${v.state}`]">{{ v.state }}</span>
+            <header v-if="c.flagViews.length > 1" class="cluster-head">
+              <span class="cluster-count">{{ c.flagViews.length }} flags here</span>
+              <span class="cluster-hint">overlapping spans</span>
             </header>
 
-            <p v-if="v.flag.rationale" class="rationale">{{ v.flag.rationale }}</p>
+            <section
+              v-for="(v, idx) in c.flagViews"
+              :key="v.flag.id"
+              class="annot-card"
+              :data-flag-id="v.flag.id"
+              :data-state="v.state"
+              :data-rung="v.flag.rung ?? 1"
+              :class="{
+                selected: selectedFlagId === v.flag.id,
+                hovered: hoveredFlagId === v.flag.id,
+                stacked: idx > 0,
+              }"
+              @click="selectFlag(v.flag.id)"
+              @mouseenter="hoverCard(v.flag.id)"
+              @mouseleave="leaveCard(v.flag.id)"
+            >
+              <header class="ann-head">
+                <span :class="['rung-pill', `rung-${v.flag.rung ?? 1}`]" :title="rungName(v.flag.rung)">
+                  {{ rungLabel(v.flag.rung) }}
+                </span>
+                <span class="pattern" :title="v.flag.patternId">{{ v.flag.patternId }}</span>
+                <span :class="['state-badge', `state-${v.state}`]">{{ v.state }}</span>
+              </header>
 
-            <!-- AWAITING-ACCEPT: candidate-aware row -->
-            <div v-if="v.state === 'awaiting' && v.candidate" class="awaiting-row">
-              <button
-                type="button"
-                class="primary"
-                @click.stop="accept(v.flag.id)"
-              >accept</button>
-              <button
-                type="button"
-                class="peek"
-                @pointerdown.stop="startPeek(v.flag.id, $event)"
-                @pointerup.stop="endPeek()"
-                @pointercancel.stop="endPeek()"
-              >hold to see original</button>
-              <button type="button" class="quiet" @click.stop="discard(v.flag.id)">discard</button>
-              <span v-if="v.candidate.modelTag" class="model-tag">via {{ v.candidate.modelTag }}</span>
-            </div>
+              <p v-if="v.flag.rationale" class="rationale">{{ v.flag.rationale }}</p>
 
-            <!-- PENDING -->
-            <div v-else-if="v.state === 'pending' && v.pendingResponse" class="pending-row">
-              <span class="thinking"><span class="spinner" /> agent thinking…</span>
-              <span class="directive">
-                <span class="kind">{{ v.pendingResponse.kind }}</span>
-                <span v-if="v.pendingResponse.body">"{{ v.pendingResponse.body }}"</span>
-              </span>
-              <button type="button" class="quiet small" @click.stop="cancelPending(v.pendingResponse.id)">cancel</button>
-            </div>
-
-            <!-- STUCK -->
-            <p v-else-if="v.state === 'stuck' && v.stuckResponse" class="stuck-row">
-              <span class="lbl">agent stuck</span>
-              <span v-if="v.stuckResponse.stuckReason" class="reason">- {{ v.stuckResponse.stuckReason }}</span>
-            </p>
-
-            <!-- Universal directive UI: chips + free input + skip/keep/let-me-try -->
-            <div class="directive-ui" @click.stop>
-              <div class="chips">
-                <button
-                  v-for="s in SHORTCUTS"
-                  :key="s"
-                  type="button"
-                  class="chip"
-                  @click="submitShortcut(v.flag.id, s)"
-                >{{ s }}</button>
+              <!-- AWAITING-ACCEPT: visible candidate + accept/discard.
+                   Hovering the candidate text previews it inline in the article. -->
+              <div v-if="v.state === 'awaiting' && v.candidate" class="awaiting-block">
+                <div
+                  class="candidate"
+                  :class="{ 'is-previewing': previewFlagId === v.flag.id }"
+                  title="hover to preview in the article"
+                  @mouseenter.stop="startPreview(v.flag.id)"
+                  @mouseleave.stop="endPreview(v.flag.id)"
+                >
+                  <span class="candidate-label">replacement</span>
+                  <span class="candidate-text">{{ v.candidate.post }}</span>
+                </div>
+                <div class="awaiting-row">
+                  <button
+                    type="button"
+                    class="primary"
+                    @click.stop="accept(v.flag.id)"
+                  >accept</button>
+                  <button type="button" class="quiet" @click.stop="discard(v.flag.id)">discard</button>
+                  <span v-if="v.candidate.modelTag" class="model-tag">via {{ v.candidate.modelTag }}</span>
+                </div>
               </div>
-              <form class="free" @submit.prevent="submitFreeDirective(v.flag.id)">
-                <input
-                  v-model="directiveInput[v.flag.id]"
-                  type="text"
-                  :placeholder="v.state === 'awaiting' ? 'nudge…' : 'custom directive…'"
-                />
-                <button type="submit" :disabled="!directiveInput[v.flag.id]?.trim()">send</button>
-              </form>
-              <div class="meta-row">
-                <button
-                  type="button"
-                  class="link"
-                  @click="letMeTryOpen[v.flag.id] = !letMeTryOpen[v.flag.id]"
-                >{{ letMeTryOpen[v.flag.id] ? 'cancel' : 'let me try…' }}</button>
-                <span class="spacer" />
-                <button type="button" class="link" @click="skip(v.flag.id)">skip</button>
-                <button type="button" class="link" @click="keep(v.flag.id)">keep deliberate</button>
+
+              <!-- PENDING -->
+              <div v-else-if="v.state === 'pending' && v.pendingResponse" class="pending-row">
+                <span class="thinking"><span class="spinner" /> agent thinking…</span>
+                <span class="directive">
+                  <span class="kind">{{ v.pendingResponse.kind }}</span>
+                  <span v-if="v.pendingResponse.body">"{{ v.pendingResponse.body }}"</span>
+                </span>
+                <button type="button" class="quiet small" @click.stop="cancelPending(v.pendingResponse.id)">cancel</button>
               </div>
-              <form
-                v-if="letMeTryOpen[v.flag.id]"
-                class="free let-me-try"
-                @submit.prevent="submitLetMeTry(v.flag.id)"
-              >
-                <input
-                  v-model="letMeTryInput[v.flag.id]"
-                  type="text"
-                  placeholder="paste your replacement"
-                />
-                <button type="submit" :disabled="!letMeTryInput[v.flag.id]">apply</button>
-              </form>
-            </div>
+
+              <!-- STUCK -->
+              <p v-else-if="v.state === 'stuck' && v.stuckResponse" class="stuck-row">
+                <span class="lbl">agent stuck</span>
+                <span v-if="v.stuckResponse.stuckReason" class="reason">- {{ v.stuckResponse.stuckReason }}</span>
+              </p>
+
+              <!-- Universal directive UI: chips + free input + skip/keep/let-me-try -->
+              <div class="directive-ui" @click.stop>
+                <div class="chips">
+                  <button
+                    v-for="s in SHORTCUTS"
+                    :key="s"
+                    type="button"
+                    class="chip"
+                    @click="submitShortcut(v.flag.id, s)"
+                  >{{ s }}</button>
+                </div>
+                <form class="free" @submit.prevent="submitFreeDirective(v.flag.id)">
+                  <input
+                    v-model="directiveInput[v.flag.id]"
+                    type="text"
+                    :placeholder="v.state === 'awaiting' ? 'nudge…' : 'custom directive…'"
+                  />
+                  <button type="submit" :disabled="!directiveInput[v.flag.id]?.trim()">send</button>
+                </form>
+                <div class="meta-row">
+                  <button
+                    type="button"
+                    class="link"
+                    @click="letMeTryOpen[v.flag.id] = !letMeTryOpen[v.flag.id]"
+                  >{{ letMeTryOpen[v.flag.id] ? 'cancel' : 'let me try…' }}</button>
+                  <span class="spacer" />
+                  <button type="button" class="link" @click="skip(v.flag.id)">skip</button>
+                  <button type="button" class="link" @click="keep(v.flag.id)">keep deliberate</button>
+                </div>
+                <form
+                  v-if="letMeTryOpen[v.flag.id]"
+                  class="free let-me-try"
+                  @submit.prevent="submitLetMeTry(v.flag.id)"
+                >
+                  <input
+                    v-model="letMeTryInput[v.flag.id]"
+                    type="text"
+                    placeholder="paste your replacement"
+                  />
+                  <button type="submit" :disabled="!letMeTryInput[v.flag.id]">apply</button>
+                </form>
+              </div>
+            </section>
           </article>
         </aside>
       </main>
@@ -1365,12 +1465,46 @@ function dismissShare(): void {
   font-size: 0.9rem;
 }
 
-/* An annotation is a self-contained card; it holds excerpt/rationale,     */
-/* state-specific affordances, and the universal directive UI.             */
+/* The annotation wrapper holds one or more flag cards. Single-flag clusters */
+/* render as one `.annot-card` styled identically to the pre-clustering      */
+/* cards; multi-flag clusters get a thin dashed left rail and a header band  */
+/* so the eye reads "these belong together" without losing per-flag detail. */
 .annot {
   position: absolute;
   left: 0;
   right: 0;
+  transition: top 180ms ease;
+}
+.annot.cluster {
+  padding-left: 0.55rem;
+  border-left: 2px dashed var(--rule);
+}
+.annot.cluster.has-selected {
+  border-left-color: var(--text);
+}
+
+.cluster-head {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  margin: 0 0 0.4rem;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.cluster-count {
+  color: var(--text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.cluster-hint {
+  font-style: italic;
+}
+
+/* Per-flag card. Visual treatment matches the pre-clustering single card. */
+.annot-card {
+  position: relative;
   min-height: 120px;
   border: 1px solid var(--rule);
   border-left-width: 3px;
@@ -1380,21 +1514,28 @@ function dismissShare(): void {
   font-size: 0.86rem;
   line-height: 1.45;
   cursor: pointer;
-  transition: top 180ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  transition: box-shadow 120ms ease, border-color 120ms ease;
 }
-.annot[data-rung="1"] { border-left-color: #2f8f6a; }
-.annot[data-rung="2"] { border-left-color: #b88f3e; }
-.annot[data-rung="3"] { border-left-color: #b8472d; }
-.annot[data-state="awaiting"] {
+.annot-card.stacked {
+  margin-top: 0.5rem;
+}
+.annot-card[data-rung="1"] { border-left-color: #2f8f6a; }
+.annot-card[data-rung="2"] { border-left-color: #b88f3e; }
+.annot-card[data-rung="3"] { border-left-color: #b8472d; }
+.annot-card[data-state="awaiting"] {
   box-shadow: 0 0 0 2px color-mix(in srgb, #2f8f6a 20%, transparent);
 }
-.annot[data-state="stuck"] {
+.annot-card[data-state="stuck"] {
   box-shadow: 0 0 0 2px color-mix(in srgb, #b8472d 18%, transparent);
 }
-.annot[data-state="pending"] { opacity: 0.92; }
-.annot.selected {
+.annot-card[data-state="pending"] { opacity: 0.92; }
+.annot-card.selected {
   border-color: var(--text);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 18%, transparent);
+}
+.annot-card.hovered {
+  border-color: var(--text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
 }
 
 .ann-head {
@@ -1446,14 +1587,54 @@ function dismissShare(): void {
   line-height: 1.4;
 }
 
-/* State rows: replace the WAS/NOW diff with a single accept-row, since   */
-/* the candidate is now visible inline in the article itself.             */
+/* The candidate-aware block: a visible quoted preview of the proposed text
+ * (hover it to render the candidate inline in the article) plus the accept/
+ * discard row underneath. Default is original-text-in-article; the candidate
+ * only flows into the prose while the writer is hovering it here.           */
+.awaiting-block {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 0.55rem;
+}
+.candidate {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid color-mix(in srgb, #2f8f6a 30%, var(--rule));
+  border-left-width: 3px;
+  border-left-color: #2f8f6a;
+  border-radius: 4px;
+  background: color-mix(in srgb, #2f8f6a 6%, var(--bg));
+  cursor: help;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.candidate:hover,
+.candidate.is-previewing {
+  background: color-mix(in srgb, #2f8f6a 14%, var(--bg));
+  border-color: #2f8f6a;
+}
+.candidate-label {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #2f8f6a;
+  font-weight: 600;
+}
+.candidate-text {
+  font-family: var(--font-prose);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  word-break: break-word;
+}
 .awaiting-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  margin: 0 0 0.55rem;
 }
 .awaiting-row .model-tag {
   font-family: var(--font-mono);
@@ -1592,7 +1773,7 @@ function dismissShare(): void {
 }
 .meta-row .link:hover { color: var(--text); border-bottom-color: var(--rule); }
 
-/* The accept / hold-to-see-original / discard cluster. */
+/* The accept / discard cluster. */
 .awaiting-row button {
   font-family: var(--font-ui);
   font-size: 0.8rem;
@@ -1610,14 +1791,6 @@ function dismissShare(): void {
   font-weight: 600;
 }
 .awaiting-row button.primary:hover { background: #1f7058; border-color: #1f7058; }
-.awaiting-row button.peek {
-  background: var(--code-bg);
-  user-select: none;
-  touch-action: none;
-}
-.awaiting-row button.peek:active {
-  background: color-mix(in srgb, #b8472d 18%, var(--code-bg));
-}
 .awaiting-row button.quiet { color: var(--muted); }
 .awaiting-row button:not(:disabled):hover { border-color: var(--text); }
 

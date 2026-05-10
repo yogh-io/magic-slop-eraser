@@ -5,8 +5,7 @@ export const patterns: PatternMeta[] = [
   {
     id: 'tier1-lexicon',
     category: 'lexical',
-    name: 'Tier 1 lexicon',
-    shortName: 'Tier 1',
+    name: 'Rich Tapestry',
     severity: 'high',
     scope: 'word',
     rung: 1,
@@ -42,7 +41,7 @@ The model reaches for them not because they describe anything but because they w
   {
     id: 'throat-clearing',
     category: 'lexical',
-    name: 'Throat-clearing openers',
+    name: 'Throat-clearing',
     severity: 'high',
     scope: 'phrase',
     rung: 1,
@@ -75,7 +74,7 @@ A real writer does not say "importantly." The word "importantly" is the writer a
   {
     id: 'closers',
     category: 'lexical',
-    name: 'Closer phrases',
+    name: 'Empty Outro',
     severity: 'high',
     scope: 'phrase',
     rung: 1,
@@ -105,7 +104,7 @@ A kicker is the moment a piece's argument lands and the line lands with it. The 
   {
     id: 'suffocation',
     category: 'lexical',
-    name: 'Suffocation',
+    name: 'Hedge Suffocation',
     severity: 'primary',
     scope: 'sentence',
     rung: 1,
@@ -196,19 +195,22 @@ The trick of the form is that it gestures at meaning without committing any. The
     scope: 'sentence',
     rung: 2,
     blurb:
-      'Load-bearing claims that turn on what no one is doing, has done, can do, or will say.',
+      'Load-bearing claims that hide the actor - either by negation over an unnamed population, or by replacing the actor with an abstract noun.',
     essay: `The kicker no agent catches, no editor quite flags, and no detector ever knows how to name - the move depends on a population the line itself has refused to enumerate. "The deal no mediator can broker." "The framework no administration has built." "The plan whose authors have never put their names to it."
 
-It feels devastating because it sounds like the writer has gone past the available evidence to a conclusion so universal that no mere person could carry it. In fact the writer has named no mediators, listed no administrations, declined to specify any aims. The line is loadbearing on a population the line itself has refused to enumerate. Works as mood. Collapses if you ask, gently, "which mediators?" The reader who knows the trick reads the line the way a mechanic listens to a misfire.`,
+It feels devastating because it sounds like the writer has gone past the available evidence to a conclusion so universal that no mere person could carry it. In fact the writer has named no mediators, listed no administrations, declined to specify any aims. The line is loadbearing on a population the line itself has refused to enumerate. Works as mood. Collapses if you ask, gently, "which mediators?" The reader who knows the trick reads the line the way a mechanic listens to a misfire.
+
+The same trick plays in a second key: instead of negating the actor, replace them with an abstract noun. "The architecture rewards short-term thinking." "The system tolerates the shortfall." "The dynamic produces this outcome." Each sentence has a subject that registers as systems thinking, but no actor has been named. The writer has not had to say who built the architecture, who tolerates the shortfall, or whose interest the dynamic serves. The literary equivalent of "mistakes were made" - true at some level of abstraction, useless at the level where the question lives.`,
     whyItsSlop:
-      'The move works by universal negation over an unnamed population: "the deal no mediator can broker," "a strategy nobody will name," "the framework no administration has built." The author\'s exasperation at a conspicuous absence gets smuggled in as the claim itself - the reader cannot test "no mediator" against anything because the line names no mediators. Especially reflexive as a closing or kicker device.',
-    fix: 'Reframe affirmatively. State what IS, not what is not. The hard question: what positive claim is this absence-line trying to make? Make that claim directly. Swapping "no one" for "no President" is the same shape with a label - that does not count as a fix.',
+      'Two mechanisms, one harm: the actor has been disappeared. (1) Universal negation over an unnamed population - "the deal no mediator can broker," "the framework no administration has built." (2) Abstract noun as agent - "the architecture rewards X," "the system tolerates Y." Both read as systems-level analysis without committing to anyone in particular. The author\'s exasperation at a conspicuous absence gets smuggled in as the claim itself. Especially reflexive as a closing or kicker device.',
+    fix: 'Name the actor. For negation-shapes: reframe affirmatively, state what IS, not what is not. For abstract-noun-as-agent: ask who built the architecture, who runs the system, whose interest the dynamic serves, and put that there. Swapping "no one" for "no President," or "the system" for "the regime" - that is the same shape with a label, not a fix.',
     subShapes: [
       'Impossibility-via-negation: "X that no Y can Z"',
       'Silent-room reveal: "the conclusion no administration will say out loud"',
       'Vacuum framing: "the architecture no one is developing"',
       'Cascading-absence list (reflexive): "No X, no Y, no Z" as mood music',
       'Never-variant: "a goal no administration has stated"',
+      'Abstract noun as agent: "the architecture rewards X," "the system tolerates Y," "the dynamic produces Z"',
     ],
     examples: [
       {
@@ -227,14 +229,22 @@ It feels devastating because it sounds like the writer has gone past the availab
         sloppy: 'There is no central authority distinct from the network it claims to manage.',
         better: 'The board answers to its members; it has no override.',
       },
+      {
+        sloppy: 'The architecture rewards short-term thinking.',
+        better: 'The bonus structure rewards short-term thinking.',
+      },
+      {
+        sloppy: 'The system tolerates the shortfall.',
+        better: 'The board has tolerated the shortfall for three quarters.',
+      },
     ],
     skipRule:
-      'Enumerated-against-template absences are legitimate ("The 2008 collapse produced the Dodd-Frank reforms. This crisis: no commission, no resignations, no new rules") - the rhetorical weight comes from the gap against a known expected sequence, and each clause is independently testable. Specific factual absences about named instruments ("no claw-back clause in the current contract") are also legitimate.',
+      'Enumerated-against-template absences are legitimate ("The 2008 collapse produced the Dodd-Frank reforms. This crisis: no commission, no resignations, no new rules") - the rhetorical weight comes from the gap against a known expected sequence, and each clause is independently testable. Specific factual absences about named instruments ("no claw-back clause in the current contract") are also legitimate. For the abstract-noun-as-agent shape: legitimate when the surrounding piece has named the actors and the abstraction is a productive shorthand for a system the writer has populated, or in technical/architectural prose where the noun is literally the system being discussed.',
   },
   {
     id: 'allusive-construct',
     category: 'structural',
-    name: 'Allusive construct',
+    name: 'Cold-Read Collapse',
     severity: 'primary',
     scope: 'sentence',
     rung: 2,
@@ -343,7 +353,7 @@ The form announces "I have considered every relevant party" while delivering the
   {
     id: 'kicker-paraphrase',
     category: 'structural',
-    name: 'Kicker paraphrase',
+    name: 'In Other Words',
     severity: 'high',
     scope: 'paragraph',
     rung: 3,
@@ -372,46 +382,12 @@ The model produces this because it has been trained that explanations require re
     skipRule:
       'Legitimate when the next paragraph genuinely picks up from the kicker to extend it - introduces a new claim, a counter-example, a complication. The flag is the same idea in different drag, especially when the second version is more abstract or less specific than the kicker - that almost always means the model is restating, not advancing.',
   },
-  {
-    id: 'abstract-actor',
-    category: 'structural',
-    name: 'Abstract actor',
-    severity: 'high',
-    scope: 'piece',
-    rung: 3,
-    blurb:
-      'An abstract noun - the architecture, the system, the dynamic - used as the grammatical agent of a sentence so the writer does not have to name who is doing what.',
-    essay: `The architecture rewards short-term thinking. The system tolerates the shortfall. The dynamic produces this outcome. Each sentence has a subject that is structurally correct, that registers as systems thinking, and that commits to nothing - because no actor is named. The writer has not had to say who built the architecture, who tolerates the shortfall, or whose interest the dynamic serves.
-
-When a piece has earned the personification - the abstract noun is genuinely the through-line and the surrounding prose has done the work of naming actors elsewhere - the construction is fine. The abstract noun has earned the right to act because the writer has already said who is behind it; the abstraction is then a productive shorthand. When the piece has not earned it, the personification is hiding the actors. The literary equivalent of "mistakes were made" - true at some level of abstraction, useless at the level where the question lives.
-
-The model loves this construction because it is grammatically clean, registers as analysis, and dodges the uncomfortable next step of naming names. Sustained, it becomes the through-line that keeps the question of agency entirely off the page.`,
-    whyItsSlop:
-      'An abstract noun as the agent of a sentence is doing two things at once: it produces the cadence of systems thinking, and it spares the writer from naming who is doing what. The model defaults to it because it is safe and reads like analysis. Sustained, it becomes the trick of the piece - structural facts everywhere, agents nowhere.',
-    fix: 'Name the actor. Who built the architecture? Who keeps it that way? Whose interest does it serve? Sometimes the answer is "no one in particular" and the abstract noun is genuinely the right level - but only after the question has been asked. Without that step, the abstraction is hiding it.',
-    examples: [
-      {
-        sloppy: 'The architecture rewards short-term thinking.',
-        better: 'The bonus structure rewards short-term thinking.',
-      },
-      {
-        sloppy: 'The system tolerates the shortfall.',
-        better: 'The board has tolerated the shortfall for three quarters.',
-      },
-      {
-        sloppy: 'The dynamic produces this outcome again and again.',
-        better: 'Procurement and engineering have run the same fight every year since 2019.',
-      },
-    ],
-    skipRule:
-      'Legitimate when the piece has earned the personification - the surrounding prose has named the actors and the abstract noun is a productive shorthand for a system that has already been populated. Also fine in technical/architectural prose where the noun is literally the system being discussed (a software architecture, a payment system). The flag is the reflexive use, where the abstract noun is doing the agent\'s work because the writer has not named one.',
-  },
 
   // ---- ARGUMENTATIVE ----
   {
     id: 'hedged-confidence',
     category: 'argumentative',
-    name: 'Hedged confidence',
+    name: 'Confidence Mush',
     severity: 'high',
     scope: 'sentence',
     rung: 2,
@@ -514,18 +490,20 @@ The model is, by training, allergic to commitment - any side it picks could be t
   {
     id: 'redundant-abstraction',
     category: 'argumentative',
-    name: 'Redundant abstraction',
+    name: 'Blurred Focus',
     severity: 'high',
     scope: 'sentence',
     rung: 3,
     blurb:
-      'A structural claim stated abstractly when the concrete version of the same claim is already on the page elsewhere.',
-    essay: `Two paragraphs upstream, the writer said the specific thing: "The minister phoned the embassy three times that week and asked the ambassador to delay the announcement." Concrete, dated, falsifiable, useful. Then later, in a different paragraph, the same content shows up in abstract drag: "There is no diplomatic position distinct from the political one." The reader registers the second line as a thesis. It is not. It is a paraphrase of evidence the piece has already delivered.
+      'Restating a concrete claim in vaguer vocabulary. The crime is not to zoom out - it is to unfocus.',
+    essay: `Two paragraphs upstream, the writer said the specific thing: "The minister phoned the embassy three times that week and asked the ambassador to delay the announcement." Concrete, dated, falsifiable. Then later, in a different paragraph, the same content shows up softened: "There is no diplomatic position distinct from the political one." The reader registers the second line as a thesis. It is not. It is the same claim with the focus dropped.
 
-This is what people sometimes call absent-actor and shrug at. It is not absent-actor. The actor is named upstream. The harm is the duplicate - the abstraction floating loose where the concrete version was already doing the work. A real abstract claim earns its abstraction by reaching further than the concrete instance: covering more cases, sharper category, cleaner reading. The slop abstraction reaches no further; it just sits at altitude where the concrete sits at street level.`,
+Be clear: zooming out from concrete to abstract is one of the most powerful moves in non-fiction writing, and when it is done right it sharpens the picture rather than blurring it. A good abstraction widens the aperture *and* keeps the lens in focus - it covers cases beyond the concrete instance, names a category that organises a set of specifics, arrives at a structural reading the concrete is then evidence for. That is the move to reach for. Done well, the abstract sentence is doing more work than any single concrete one could; the reader sees further because the writer climbed.
+
+The slop version looks identical from the cadence side and does none of this work. Blurred focus does not widen the aperture; it just blurs the lens. Same scope, vaguer vocabulary, no ground covered that the concrete was not already covering. The crime is not to zoom out. The crime is to unfocus. The model produces this because it is trained to vary phrasing and to summarise; it offers a softened paraphrase next to the concrete and dresses it as a thesis. The reader feels the cadence of insight without receiving any.`,
     whyItsSlop:
-      'The model is trained to vary phrasing and to summarise. When the concrete version is already in the piece, the abstract version is doing nothing - it reads like a thesis line because it has the shape of one, but the concrete version is the load-bearing claim. Two passes over the same content is one pass too many.',
-    fix: 'Cut the abstract version. Keep the concrete one. If the abstraction is genuinely a stronger claim - covers more cases, makes a cleaner category - keep the abstract version and use the concrete one as the example that anchors it. One of the two has to go.',
+      'Real abstraction zooms out - it covers cases beyond the concrete instance, names a category, organises multiple specifics into one claim. Soft-focus restatement does none of this: same scope, fuzzier words. The abstract version reads like a thesis (cadence, gravitas, register) but the concrete version was already doing the thesis work; the blurred-focus pass just restates it through a softer lens. Filler dressed as substance.',
+    fix: 'Cut. The concrete version is doing the load-bearing work; the blurred-focus restatement is filler. The test: does removing the abstraction lose a generalisation, or lose nothing? If it loses a generalisation - the abstraction was genuinely zooming out, organising multiple instances - keep the abstraction and let the concrete be the example that anchors it. If it loses nothing, the line was blurred focus.',
     examples: [
       {
         sloppy: 'There is no American position distinct from the Israeli one.',
@@ -537,7 +515,7 @@ This is what people sometimes call absent-actor and shrug at. It is not absent-a
       },
     ],
     skipRule:
-      'Legitimate when the abstract claim genuinely reaches further than the concrete one - covers more cases, cleaner category, or arrives at a structural reading that the concrete instance is then evidence for. The flag is the abstract version that is just the concrete one in vaguer drag, with the concrete one already doing the work elsewhere on the page.',
+      'Legitimate when the abstraction zooms out - names a category that organises multiple instances, generalises beyond the specific concrete claim, or arrives at a structural reading the concrete is then evidence for. The flag is restatement at lower resolution: same content, vaguer words, no ground covered that was not already on the page. When in doubt, run the cut-test - if removing the abstract line loses nothing, it was blurred focus.',
   },
   {
     id: 'lens-fits-everything',

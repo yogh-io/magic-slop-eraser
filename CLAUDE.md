@@ -35,7 +35,7 @@ The numbering is **layer, not order**. An agent or author picks the entry rung b
 - **Scope**: the piece as a piece. The question is whether its substance - the actual arguments, values, internal merits of what is being said - is coming through to the reader. Frame stacking buries the thesis under preamble; performative balance dilutes the position into nothing; header inflation pads scaffolding where the argument should carry weight. These are the moves a chief editor catches on the second read.
 - **Fix**: substantial rewrite focused on what the piece is *saying*, not just where it sits on the page. Outside the scope of an autonomous fixer. Slopmop flags positions where the presentation of the content needs reworking and gets out of the way.
 - **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the drafter reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the drafter drafts the prose, the author re-directs. The relevant references in `` are `.claude/commands/workshop.md` (interactive multi-pass diagnostic + author-driven rewriting) and `.claude/commands/chief-edit.md` (the ship gate / blurb / preamble drafter). Rung 3 in slopmop is positioned as the entry point to that kind of workflow.
-- **Patterns currently here**: `frame-stacking`, `kicker-paraphrase`, `abstract-actor`, `redundant-abstraction`, `lens-fits-everything`, `header-inflation`.
+- **Patterns currently here**: `frame-stacking`, `kicker-paraphrase`, `redundant-abstraction`, `lens-fits-everything`, `header-inflation`.
 
 ## The loop: paired writing in batched turns
 

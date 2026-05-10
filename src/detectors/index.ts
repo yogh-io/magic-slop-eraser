@@ -22,7 +22,6 @@ export function severityFor(patternId: string): number {
     case 'throat-clearing':
     case 'vague-gravitas':
     case 'kicker-paraphrase':
-    case 'abstract-actor':
     case 'redundant-abstraction':
       return 0.8
     case 'enthusiasm-inflation':

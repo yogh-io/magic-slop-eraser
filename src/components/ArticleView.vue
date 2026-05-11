@@ -510,15 +510,6 @@ function onMouseUp(): void {
   stroke-width: 0.8;
   stroke-linejoin: round;
 }
-/* Vertical baseline (at x = LANE_WIDTH_PX) behind the silhouette. Bumps
- * obscure it; dents reveal it inside the lane, so the eye reads deflection
- * direction against a fixed reference. */
-.article-view :deep(.density-rail-baseline) {
-  stroke: var(--rail-color, var(--muted, #888));
-  stroke-width: 0.6;
-  stroke-opacity: 0.35;
-  vector-effect: non-scaling-stroke;
-}
 /* Gradient stops: the SVG <stop> elements inherit --rail-color from the
  * lane container (set per-axis by JS), so each lane fades to its own hue
  * inside paragraph rows and to the theme's muted colour in between. */

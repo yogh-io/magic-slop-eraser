@@ -1,5 +1,6 @@
 # --- Stage 1: build the Vue frontend with Bun ---
 FROM oven/bun:1.3-alpine AS frontend
+RUN apk add --no-cache git
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile

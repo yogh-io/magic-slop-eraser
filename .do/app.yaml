@@ -1,14 +1,16 @@
 name: slopmop
 region: ams
 domains:
-  - domain: slop.rip
+  - domain: slopmop.io
     type: PRIMARY
+  - domain: slop.rip
+    type: ALIAS
 services:
   - name: web
     dockerfile_path: Dockerfile
     source_dir: /
     github:
-      repo: yogh-io/slopmop
+      repo: yogh-io/magic-slop-eraser
       branch: main
       deploy_on_push: true
     instance_size_slug: basic-xxs
@@ -26,6 +28,9 @@ services:
       - key: STATIC_DIR
         scope: RUN_TIME
         value: /app/dist
+      - key: STORAGE_DIR
+        scope: RUN_TIME
+        value: /app/data
 
       # Persistence: DigitalOcean Spaces (S3-compatible). The S3Store backend
       # is selected when S3_BUCKET is set; STORAGE_DIR is then ignored. The

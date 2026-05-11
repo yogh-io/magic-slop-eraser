@@ -60,19 +60,17 @@ export const CANONICAL_AXES: ReadonlyArray<AxisMeta> = [
   },
 ]
 
-/** Visible width of a single lane column (px). Centerline runs through its
- *  middle; both edges deflect symmetrically away from (or into) the centerline
- *  per paragraph. */
+/** Visible width of a single lane column (px). Left edge is fixed at x=0;
+ *  the right edge is the wavy baseline that deflects per paragraph. */
 const LANE_WIDTH_PX = 14
-/** Horizontal gap between adjacent lane containers (px). Sized so two opposing
- *  max-positive bumps (one from lane i's right edge, one from lane i+1's left
- *  edge) never touch: 2 * MAX_PER_SIDE_PX + INNER_GAP_PX = 10. */
+/** Horizontal gap between adjacent lane containers (px). Sized so a max
+ *  outward bump from lane i's right edge clears lane i+1's left edge by
+ *  INNER_GAP_PX: MAX_DEPTH_PX + INNER_GAP_PX = LANE_GAP_PX. */
 const LANE_GAP_PX = 10
-/** Per-side amplitude of an outward bulge or inward dent (px). Symmetric:
- *  score=+10 pushes each edge 4px outward (lane widens by 8px total to 22px);
- *  score=-10 pulls each edge 4px inward (lane pinches by 8px to 6px wide).
- *  Mirror-image at any magnitude. */
-const MAX_PER_SIDE_PX = 4
+/** Max deflection depth of the right edge (px) per the v3.2 spec. Positive
+ *  score=+10 bumps the right edge 8px outward; negative score=-10 dents
+ *  it 8px inward (leaving a 6px sliver of lane material on the left). */
+const MAX_DEPTH_PX = 8
 /** Min buffer between two adjacent lanes' max-positive bumps. */
 const INNER_GAP_PX = 2
 /** Below this absolute score, the bump/dent isn't drawn at all - the
@@ -90,11 +88,13 @@ const TRANSITION_PX = 6
 
 /**
  * Walk the rendered article and paint a parallel set of vertical lanes in
- * the left gutter, one per axis. Each lane is a single SVG closed path with
- * BOTH edges wavy and mirrored around the lane's centerline: positive scores
- * push both edges outward (lane widens symmetrically, convex bulge); negative
- * scores pull both edges inward (lane pinches symmetrically, concave dent).
- * The deflection magnitude at each edge is `(score / 10) * MAX_PER_SIDE_PX`.
+ * the left gutter, one per axis. Each lane is a single SVG closed path: the
+ * left edge is straight at `x = 0`, the right edge is wavy at baseline
+ * `x = LANE_WIDTH_PX`. Positive scores bulge the right edge outward (convex
+ * bump past the baseline); negative scores cave it inward (concave dent
+ * into the lane). Deflection depth is `(score / 10) * MAX_DEPTH_PX`. A
+ * faint vertical baseline behind the silhouette gives the eye a fixed
+ * reference against which to read deflection direction.
  *
  * The lane fill uses a per-lane vertical linearGradient that fades from the
  * axis colour inside each paragraph row to a muted gray in the gaps between
@@ -203,6 +203,18 @@ export function applyDensityRails(
     defs.appendChild(buildLaneGradient(segments, trackTop, trackHeight, gradId))
     svg.appendChild(defs)
 
+    // Faint vertical baseline at x = LANE_WIDTH_PX so deflections read as
+    // "right of the line = bump, left of the line = dent" (v3.2 spec).
+    // Rendered behind the silhouette; the fill obscures it inside positive
+    // bumps, the dent reveals it inside the lane for negative scores.
+    const baseline = document.createElementNS(SVG_NS, 'line')
+    baseline.setAttribute('class', 'density-rail-baseline')
+    baseline.setAttribute('x1', String(LANE_WIDTH_PX))
+    baseline.setAttribute('y1', '0')
+    baseline.setAttribute('x2', String(LANE_WIDTH_PX))
+    baseline.setAttribute('y2', String(trackHeight))
+    svg.appendChild(baseline)
+
     const path = document.createElementNS(SVG_NS, 'path')
     path.setAttribute('d', pathD)
     path.setAttribute('class', 'density-rail-silhouette')
@@ -225,9 +237,9 @@ export function applyDensityRails(
       const score = typeof v === 'number' && Number.isFinite(v) ? v : null
 
       const rect = document.createElementNS(SVG_NS, 'rect')
-      rect.setAttribute('x', String(-MAX_PER_SIDE_PX))
+      rect.setAttribute('x', '0')
       rect.setAttribute('y', py_start.toString())
-      rect.setAttribute('width', String(LANE_WIDTH_PX + 2 * MAX_PER_SIDE_PX))
+      rect.setAttribute('width', String(LANE_WIDTH_PX + MAX_DEPTH_PX))
       rect.setAttribute('height', seg.height.toString())
       rect.setAttribute('fill', 'transparent')
       rect.dataset.axisKey = ax.key
@@ -268,13 +280,12 @@ export function applyDensityRails(
 }
 
 /**
- * Build the SVG path string for one lane's silhouette. The path is a closed
- * polygon: both the left edge (x=0 baseline) and the right edge (x=LANE_WIDTH
- * baseline) deflect through each paragraph row by a cubic Bezier, mirrored
- * around the lane's centerline. Positive scores push both edges outward (left
- * edge goes to negative x, right edge goes past LANE_WIDTH); negative scores
- * pull both edges inward toward the centerline. The lane visibly widens or
- * narrows at the paragraph row, symmetrically.
+ * Build the SVG path string for one lane's silhouette per the v3.2 spec.
+ * The path is a closed polygon: the left edge is straight at `x = 0`; the
+ * right edge is the wavy baseline at `x = LANE_WIDTH_PX` that deflects
+ * through each paragraph row by a cubic Bezier. Positive scores bulge the
+ * right edge outward (past LANE_WIDTH_PX); negative scores cave it inward
+ * (toward x = 0); near-zero scores keep it flat at baseline.
  */
 function buildLanePath(
   segments: ReadonlyArray<{ top: number; height: number; scores: DensityAxes }>,
@@ -285,44 +296,16 @@ function buildLanePath(
   const leftBase = 0
   const rightBase = LANE_WIDTH_PX
 
-  // Clockwise trace: top-left -> down left edge -> bottom-left -> bottom-right
-  // -> up right edge -> top-right -> close.
+  // Clockwise trace: top-left -> down straight left edge -> bottom-left ->
+  // bottom-right -> up wavy right edge -> top-right -> close.
   let path = `M ${leftBase} 0`
-
-  // Left edge: deflect outward (negative x) for positive scores, inward
-  // (positive x) for negative scores. Iterate top-down.
-  let lastY = 0
-  for (const seg of segments) {
-    const v = seg.scores[axisKey]
-    if (typeof v !== 'number' || !Number.isFinite(v)) continue
-    const py_start = seg.top - trackTop
-    const py_end = py_start + seg.height
-    if (py_start > lastY) path += ` L ${leftBase} ${py_start.toFixed(2)}`
-
-    if (Math.abs(v) < SPARSITY_SCORE) {
-      path += ` L ${leftBase} ${py_end.toFixed(2)}`
-      lastY = py_end
-      continue
-    }
-
-    const clamped = v > 10 ? 10 : v < -10 ? -10 : v
-    const d = (clamped / 10) * MAX_PER_SIDE_PX
-    // Left edge moves OPPOSITE the right edge so the deflection is mirrored:
-    // positive score -> peak_x_left = leftBase - d (outward, to the left).
-    const peakX = leftBase - BEZIER_PEAK_K * d
-    const ctrlY1 = py_start + (py_end - py_start) / 3
-    const ctrlY2 = py_start + (2 * (py_end - py_start)) / 3
-    path += ` C ${peakX.toFixed(2)} ${ctrlY1.toFixed(2)}, ${peakX.toFixed(2)} ${ctrlY2.toFixed(2)}, ${leftBase} ${py_end.toFixed(2)}`
-    lastY = py_end
-  }
-  if (lastY < trackHeight) path += ` L ${leftBase} ${trackHeight.toFixed(2)}`
-
-  // Bottom edge: bottom-left -> bottom-right.
+  path += ` L ${leftBase} ${trackHeight.toFixed(2)}`
   path += ` L ${rightBase} ${trackHeight.toFixed(2)}`
 
   // Right edge: iterate paragraphs bottom-up (reverse order) so the curve
-  // matches the clockwise trace direction. Positive score -> outward (right).
-  lastY = trackHeight
+  // matches the clockwise trace direction. Positive score -> outward (right);
+  // negative -> inward (left).
+  let lastY = trackHeight
   for (let i = segments.length - 1; i >= 0; i--) {
     const seg = segments[i]
     const v = seg.scores[axisKey]
@@ -338,7 +321,7 @@ function buildLanePath(
     }
 
     const clamped = v > 10 ? 10 : v < -10 ? -10 : v
-    const d = (clamped / 10) * MAX_PER_SIDE_PX
+    const d = (clamped / 10) * MAX_DEPTH_PX
     const peakX = rightBase + BEZIER_PEAK_K * d
     // Going UP (from py_end to py_start), so swap the y-ordering of control points.
     const ctrlY1 = py_end - (py_end - py_start) / 3

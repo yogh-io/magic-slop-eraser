@@ -218,7 +218,7 @@ slopmop catalogue > /tmp/slopmop-catalogue.json
 
 `{ categories, patterns }`. Each pattern carries `whyItsSlop`, `fix`, `examples` (sloppy / better pairs), `skipRule`, and often a long-form `essay`. That's your detection spec.
 
-**`skipRule` is a severity weight, not a skip.** It describes when the pattern shape is doing legitimate work, so you score it *lower* - not when to drop the flag from the walk. A flag that matches `skipRule` still gets posted, often at severity 0.1-0.3; the author reads the rationale and decides what to keep or discard. "Doesn't bite here" is a *low-severity* verdict, not a missing flag. Long manuscripts with broad deliberate devices (a novel's controlled voice, a critic's institutional vocabulary) tempt detection agents to treat shields as blanket immunity - resist that. The shield says "weigh carefully," not "look away."
+**`skipRule` is a severity weight, not a skip.** It describes when the pattern shape is doing legitimate work, so you score it *lower* - not when to drop the flag from the walk. A flag that matches `skipRule` still gets posted, often at severity 0.1-0.3; the author reads the rationale and decides what to keep or discard. "Doesn't bite here" is a *low-severity* verdict, not a missing flag. A piece with broad deliberate devices tempts detection agents to treat the shields as blanket immunity - resist that. The shield says "weigh carefully," not "look away."
 
 ### 1c. detect
 
@@ -477,7 +477,7 @@ For the full command list run `slopmop --help`. Body conventions for write comma
 
 - **All detection is yours.** Rung 1, 2, and 3 - the server doesn't read prose. The catalogue is the spec; you walk it.
 - **Detection walks blind; the voice memo enters at severity-weighting.** Don't seed detection subagents with the voice memo - it primes them to skip whole patterns. Detection sees catalogue + source. Voice memo lands in a separate severity-adjust pass on top of the flag set.
-- **Shields lower severity, they don't drop the flag.** `skipRule` and the voice memo describe when a pattern shape is doing legitimate work - that's a *low* number, not a missing flag. The author dismisses what doesn't bother them; you don't get to make that call. A 90k-word manuscript returning zero flags in a rung is a failed detection pass, not a clean piece.
+- **Shields lower severity, they don't drop the flag.** `skipRule` and the voice memo describe when a pattern shape is doing legitimate work - that's a *low* number, not a missing flag. The author dismisses what doesn't bother them; you don't get to make that call. Zero flags across a whole rung on a piece of any meaningful length is a failure signal, not a clean verdict - the shields swallowed the walk.
 - **Severity is your scoring vote.** Per-flag `severity` is the score. The voice memo informs the weight - a deliberate move scores low even if it matches a catalogued pattern (and the flag still posts). Don't autopilot the catalogue's nominal severity through; adjust per instance.
 - **The author shapes; you write.** Slopmop's loop is: you draft, author redirects via shape directives. Never ask the author to write the sentence.
 - **Pull, don't push.** The author submits directives whenever they want; you pull when you have capacity. The queue holds work for you - none of it is missed if you're slow.

@@ -185,7 +185,6 @@ export function applyDensityRails(
     const lane = document.createElement('div')
     lane.className = 'density-rail'
     lane.dataset.axis = ax.key
-    lane.title = ax.label
     lane.style.setProperty('--rail-color', `var(--rail-${ax.key}, var(--accent))`)
     if (!hasSignal(segments, ax.key)) lane.dataset.noSignal = '1'
 
@@ -464,9 +463,6 @@ function buildHeaders(
     h.className = 'density-rail-header'
     h.dataset.axis = ax.key
     h.style.setProperty('--rail-color', `var(--rail-${ax.key}, var(--accent))`)
-    // Native title kept as a fallback for non-mouse devices; the custom popover
-    // below takes over on hover for cursor users.
-    h.title = ax.description || ax.label
     const span = document.createElement('span')
     span.textContent = ax.label
     h.appendChild(span)

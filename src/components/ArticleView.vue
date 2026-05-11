@@ -289,14 +289,15 @@ function onMouseUp(): void {
 }
 
 /* Density rails: N parallel vertical lanes in the left gutter, one per     */
-/* axis. Each lane is an SVG silhouette - left edge straight at the lane's */
-/* baseline, right edge wavy. Convex bumps protrude outward at paragraphs */
-/* scoring positive against the internet-average baseline (0); concave    */
-/* dents cave inward at paragraphs scoring negative. Symmetric: |+6| and  */
-/* |-6| produce mirror-image deflections of equal depth. Colour carries   */
-/* axis identity (via --rail-color set per-lane by JS) so the rail is a   */
-/* literal silhouette of where the prose is above vs below ambient noise. */
-/* See docs/density-rail.md for the spec.                                 */
+/* axis. Each lane is an SVG silhouette with BOTH edges wavy and mirrored */
+/* around the lane centerline: positive scores push both edges outward    */
+/* (lane widens symmetrically, convex bulge); negative scores pull both   */
+/* edges inward (lane pinches symmetrically, concave dent). The fill is a */
+/* per-lane vertical linearGradient that fades from the axis colour       */
+/* inside each paragraph row to a muted gray in the gaps between, so the  */
+/* rail only carries colour where the score is actually measuring         */
+/* something. Inter-paragraph zones, headings, and top/bottom margins     */
+/* read as ambient noise. See docs/density-rail.md for the spec.          */
 .article-view :deep(.density-rails) {
   position: absolute;
   left: -8rem;
@@ -355,21 +356,24 @@ function onMouseUp(): void {
   flex-shrink: 0;
   overflow: visible;
 }
-/* Baseline: a faint vertical guide at the lane's natural right edge so the
- * writer can read deflections as "to the left of baseline = dent, to the
- * right = bump". Drawn behind the silhouette via z-stacking. */
-.article-view :deep(.density-rail::before) {
+/* Baseline guides: two faint vertical lines at the lane's left and right
+ * edges (both edges deflect now, so the writer needs both lines to read
+ * symmetric bulges/dents). Drawn behind the silhouette via z-stacking. */
+.article-view :deep(.density-rail::before),
+.article-view :deep(.density-rail::after) {
   content: '';
   position: absolute;
-  right: 0;
   top: 0;
   bottom: 0;
   width: 1px;
-  background: color-mix(in srgb, var(--rail-color, var(--accent)) 18%, transparent);
+  background: color-mix(in srgb, var(--rail-color, var(--accent)) 14%, transparent);
   z-index: 0;
 }
-.article-view :deep(.density-rail[data-no-signal="1"]::before) {
-  background: color-mix(in srgb, var(--muted) 16%, transparent);
+.article-view :deep(.density-rail::before) { left: 0; }
+.article-view :deep(.density-rail::after) { right: 0; }
+.article-view :deep(.density-rail[data-no-signal="1"]::before),
+.article-view :deep(.density-rail[data-no-signal="1"]::after) {
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
 }
 .article-view :deep(.density-rail-svg) {
   position: relative;
@@ -377,10 +381,19 @@ function onMouseUp(): void {
   pointer-events: none;
 }
 .article-view :deep(.density-rail-silhouette) {
-  fill: color-mix(in srgb, var(--rail-color, var(--accent)) 62%, transparent);
-  stroke: color-mix(in srgb, var(--rail-color, var(--accent)) 88%, transparent);
   stroke-width: 0.8;
   stroke-linejoin: round;
+}
+/* Gradient stops: the SVG <stop> elements inherit --rail-color from the
+ * lane container (set per-axis by JS), so each lane fades to its own hue
+ * inside paragraph rows and to the theme's muted colour in between. */
+.article-view :deep(.density-rail-stop-axis) {
+  stop-color: var(--rail-color, var(--accent));
+  stop-opacity: 0.7;
+}
+.article-view :deep(.density-rail-stop-muted) {
+  stop-color: var(--muted, #888);
+  stop-opacity: 0.18;
 }
 .article-view :deep(p.has-density-rail) {
   cursor: help;

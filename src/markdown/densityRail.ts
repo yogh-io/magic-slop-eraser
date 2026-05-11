@@ -25,21 +25,20 @@ export const CANONICAL_AXES: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'voice', label: 'voice' },
 ]
 
-/** Visible width of a single lane column (px). The silhouette's baseline
- *  sits at this lane's natural right edge; bumps extend right past it and
- *  dents cave left into the lane interior. */
+/** Visible width of a single lane column (px). Centerline runs through its
+ *  middle; both edges deflect symmetrically away from (or into) the centerline
+ *  per paragraph. */
 const LANE_WIDTH_PX = 14
-/** Horizontal gap between adjacent lane containers (px). Big enough that
- *  a max-positive bump from lane i can extend its full depth without
- *  touching lane i+1, with INNER_GAP_PX of buffer left over. */
+/** Horizontal gap between adjacent lane containers (px). Sized so two opposing
+ *  max-positive bumps (one from lane i's right edge, one from lane i+1's left
+ *  edge) never touch: 2 * MAX_PER_SIDE_PX + INNER_GAP_PX = 10. */
 const LANE_GAP_PX = 10
-/** Max amplitude of a bump (positive score) or a dent (negative score) in px.
- *  Symmetric: score=+10 produces an 8px outward bulge, score=-10 produces an
- *  8px inward dent. Picked so dents leave a visible sliver of lane material
- *  on the left even at the strongest negative score (14 - 8 = 6px left of
- *  the dent peak). */
-const MAX_DEPTH_PX = 8
-/** Min buffer kept between a bump's tip and the next lane's left edge. */
+/** Per-side amplitude of an outward bulge or inward dent (px). Symmetric:
+ *  score=+10 pushes each edge 4px outward (lane widens by 8px total to 22px);
+ *  score=-10 pulls each edge 4px inward (lane pinches by 8px to 6px wide).
+ *  Mirror-image at any magnitude. */
+const MAX_PER_SIDE_PX = 4
+/** Min buffer between two adjacent lanes' max-positive bumps. */
 const INNER_GAP_PX = 2
 /** Below this absolute score, the bump/dent isn't drawn at all - the
  *  paragraph reads as flat on this axis, anchored at the baseline. */
@@ -49,16 +48,24 @@ const SPARSITY_SCORE = 0.5
  *  the t=0.5 value of a cubic Bezier with P0.x=P3.x=baseline and
  *  P1.x=P2.x=peak_x:  x(0.5) = baseline + (3/4) * (peak_x - baseline). */
 const BEZIER_PEAK_K = 4 / 3
-/** Max effective depth (lane interior dent or outward bump) the silhouette
- *  may show even before per-axis scaling, used to size the SVG overflow box. */
+/** Fade distance between a paragraph's coloured zone and the muted-gray
+ *  inter-paragraph zone (px). Smooths the colour transition so the rail
+ *  reads as alive within paragraphs and quiet between them. */
+const TRANSITION_PX = 6
 
 /**
  * Walk the rendered article and paint a parallel set of vertical lanes in
- * the left gutter, one per axis. Each lane is a single SVG closed path: the
- * left edge is straight at x=0, the right edge is a wavy silhouette that
- * bulges outward (convex) at paragraphs scoring positive against the
- * internet-average baseline and caves inward (concave) at paragraphs
- * scoring negative. Length of bulge/dent encodes |score|/10 * MAX_DEPTH.
+ * the left gutter, one per axis. Each lane is a single SVG closed path with
+ * BOTH edges wavy and mirrored around the lane's centerline: positive scores
+ * push both edges outward (lane widens symmetrically, convex bulge); negative
+ * scores pull both edges inward (lane pinches symmetrically, concave dent).
+ * The deflection magnitude at each edge is `(score / 10) * MAX_PER_SIDE_PX`.
+ *
+ * The lane fill uses a per-lane vertical linearGradient that fades from the
+ * axis colour inside each paragraph row to a muted gray in the gaps between
+ * paragraphs and above headings - so the rail only carries colour where it
+ * encodes something. Inter-paragraph zones, headings, and top/bottom margins
+ * read as ambient noise.
  *
  * The scoring range is symmetric (-10..+10) with 0 as "internet-average".
  * Server clears legacy 0..10 scores on first read after the schema bump,
@@ -134,23 +141,23 @@ export function applyDensityRails(
   const lanesEl = document.createElement('div')
   lanesEl.className = 'density-rail-lanes'
 
+  // Per-render nonce so two rails on the same page (HMR, multiple docs in a
+  // future tab pane) don't clash on gradient IDs.
+  const nonce = Math.random().toString(36).slice(2, 8)
+  const SVG_NS = 'http://www.w3.org/2000/svg'
+
   for (const ax of axes) {
     const lane = document.createElement('div')
     lane.className = 'density-rail'
     lane.dataset.axis = ax.key
     lane.title = ax.label
     lane.style.setProperty('--rail-color', `var(--rail-${ax.key}, var(--accent))`)
-
-    // Quiet when an axis has no signal across the whole doc - lane renders
-    // as a thin baseline column only, no silhouette path.
-    if (!hasSignal(segments, ax.key)) {
-      lane.dataset.noSignal = '1'
-      lanesEl.appendChild(lane)
-      continue
-    }
+    if (!hasSignal(segments, ax.key)) lane.dataset.noSignal = '1'
 
     const pathD = buildLanePath(segments, trackTop, trackHeight, ax.key)
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    const gradId = `density-rail-grad-${ax.key}-${nonce}`
+
+    const svg = document.createElementNS(SVG_NS, 'svg')
     svg.setAttribute('class', 'density-rail-svg')
     svg.setAttribute('viewBox', `0 0 ${LANE_WIDTH_PX} ${trackHeight}`)
     svg.setAttribute('preserveAspectRatio', 'none')
@@ -158,9 +165,15 @@ export function applyDensityRails(
     svg.setAttribute('height', String(trackHeight))
     svg.style.overflow = 'visible'
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    const defs = document.createElementNS(SVG_NS, 'defs')
+    defs.appendChild(buildLaneGradient(segments, trackTop, trackHeight, gradId))
+    svg.appendChild(defs)
+
+    const path = document.createElementNS(SVG_NS, 'path')
     path.setAttribute('d', pathD)
     path.setAttribute('class', 'density-rail-silhouette')
+    path.setAttribute('fill', `url(#${gradId})`)
+    path.setAttribute('stroke', `url(#${gradId})`)
     svg.appendChild(path)
 
     lane.appendChild(svg)
@@ -174,9 +187,12 @@ export function applyDensityRails(
 
 /**
  * Build the SVG path string for one lane's silhouette. The path is a closed
- * polygon: straight left edge at x=0, wavy right edge that hovers at the
- * baseline (x=LANE_WIDTH) and deflects through each paragraph row by a
- * cubic Bezier whose midpoint sits at baseline + (score/10)*MAX_DEPTH.
+ * polygon: both the left edge (x=0 baseline) and the right edge (x=LANE_WIDTH
+ * baseline) deflect through each paragraph row by a cubic Bezier, mirrored
+ * around the lane's centerline. Positive scores push both edges outward (left
+ * edge goes to negative x, right edge goes past LANE_WIDTH); negative scores
+ * pull both edges inward toward the centerline. The lane visibly widens or
+ * narrows at the paragraph row, symmetrically.
  */
 function buildLanePath(
   segments: ReadonlyArray<{ top: number; height: number; scores: DensityAxes }>,
@@ -184,38 +200,161 @@ function buildLanePath(
   trackHeight: number,
   axisKey: string,
 ): string {
-  const baseline = LANE_WIDTH_PX
-  let path = `M 0 0 L ${baseline} 0`
-  let lastY = 0
+  const leftBase = 0
+  const rightBase = LANE_WIDTH_PX
 
+  // Clockwise trace: top-left -> down left edge -> bottom-left -> bottom-right
+  // -> up right edge -> top-right -> close.
+  let path = `M ${leftBase} 0`
+
+  // Left edge: deflect outward (negative x) for positive scores, inward
+  // (positive x) for negative scores. Iterate top-down.
+  let lastY = 0
   for (const seg of segments) {
     const v = seg.scores[axisKey]
     if (typeof v !== 'number' || !Number.isFinite(v)) continue
     const py_start = seg.top - trackTop
     const py_end = py_start + seg.height
-    if (py_start > lastY) path += ` L ${baseline} ${py_start.toFixed(2)}`
+    if (py_start > lastY) path += ` L ${leftBase} ${py_start.toFixed(2)}`
 
     if (Math.abs(v) < SPARSITY_SCORE) {
-      // Sparse: skip the bump, draw a flat segment through the paragraph.
-      path += ` L ${baseline} ${py_end.toFixed(2)}`
+      path += ` L ${leftBase} ${py_end.toFixed(2)}`
       lastY = py_end
       continue
     }
 
-    // Map score linearly onto MAX_DEPTH; clamp at +/- 10 so freak inputs
-    // can't push the silhouette outside the lane's overflow allowance.
     const clamped = v > 10 ? 10 : v < -10 ? -10 : v
-    const displacement = (clamped / 10) * MAX_DEPTH_PX
-    const peakX = baseline + BEZIER_PEAK_K * displacement
+    const d = (clamped / 10) * MAX_PER_SIDE_PX
+    // Left edge moves OPPOSITE the right edge so the deflection is mirrored:
+    // positive score -> peak_x_left = leftBase - d (outward, to the left).
+    const peakX = leftBase - BEZIER_PEAK_K * d
     const ctrlY1 = py_start + (py_end - py_start) / 3
     const ctrlY2 = py_start + (2 * (py_end - py_start)) / 3
-    path += ` C ${peakX.toFixed(2)} ${ctrlY1.toFixed(2)}, ${peakX.toFixed(2)} ${ctrlY2.toFixed(2)}, ${baseline} ${py_end.toFixed(2)}`
+    path += ` C ${peakX.toFixed(2)} ${ctrlY1.toFixed(2)}, ${peakX.toFixed(2)} ${ctrlY2.toFixed(2)}, ${leftBase} ${py_end.toFixed(2)}`
     lastY = py_end
   }
+  if (lastY < trackHeight) path += ` L ${leftBase} ${trackHeight.toFixed(2)}`
 
-  if (lastY < trackHeight) path += ` L ${baseline} ${trackHeight.toFixed(2)}`
-  path += ` L 0 ${trackHeight.toFixed(2)} Z`
+  // Bottom edge: bottom-left -> bottom-right.
+  path += ` L ${rightBase} ${trackHeight.toFixed(2)}`
+
+  // Right edge: iterate paragraphs bottom-up (reverse order) so the curve
+  // matches the clockwise trace direction. Positive score -> outward (right).
+  lastY = trackHeight
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i]
+    const v = seg.scores[axisKey]
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    const py_start = seg.top - trackTop
+    const py_end = py_start + seg.height
+    if (py_end < lastY) path += ` L ${rightBase} ${py_end.toFixed(2)}`
+
+    if (Math.abs(v) < SPARSITY_SCORE) {
+      path += ` L ${rightBase} ${py_start.toFixed(2)}`
+      lastY = py_start
+      continue
+    }
+
+    const clamped = v > 10 ? 10 : v < -10 ? -10 : v
+    const d = (clamped / 10) * MAX_PER_SIDE_PX
+    const peakX = rightBase + BEZIER_PEAK_K * d
+    // Going UP (from py_end to py_start), so swap the y-ordering of control points.
+    const ctrlY1 = py_end - (py_end - py_start) / 3
+    const ctrlY2 = py_end - (2 * (py_end - py_start)) / 3
+    path += ` C ${peakX.toFixed(2)} ${ctrlY1.toFixed(2)}, ${peakX.toFixed(2)} ${ctrlY2.toFixed(2)}, ${rightBase} ${py_start.toFixed(2)}`
+    lastY = py_start
+  }
+  if (lastY > 0) path += ` L ${rightBase} 0`
+
+  path += ` Z`
   return path
+}
+
+/**
+ * Build a vertical linearGradient that fills the silhouette with the axis
+ * colour through paragraph rows and fades to muted gray in the gaps between.
+ * Headings, top/bottom margins, and inter-paragraph whitespace all read as
+ * "no signal here" without us having to identify them structurally - the
+ * gradient simply traces the paragraph y-ranges, and everything outside
+ * those ranges is the muted zone.
+ *
+ * Stops, per paragraph: muted (fade-in start) -> axis (paragraph start) ->
+ * axis (paragraph end) -> muted (fade-out end). Fades clamp to the midpoint
+ * of the gap so two adjacent paragraphs always have a stretch of muted
+ * gradient between them.
+ */
+function buildLaneGradient(
+  segments: ReadonlyArray<{ top: number; height: number; scores: DensityAxes }>,
+  trackTop: number,
+  trackHeight: number,
+  gradId: string,
+): SVGLinearGradientElement {
+  const SVG_NS = 'http://www.w3.org/2000/svg'
+  const grad = document.createElementNS(SVG_NS, 'linearGradient')
+  grad.setAttribute('id', gradId)
+  grad.setAttribute('gradientUnits', 'userSpaceOnUse')
+  grad.setAttribute('x1', '0')
+  grad.setAttribute('y1', '0')
+  grad.setAttribute('x2', '0')
+  grad.setAttribute('y2', String(trackHeight))
+
+  type Stop = { y: number; kind: 'muted' | 'axis' }
+  const stops: Stop[] = []
+  stops.push({ y: 0, kind: 'muted' })
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const py_start = seg.top - trackTop
+    const py_end = py_start + seg.height
+
+    let fadeIn = TRANSITION_PX
+    if (i > 0) {
+      const prev = segments[i - 1]
+      const prev_end = prev.top - trackTop + prev.height
+      fadeIn = Math.min(fadeIn, Math.max(0, (py_start - prev_end) / 2))
+    } else {
+      fadeIn = Math.min(fadeIn, py_start)
+    }
+
+    let fadeOut = TRANSITION_PX
+    if (i < segments.length - 1) {
+      const next = segments[i + 1]
+      const next_start = next.top - trackTop
+      fadeOut = Math.min(fadeOut, Math.max(0, (next_start - py_end) / 2))
+    } else {
+      fadeOut = Math.min(fadeOut, trackHeight - py_end)
+    }
+
+    if (fadeIn > 0) stops.push({ y: py_start - fadeIn, kind: 'muted' })
+    stops.push({ y: py_start, kind: 'axis' })
+    stops.push({ y: py_end, kind: 'axis' })
+    if (fadeOut > 0) stops.push({ y: py_end + fadeOut, kind: 'muted' })
+  }
+
+  stops.push({ y: trackHeight, kind: 'muted' })
+
+  // Ensure offsets are monotonically increasing in [0, trackHeight].
+  stops.sort((a, b) => a.y - b.y)
+  let last = -1
+  for (const s of stops) {
+    if (s.y < last) s.y = last
+    last = s.y
+  }
+
+  for (const s of stops) {
+    const stop = document.createElementNS(SVG_NS, 'stop')
+    const pct = trackHeight > 0 ? (s.y / trackHeight) * 100 : 0
+    stop.setAttribute('offset', `${pct.toFixed(3)}%`)
+    stop.setAttribute(
+      'class',
+      s.kind === 'muted'
+        ? 'density-rail-stop density-rail-stop-muted'
+        : 'density-rail-stop density-rail-stop-axis',
+    )
+    grad.appendChild(stop)
+  }
+
+  return grad
 }
 
 function hasSignal(

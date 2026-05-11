@@ -1,6 +1,7 @@
-/* normal theme - the defaults from tokens.css with light/dark adaptive */
+/* Light theme — the defaults. Tokens defined here override tokens.css when
+ * [data-theme='light'] is set on <html>. */
 
-[data-theme='normal'] {
+[data-theme='light'] {
   --bg: #fbfbf8;
   --header-bg: rgba(251, 251, 248, 0.88);
   --panel-bg: #f3f2ec;

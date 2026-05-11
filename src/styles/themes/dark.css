@@ -1,0 +1,40 @@
+/* Dark theme - same token contract, dark palette. Applied when
+ * [data-theme='dark'] is set on <html>. */
+
+[data-theme='dark'] {
+  --bg: #141413;
+  --header-bg: rgba(20, 20, 19, 0.85);
+  --panel-bg: #1c1c1a;
+  --card-bg: #1a1a18;
+  --code-bg: #232320;
+
+  --text: #e8e6df;
+  --muted: #918e84;
+  --heading: #f3f0e8;
+  --link: #d2a86b;
+
+  --rule: #34332e;
+  --accent: #e07d5a;
+  --accent-fg: #14140f;
+
+  --font-prose: Charter, 'Iowan Old Style', 'Source Serif Pro', Georgia, serif;
+  --font-display: Inter, system-ui, -apple-system, sans-serif;
+  --font-ui: Inter, system-ui, -apple-system, sans-serif;
+  --heading-tracking: -0.005em;
+
+  /* Density-rail palette - brighter variants for the dark surface. */
+  --rail-information: #7fb0ce;
+  --rail-argument: #b095d8;
+  --rail-impact: #e8a460;
+  --rail-specificity: #8fc4a4;
+  --rail-voice: #df90a9;
+}
+
+[data-theme='dark'] ::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+[data-theme='dark'] img,
+[data-theme='dark'] video {
+  filter: brightness(0.92);
+}

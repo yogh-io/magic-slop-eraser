@@ -9,9 +9,8 @@ interface Option {
 }
 
 const options: Option[] = [
-  { id: 'normal', label: 'normal', glyph: '◐' },     // ◐ light/dark balance
-  { id: 'magic', label: 'magic', glyph: '✦' },       // ✦ sparkle
-  { id: 'scholar', label: 'scholar', glyph: '❦' },   // ❦ fleuron
+  { id: 'light', label: 'light', glyph: '☀' },
+  { id: 'dark', label: 'dark', glyph: '☾' },
 ]
 </script>
 

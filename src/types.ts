@@ -13,7 +13,7 @@ export interface CategoryMeta {
   glyph: string
   /** Per-theme accent colour. Drives the `--cat-<id>` CSS variable applied at
    *  runtime by state/theme.ts. Add a key per ThemeId; missing keys fall back
-   *  to the value for `normal`. */
+   *  to the value for `light`. */
   themeColors: Record<ThemeId, string>
 }
 
@@ -245,4 +245,4 @@ export interface CompanionDoc {
   score?: { value: number; rationale: string }
 }
 
-export type ThemeId = 'normal' | 'magic' | 'scholar'
+export type ThemeId = 'light' | 'dark'

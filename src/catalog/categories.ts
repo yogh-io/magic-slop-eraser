@@ -21,9 +21,8 @@ export const categories: CategoryMeta[] = [
 The fix is the easiest in the catalogue: notice them, pick the concrete thing they were standing in for, replace. The reason most writers do not is that one or two of these words always feel innocent in isolation. They are. The accumulation is not. Once you have seen "delve into the rich tapestry" three times in a week, you can no longer un-see it.`,
     glyph: '◆',
     themeColors: {
-      normal: '#d97757',
-      magic: '#ff7eb6',
-      scholar: '#8a1a1a',
+      light: '#d97757',
+      dark: '#f0926d',
     },
   },
   {
@@ -37,9 +36,8 @@ The fix is the easiest in the catalogue: notice them, pick the concrete thing th
 These are the patterns the writer is least equipped to see in their own work, because the templates feel from the inside like the writer's voice. They are not. They are the residue of training data, lightly laundered. The bad news is that this category requires judgment, not regex. The good news is that once you have seen one of them, you cannot unsee them, and your future drafts will be quieter for it.`,
     glyph: '▦',
     themeColors: {
-      normal: '#7a55b8',
-      magic: '#b878d4',
-      scholar: '#2e2a72',
+      light: '#7a55b8',
+      dark: '#b095d8',
     },
   },
   {
@@ -53,9 +51,8 @@ These are the patterns the writer is least equipped to see in their own work, be
 The model produces these because every move that takes a position is a risk, and the gradient that produced the model rewarded risk-aversion above almost everything else. The training corpus is full of NPR-host hedges, op-ed preambles that take eight paragraphs to say what could have been said in one, and the careful registers of writers whose paycheque depended on never being wrong in a way that anyone could pin on them. Reading enough of it gives you the strange feeling of having been told something while having received nothing. The cure is the same as the cure for empty calories: less of them, and a habit of noticing.`,
     glyph: '▲',
     themeColors: {
-      normal: '#3a86c4',
-      magic: '#6cc7e8',
-      scholar: '#1f5d52',
+      light: '#3a86c4',
+      dark: '#6cb1ec',
     },
   },
 ]

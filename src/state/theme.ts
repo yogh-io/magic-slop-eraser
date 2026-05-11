@@ -3,72 +3,51 @@ import type { ThemeId } from '../types'
 import { categories } from '../catalog/categories'
 
 const STORAGE_KEY = 'mse.theme'
-const URL_PARAM = 't'
+const MEDIA_QUERY = '(prefers-color-scheme: dark)'
 const TRANSITION_CLASS = 'theme-transitioning'
 const TRANSITION_MS = 480
 
-// Obscure stable codes used in the URL so a shared link carries the theme
-// without naming it directly. Picked to be short, opaque, and unlikely to
-// collide with anything else.
-const THEME_TO_CODE: Record<ThemeId, string> = {
-  normal: 'qe',
-  magic: 'xk',
-  scholar: 'jv',
-}
-const CODE_TO_THEME: Record<string, ThemeId> = Object.fromEntries(
-  Object.entries(THEME_TO_CODE).map(([id, code]) => [code, id as ThemeId]),
-) as Record<string, ThemeId>
-
-export const theme = ref<ThemeId>('normal')
+export const theme = ref<ThemeId>('light')
 
 export function initTheme(): void {
-  const fromUrl = readThemeFromUrl()
-  const fromStorage = readThemeFromStorage()
-  const initial: ThemeId = fromUrl ?? fromStorage ?? 'normal'
+  const stored = readStored()
+  const initial: ThemeId = stored ?? readSystem()
   theme.value = initial
   applyTheme(initial, { animate: false })
-  // Make sure the URL reflects the active theme so refreshes and shares are stable.
-  syncUrl(initial)
+
+  // Follow OS changes only when the user hasn't picked an explicit theme.
+  const mq = window.matchMedia(MEDIA_QUERY)
+  mq.addEventListener('change', (e) => {
+    if (readStored()) return
+    theme.value = e.matches ? 'dark' : 'light'
+  })
 
   watch(theme, (next, prev) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, next)
-    } catch {
-      /* ignore storage failures */
-    }
-    if (next !== prev) {
-      applyTheme(next, { animate: true })
-      syncUrl(next)
-    }
+    if (next !== prev) applyTheme(next, { animate: true })
   })
 }
 
-function readThemeFromUrl(): ThemeId | null {
-  if (typeof window === 'undefined') return null
-  const code = new URL(window.location.href).searchParams.get(URL_PARAM)
-  if (!code) return null
-  return CODE_TO_THEME[code] ?? null
-}
-
-function readThemeFromStorage(): ThemeId | null {
+export function setTheme(t: ThemeId): void {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === 'normal' || saved === 'magic' || saved === 'scholar') return saved
-    if (saved === 'germanic') return 'scholar' // legacy key
+    localStorage.setItem(STORAGE_KEY, t)
   } catch {
     /* ignore */
   }
-  return null
+  theme.value = t
 }
 
-function syncUrl(t: ThemeId): void {
-  if (typeof window === 'undefined') return
-  const url = new URL(window.location.href)
-  const code = THEME_TO_CODE[t]
-  if (url.searchParams.get(URL_PARAM) === code) return
-  url.searchParams.set(URL_PARAM, code)
-  const next = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') + url.hash
-  window.history.replaceState(window.history.state, '', next)
+function readStored(): ThemeId | null {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY)
+    return v === 'light' || v === 'dark' ? v : null
+  } catch {
+    return null
+  }
+}
+
+function readSystem(): ThemeId {
+  if (typeof window === 'undefined') return 'light'
+  return window.matchMedia(MEDIA_QUERY).matches ? 'dark' : 'light'
 }
 
 function applyTheme(t: ThemeId, opts: { animate: boolean }): void {
@@ -84,11 +63,7 @@ function applyTheme(t: ThemeId, opts: { animate: boolean }): void {
 function applyCategoryTokens(t: ThemeId): void {
   const root = document.documentElement
   for (const c of categories) {
-    const color = c.themeColors[t] ?? c.themeColors.normal
+    const color = c.themeColors[t] ?? c.themeColors.light
     root.style.setProperty(`--cat-${c.id}`, color)
   }
-}
-
-export function setTheme(t: ThemeId): void {
-  theme.value = t
 }

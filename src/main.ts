@@ -6,9 +6,8 @@ import { patterns } from './catalog/patterns'
 import { categories } from './catalog/categories'
 import './styles/tokens.css'
 import './styles/base.css'
-import './styles/themes/normal.css'
-import './styles/themes/magic.css'
-import './styles/themes/scholar.css'
+import './styles/themes/light.css'
+import './styles/themes/dark.css'
 import { initTheme } from './state/theme'
 
 // vite-ssg installs @unhead/vue itself and provides the head instance via the

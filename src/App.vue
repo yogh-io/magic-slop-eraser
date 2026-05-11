@@ -3,6 +3,10 @@ import { RouterLink, RouterView } from 'vue-router'
 import ThemePicker from './components/ThemePicker.vue'
 
 const gitHash = __GIT_HASH__
+const commitUrl =
+  gitHash === 'unknown'
+    ? null
+    : `https://github.com/yogh-io/magic-slop-eraser/commit/${gitHash}`
 </script>
 
 <template>
@@ -30,7 +34,15 @@ const gitHash = __GIT_HASH__
     </main>
 
     <footer class="build-meta" aria-label="build version">
-      <code class="git-hash" :title="`build ${gitHash}`">{{ gitHash }}</code>
+      <a
+        v-if="commitUrl"
+        class="git-hash"
+        :href="commitUrl"
+        target="_blank"
+        rel="noopener"
+        :title="`build ${gitHash}`"
+      >{{ gitHash }}</a>
+      <code v-else class="git-hash" :title="`build ${gitHash}`">{{ gitHash }}</code>
     </footer>
 
     <div class="theme-overlay" aria-hidden="true" />
@@ -107,5 +119,9 @@ const gitHash = __GIT_HASH__
   background: transparent;
   padding: 0;
   letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  color: inherit;
+  text-decoration: none;
 }
+.build-meta a.git-hash:hover { text-decoration: underline; }
 </style>

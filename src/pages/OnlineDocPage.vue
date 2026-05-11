@@ -9,6 +9,11 @@ import type { AgentNote, AgentTask, DocResponse, Flag, Suggestion } from '../typ
 const route = useRoute()
 const fatalError = ref<string | null>(null)
 const selectedFlagId = ref<string | null>(null)
+/** Per-flag expansion state. Cards default to collapsed (header only) so the
+ * gutter stays compact and most cards sit near their anchors. Expanding a card
+ * grows it to full content; the layout reflows so expanded cards anchor and
+ * collapsed ones get displaced if needed. */
+const expandedFlagIds = ref<Set<string>>(new Set())
 /** Card-hover: highlights the anchored span in the article so the writer can locate what the annotation refers to. */
 const hoveredFlagId = ref<string | null>(null)
 /** Suggestion-hover within a card: temporarily renders the candidate (post) text inside the article in place of the original. */
@@ -270,6 +275,11 @@ async function submitLetMeTry(flagId: string): Promise<void> {
 async function accept(flagId: string): Promise<void> {
   await session?.acceptFlag(flagId)
   if (selectedFlagId.value === flagId) selectedFlagId.value = null
+  if (expandedFlagIds.value.has(flagId)) {
+    const next = new Set(expandedFlagIds.value)
+    next.delete(flagId)
+    expandedFlagIds.value = next
+  }
 }
 
 async function discard(flagId: string): Promise<void> {
@@ -309,8 +319,34 @@ function selectFlag(id: string): void {
   selectedFlagId.value = id
 }
 
+function isExpanded(flagId: string): boolean {
+  return expandedFlagIds.value.has(flagId)
+}
+
+function toggleExpanded(flagId: string): void {
+  const next = new Set(expandedFlagIds.value)
+  if (next.has(flagId)) {
+    next.delete(flagId)
+  } else {
+    next.add(flagId)
+    // Expanding focuses the flag: the article-side highlight follows.
+    selectedFlagId.value = flagId
+  }
+  expandedFlagIds.value = next
+  // Card heights changed, so the gutter needs to re-pack.
+  scheduleRecompute()
+}
+
 function onFlagClick(id: string): void {
   selectedFlagId.value = id
+  // Clicking the flag in the article expands its card so the user can act
+  // on it without a separate click in the gutter.
+  if (!expandedFlagIds.value.has(id)) {
+    const next = new Set(expandedFlagIds.value)
+    next.add(id)
+    expandedFlagIds.value = next
+    scheduleRecompute()
+  }
   // Scroll the cluster card containing this flag into view.
   nextTick(() => {
     const cid = clusterIdByFlag.value.get(id) ?? id
@@ -324,6 +360,10 @@ function onFlagClick(id: string): void {
 const articleViewRef = ref<InstanceType<typeof ArticleView> | null>(null)
 const annotationRefs = ref<Map<string, HTMLElement>>(new Map())
 const finalTops = ref<Map<string, number>>(new Map())
+/** Per-flag anchor box (top + height) in article-container coords. Refreshed
+ * by recomputeLayout so the connector overlay reflects the latest mark
+ * positions after scrolls, content edits, or window resizes. */
+const markBoxes = ref<Map<string, { top: number; height: number }>>(new Map())
 const gutterMinHeight = ref(0)
 let cardResizeObserver: ResizeObserver | null = null
 let pendingRecomputeRaf = 0
@@ -348,11 +388,68 @@ function setAnnotationRef(id: string, el: Element | null): void {
 }
 
 const ANNOTATION_GAP = 10
+/** Width of the connector overlay SVG (px). The SVG sits with left = -1.6rem
+ * (the .canvas grid gap) so its x=0 is at the article's right edge and
+ * x=CONNECTOR_WIDTH lands just inside the gutter's left edge. Wider than the
+ * raw gap gives the cubic Bezier room to curve. */
+const CONNECTOR_WIDTH = 32
+
+interface Connector {
+  id: string
+  d: string
+  active: boolean
+}
+
+const connectors = computed<Connector[]>(() => {
+  const out: Connector[] = []
+  if (gutterMinHeight.value === 0) return out
+  const boxes = markBoxes.value
+  for (const c of clusters.value) {
+    const cardTop = finalTops.value.get(c.id)
+    if (cardTop === undefined) continue
+    let anchorTop: number | undefined
+    let anchorHeight = 18
+    for (const v of c.flagViews) {
+      const b = boxes.get(v.flag.id)
+      if (!b) continue
+      if (anchorTop === undefined || b.top < anchorTop) {
+        anchorTop = b.top
+        anchorHeight = b.height
+      }
+    }
+    if (anchorTop === undefined) continue
+    const cardEl = annotationRefs.value.get(c.id)
+    const cardHeight = cardEl?.offsetHeight ?? 32
+    const anchorBottom = anchorTop + anchorHeight
+    const cardBottom = cardTop + cardHeight
+    const xMid = CONNECTOR_WIDTH / 2
+    // Closed ribbon: anchor y-range on the article side curves to card y-range
+    // on the gutter side. The user reads the height match at a glance instead
+    // of having to mentally pair anchor->card by position alone.
+    const d = [
+      `M 0 ${anchorTop.toFixed(2)}`,
+      `C ${xMid} ${anchorTop.toFixed(2)}, ${xMid} ${cardTop.toFixed(2)}, ${CONNECTOR_WIDTH} ${cardTop.toFixed(2)}`,
+      `L ${CONNECTOR_WIDTH} ${cardBottom.toFixed(2)}`,
+      `C ${xMid} ${cardBottom.toFixed(2)}, ${xMid} ${anchorBottom.toFixed(2)}, 0 ${anchorBottom.toFixed(2)}`,
+      'Z',
+    ].join(' ')
+    const sid = selectedFlagId.value
+    const hid = hoveredFlagId.value
+    const active = c.flagViews.some(
+      (v) => v.flag.id === sid || v.flag.id === hid || expandedFlagIds.value.has(v.flag.id),
+    )
+    out.push({ id: c.id, d, active })
+  }
+  return out
+})
 
 async function recomputeLayout(): Promise<void> {
   await nextTick()
   if (!articleViewRef.value) return
-  const positions = articleViewRef.value.getMarkPositions()
+  const boxes = articleViewRef.value.getMarkBoxes()
+  markBoxes.value = boxes
+  const positions = new Map<string, number>()
+  for (const [fid, box] of boxes) positions.set(fid, box.top)
 
   // Position by cluster, not by individual flag. The cluster's anchor row
   // is the topmost mark among its members (clusters are tiny - typically
@@ -710,6 +807,23 @@ function dismissShare(): void {
         </section>
 
         <aside class="gutter" :style="{ minHeight: gutterMinHeight + 'px' }">
+          <svg
+            v-if="connectors.length > 0"
+            class="annot-connectors"
+            :viewBox="`0 0 ${CONNECTOR_WIDTH} ${gutterMinHeight}`"
+            :style="{ height: gutterMinHeight + 'px' }"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path
+              v-for="conn in connectors"
+              :key="conn.id"
+              :d="conn.d"
+              class="connector-path"
+              :class="{ active: conn.active }"
+            />
+          </svg>
+
           <p v-if="visibleFlags.length === 0" class="empty">
             No open flags. The document is clean (or the agent hasn't run detectors yet).
           </p>
@@ -746,18 +860,30 @@ function dismissShare(): void {
                 selected: selectedFlagId === v.flag.id,
                 hovered: hoveredFlagId === v.flag.id,
                 stacked: idx > 0,
+                expanded: isExpanded(v.flag.id),
+                collapsed: !isExpanded(v.flag.id),
               }"
-              @click="selectFlag(v.flag.id)"
               @mouseenter="hoverCard(v.flag.id)"
               @mouseleave="leaveCard(v.flag.id)"
             >
-              <header class="ann-head">
+              <header
+                class="ann-head"
+                @click="toggleExpanded(v.flag.id)"
+                :title="isExpanded(v.flag.id) ? 'collapse' : 'expand'"
+              >
+                <span
+                  class="expand-chevron"
+                  :class="{ open: isExpanded(v.flag.id) }"
+                  aria-hidden="true"
+                >▸</span>
                 <span :class="['rung-pill', `rung-${v.flag.rung ?? 1}`]" :title="rungName(v.flag.rung)">
                   {{ rungLabel(v.flag.rung) }}
                 </span>
                 <span class="pattern" :title="v.flag.patternId">{{ v.flag.patternId }}</span>
                 <span :class="['state-badge', `state-${v.state}`]">{{ v.state }}</span>
               </header>
+
+              <template v-if="isExpanded(v.flag.id)">
 
               <p v-if="v.flag.rationale" class="rationale">{{ v.flag.rationale }}</p>
 
@@ -843,6 +969,8 @@ function dismissShare(): void {
                   <button type="submit" :disabled="!letMeTryInput[v.flag.id]">apply</button>
                 </form>
               </div>
+
+              </template>
             </section>
           </article>
         </aside>
@@ -1455,6 +1583,35 @@ function dismissShare(): void {
   position: relative;
   min-height: 200px;
 }
+
+/* Connector overlay: a thin ribbon from each anchor's y-range in the article
+ * to its card's y-range in the gutter. Sits across the .canvas grid gap
+ * (left = -1.6rem matches the gap), behind the cards. */
+.annot-connectors {
+  position: absolute;
+  left: -1.6rem;
+  top: 0;
+  width: calc(1.6rem + 0.4rem);
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
+}
+.connector-path {
+  fill: color-mix(in srgb, var(--muted) 14%, transparent);
+  stroke: color-mix(in srgb, var(--muted) 28%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: fill 120ms ease, stroke 120ms ease;
+}
+.connector-path.active {
+  fill: color-mix(in srgb, var(--accent) 20%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+/* Cards above the connector overlay so the ribbon visually terminates at the
+ * card's left edge instead of running across the card body. */
+.annot {
+  z-index: 1;
+}
 .empty {
   position: absolute;
   top: 0;
@@ -1505,19 +1662,46 @@ function dismissShare(): void {
 /* Per-flag card. Visual treatment matches the pre-clustering single card. */
 .annot-card {
   position: relative;
-  min-height: 120px;
   border: 1px solid var(--rule);
   border-left-width: 3px;
   border-radius: 6px;
-  padding: 0.65rem 0.8rem 0.75rem;
+  padding: 0.5rem 0.8rem 0.6rem;
   background: var(--bg);
   font-size: 0.86rem;
   line-height: 1.45;
-  cursor: pointer;
-  transition: box-shadow 120ms ease, border-color 120ms ease;
+  transition: box-shadow 120ms ease, border-color 120ms ease, padding 120ms ease;
+}
+.annot-card.expanded {
+  min-height: 120px;
+  padding: 0.65rem 0.8rem 0.75rem;
+}
+.annot-card.collapsed {
+  /* Header-only mode: tight padding, no body. The header itself stays
+   * clickable as the toggle target. */
+  min-height: 0;
+}
+.annot-card.collapsed .ann-head {
+  margin-bottom: 0;
 }
 .annot-card.stacked {
   margin-top: 0.5rem;
+}
+/* The header is the click target for toggling. The body's buttons and
+ * inputs stop propagation on their own so they don't accidentally collapse
+ * the card mid-interaction. */
+.annot-card .ann-head {
+  cursor: pointer;
+}
+.expand-chevron {
+  display: inline-block;
+  width: 0.75rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  transition: transform 120ms ease;
+  line-height: 1;
+}
+.expand-chevron.open {
+  transform: rotate(90deg);
 }
 .annot-card[data-rung="1"] { border-left-color: #2f8f6a; }
 .annot-card[data-rung="2"] { border-left-color: #b88f3e; }

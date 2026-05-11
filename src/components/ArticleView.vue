@@ -195,6 +195,21 @@ defineExpose({
     }
     return out
   },
+  /** Returns flagId -> {top, height} of the anchored mark relative to the
+   * article container. Used by the connector overlay so the visual link
+   * spans the anchor's y-range to the card's y-range. */
+  getMarkBoxes(): Map<string, { top: number; height: number }> {
+    const out = new Map<string, { top: number; height: number }>()
+    if (!containerRef.value) return out
+    const containerTop = containerRef.value.getBoundingClientRect().top
+    for (const m of containerRef.value.querySelectorAll<HTMLElement>('mark.slop-flag')) {
+      const fid = m.dataset.flagId
+      if (!fid || out.has(fid)) continue
+      const r = m.getBoundingClientRect()
+      out.set(fid, { top: r.top - containerTop, height: r.height })
+    }
+    return out
+  },
 })
 
 watch(

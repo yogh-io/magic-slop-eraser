@@ -17,12 +17,47 @@ export type DensityAxes = Record<string, number>
  *
  * See docs/density-rail.md for the full spec.
  */
-export const CANONICAL_AXES: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'information', label: 'info' },
-  { key: 'argument', label: 'arg' },
-  { key: 'impact', label: 'impact' },
-  { key: 'specificity', label: 'spec' },
-  { key: 'voice', label: 'voice' },
+export interface AxisMeta {
+  key: string
+  label: string
+  /** Short prose answer to "wtf is this axis?" - surfaced as a tooltip on the
+   *  rail's column header so the reader doesn't have to leave the article to
+   *  guess at the label. Tracked here (not in the catalogue) so the rail
+   *  remains self-contained as a vendored prompt-spec library. */
+  description: string
+}
+
+export const CANONICAL_AXES: ReadonlyArray<AxisMeta> = [
+  {
+    key: 'information',
+    label: 'info',
+    description:
+      'Density of facts, named entities, numbers. Hand-wavy abstractions read low; concrete claims read high.',
+  },
+  {
+    key: 'argument',
+    label: 'arg',
+    description:
+      'Is a claim being made and supported, or is the paragraph sitting there? Inert connective tissue reads low; load-bearing reads high.',
+  },
+  {
+    key: 'impact',
+    label: 'impact',
+    description:
+      'Does this hit. Punchline quality, specific imagery, payoff. Filler reads low; lands reads high.',
+  },
+  {
+    key: 'specificity',
+    label: 'spec',
+    description:
+      'Concrete nouns vs abstractions. "Three counties" beats "many areas." Specific reads high.',
+  },
+  {
+    key: 'voice',
+    label: 'voice',
+    description:
+      "Does this sound like the writer (per voice samples) or like a model. Signature voice reads high; generic reads low.",
+  },
 ]
 
 /** Visible width of a single lane column (px). Centerline runs through its
@@ -175,6 +210,54 @@ export function applyDensityRails(
     path.setAttribute('fill', `url(#${gradId})`)
     path.setAttribute('stroke', `url(#${gradId})`)
     svg.appendChild(path)
+
+    // Per-paragraph hover targets, layered on top of the silhouette. Each is
+    // a transparent <rect> spanning the paragraph's full y-range and the
+    // lane's full hoverable width (lane body + max bump on each side), with
+    // pointer-events flipped back on so it captures mouse activity even
+    // though the rails container has pointer-events: none. On move/enter,
+    // dispatches a CustomEvent the host (ArticleView) listens for to drive
+    // a Vue-rendered tooltip popover near the cursor.
+    const hoverGroup = document.createElementNS(SVG_NS, 'g')
+    hoverGroup.setAttribute('class', 'density-rail-hover-zones')
+    for (const seg of segments) {
+      const py_start = seg.top - trackTop
+      const v = seg.scores[ax.key]
+      const score = typeof v === 'number' && Number.isFinite(v) ? v : null
+
+      const rect = document.createElementNS(SVG_NS, 'rect')
+      rect.setAttribute('x', String(-MAX_PER_SIDE_PX))
+      rect.setAttribute('y', py_start.toString())
+      rect.setAttribute('width', String(LANE_WIDTH_PX + 2 * MAX_PER_SIDE_PX))
+      rect.setAttribute('height', seg.height.toString())
+      rect.setAttribute('fill', 'transparent')
+      rect.dataset.axisKey = ax.key
+
+      const onMove = (e: MouseEvent): void => {
+        rect.dispatchEvent(
+          new CustomEvent('density-rail-hover', {
+            bubbles: true,
+            detail: {
+              x: e.clientX,
+              y: e.clientY,
+              axisKey: ax.key,
+              axisLabel: ax.label,
+              score,
+              descriptor: describeScore(score),
+            },
+          }),
+        )
+      }
+      const onLeave = (): void => {
+        rect.dispatchEvent(new CustomEvent('density-rail-hover-end', { bubbles: true }))
+      }
+      rect.addEventListener('mousemove', onMove)
+      rect.addEventListener('mouseenter', onMove)
+      rect.addEventListener('mouseleave', onLeave)
+
+      hoverGroup.appendChild(rect)
+    }
+    svg.appendChild(hoverGroup)
 
     lane.appendChild(svg)
     lanesEl.appendChild(lane)
@@ -371,7 +454,7 @@ function hasSignal(
 }
 
 function buildHeaders(
-  axes: ReadonlyArray<{ key: string; label: string }>,
+  axes: ReadonlyArray<AxisMeta>,
   position: 'top' | 'bottom',
 ): HTMLElement {
   const el = document.createElement('div')
@@ -381,10 +464,36 @@ function buildHeaders(
     h.className = 'density-rail-header'
     h.dataset.axis = ax.key
     h.style.setProperty('--rail-color', `var(--rail-${ax.key}, var(--accent))`)
-    h.title = ax.label
+    // Native title kept as a fallback for non-mouse devices; the custom popover
+    // below takes over on hover for cursor users.
+    h.title = ax.description || ax.label
     const span = document.createElement('span')
     span.textContent = ax.label
     h.appendChild(span)
+
+    if (ax.description) {
+      const onMove = (e: MouseEvent): void => {
+        h.dispatchEvent(
+          new CustomEvent('density-rail-header-hover', {
+            bubbles: true,
+            detail: {
+              x: e.clientX,
+              y: e.clientY,
+              axisKey: ax.key,
+              axisLabel: ax.label,
+              description: ax.description,
+            },
+          }),
+        )
+      }
+      const onLeave = (): void => {
+        h.dispatchEvent(new CustomEvent('density-rail-header-hover-end', { bubbles: true }))
+      }
+      h.addEventListener('mousemove', onMove)
+      h.addEventListener('mouseenter', onMove)
+      h.addEventListener('mouseleave', onLeave)
+    }
+
     el.appendChild(h)
   }
   return el
@@ -392,12 +501,12 @@ function buildHeaders(
 
 function unionOfAxes(
   density: Record<string, DensityAxes>,
-): ReadonlyArray<{ key: string; label: string }> {
+): ReadonlyArray<AxisMeta> {
   const seen = new Set<string>()
   for (const axes of Object.values(density)) {
     for (const k of Object.keys(axes)) seen.add(k)
   }
-  const out: { key: string; label: string }[] = []
+  const out: AxisMeta[] = []
   for (const ax of CANONICAL_AXES) {
     if (seen.has(ax.key)) out.push({ ...ax })
   }
@@ -406,14 +515,14 @@ function unionOfAxes(
   }
   for (const k of [...seen].sort()) {
     if (CANONICAL_AXES.some((ax) => ax.key === k)) continue
-    out.push({ key: k, label: k.slice(0, 8) })
+    out.push({ key: k, label: k.slice(0, 8), description: '' })
   }
   return out
 }
 
 function formatTooltip(
   scores: DensityAxes,
-  axes: ReadonlyArray<{ key: string; label: string }>,
+  axes: ReadonlyArray<AxisMeta>,
 ): string {
   const parts: string[] = []
   for (const ax of axes) {
@@ -431,4 +540,14 @@ function formatTooltip(
 
 function canonical(s: string): string {
   return s.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+/** Sign-aware label for a score: "weak" / "unremarkable" / "strong" / null
+ *  when the score is missing. SPARSITY_SCORE is the same threshold the
+ *  silhouette uses to stay flat against the baseline, so the descriptor
+ *  matches what the rail actually shows. */
+export function describeScore(score: number | null): 'weak' | 'unremarkable' | 'strong' | null {
+  if (score === null) return null
+  if (Math.abs(score) < SPARSITY_SCORE) return 'unremarkable'
+  return score < 0 ? 'weak' : 'strong'
 }

@@ -1,10 +1,29 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { highlightFlagsInDom } from '../anchoring/domHighlight'
 import { segmentSource, type Segment } from '../markdown/segments'
 import { applyDensityRails, type DensityAxes, type ParagraphInfo } from '../markdown/densityRail'
 import type { Flag } from '../types'
+
+type DensityTooltipState =
+  | {
+      kind: 'score'
+      x: number
+      y: number
+      axisKey: string
+      axisLabel: string
+      score: number | null
+      descriptor: 'weak' | 'unremarkable' | 'strong' | null
+    }
+  | {
+      kind: 'description'
+      x: number
+      y: number
+      axisKey: string
+      axisLabel: string
+      description: string
+    }
 
 const props = withDefaults(
   defineProps<{
@@ -59,7 +78,76 @@ async function applyHighlights(): Promise<void> {
   requestAnimationFrame(() => emit('layout-ready'))
 }
 
-onMounted(applyHighlights)
+// --- density rail tooltip ---------------------------------------------------
+
+const densityTooltip = ref<DensityTooltipState | null>(null)
+
+function onDensityScoreHover(e: Event): void {
+  const evt = e as CustomEvent<Omit<DensityTooltipState & { kind: 'score' }, 'kind'>>
+  densityTooltip.value = { kind: 'score', ...evt.detail }
+}
+
+function onDensityHeaderHover(e: Event): void {
+  const evt = e as CustomEvent<Omit<DensityTooltipState & { kind: 'description' }, 'kind'>>
+  densityTooltip.value = { kind: 'description', ...evt.detail }
+}
+
+function onDensityHoverEnd(): void {
+  densityTooltip.value = null
+}
+
+function formatDensityScore(score: number | null): string {
+  if (score === null) return '–'
+  const sign = score > 0 ? '+' : ''
+  return `${sign}${score.toFixed(1)}`
+}
+
+// --- frontmatter collapsible ------------------------------------------------
+
+const FRONTMATTER_COLLAPSED_KEY = 'mse.frontmatter.collapsed'
+
+function readFrontmatterCollapsed(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(FRONTMATTER_COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const frontmatterCollapsed = ref<boolean>(readFrontmatterCollapsed())
+
+function toggleFrontmatter(): void {
+  frontmatterCollapsed.value = !frontmatterCollapsed.value
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(
+      FRONTMATTER_COLLAPSED_KEY,
+      frontmatterCollapsed.value ? '1' : '0',
+    )
+  } catch {
+    /* ignore quota / disabled storage */
+  }
+}
+
+onMounted(() => {
+  void applyHighlights()
+  const el = containerRef.value
+  if (!el) return
+  el.addEventListener('density-rail-hover', onDensityScoreHover)
+  el.addEventListener('density-rail-hover-end', onDensityHoverEnd)
+  el.addEventListener('density-rail-header-hover', onDensityHeaderHover)
+  el.addEventListener('density-rail-header-hover-end', onDensityHoverEnd)
+})
+
+onBeforeUnmount(() => {
+  const el = containerRef.value
+  if (!el) return
+  el.removeEventListener('density-rail-hover', onDensityScoreHover)
+  el.removeEventListener('density-rail-hover-end', onDensityHoverEnd)
+  el.removeEventListener('density-rail-header-hover', onDensityHeaderHover)
+  el.removeEventListener('density-rail-header-hover-end', onDensityHoverEnd)
+})
 watch(
   () => [
     props.source,
@@ -172,9 +260,22 @@ function onMouseUp(): void {
     @mouseup="onMouseUp"
   >
     <template v-for="(seg, idx) in segments" :key="idx">
-      <aside v-if="seg.kind === 'frontmatter'" class="md-aside md-frontmatter">
-        <div class="md-aside-label">frontmatter <span class="muted">· not edited</span></div>
-        <pre>{{ seg.body }}</pre>
+      <aside
+        v-if="seg.kind === 'frontmatter'"
+        class="md-aside md-frontmatter"
+        :class="{ collapsed: frontmatterCollapsed }"
+      >
+        <button
+          type="button"
+          class="md-aside-label md-aside-toggle"
+          :aria-expanded="!frontmatterCollapsed"
+          :aria-label="frontmatterCollapsed ? 'Expand frontmatter' : 'Collapse frontmatter'"
+          @click="toggleFrontmatter"
+        >
+          <span class="md-aside-caret">{{ frontmatterCollapsed ? '▸' : '▾' }}</span>
+          frontmatter <span class="muted">· not edited</span>
+        </button>
+        <pre v-if="!frontmatterCollapsed">{{ seg.body }}</pre>
       </aside>
 
       <aside v-else-if="seg.kind === 'html-comment'" class="md-aside md-comment">
@@ -192,6 +293,31 @@ function onMouseUp(): void {
 
       <div v-else class="md-prose" v-html="renderProse(seg.text)" />
     </template>
+
+    <Teleport to="body">
+      <div
+        v-if="densityTooltip"
+        class="density-rail-tooltip"
+        :data-kind="densityTooltip.kind"
+        :data-descriptor="densityTooltip.kind === 'score' ? densityTooltip.descriptor ?? 'none' : 'none'"
+        :style="{
+          left: densityTooltip.x + 'px',
+          top: densityTooltip.y + 'px',
+          '--rail-color': `var(--rail-${densityTooltip.axisKey}, var(--accent))`,
+        }"
+      >
+        <span class="density-rail-tooltip-label">{{ densityTooltip.axisLabel }}</span>
+        <template v-if="densityTooltip.kind === 'score'">
+          <span class="density-rail-tooltip-score">{{
+            formatDensityScore(densityTooltip.score)
+          }}</span>
+          <span v-if="densityTooltip.descriptor" class="density-rail-tooltip-descriptor">{{
+            densityTooltip.descriptor
+          }}</span>
+        </template>
+        <p v-else class="density-rail-tooltip-description">{{ densityTooltip.description }}</p>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -398,8 +524,92 @@ function onMouseUp(): void {
 .article-view :deep(p.has-density-rail) {
   cursor: help;
 }
+/* Hover targets sit on top of the silhouette and re-enable pointer events so
+ * the cursor can drive the tooltip popover. The cursor turns to a help marker
+ * to advertise the affordance. */
+.article-view :deep(.density-rail-hover-zones rect) {
+  pointer-events: all;
+  cursor: help;
+}
 @media (max-width: 900px) {
   .article-view :deep(.density-rails) { display: none; }
+}
+
+/* Density-rail tooltip popover. Teleported to <body> so its position:fixed
+ * coordinates are viewport-relative and it isn't clipped by overflow:auto
+ * ancestors. Themed per-axis via --rail-color set inline by the listener;
+ * descriptor (weak/unremarkable/strong) lights up to mirror the silhouette. */
+.density-rail-tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(16px, -50%);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  background: var(--card-bg, #fff);
+  border: 1px solid color-mix(in srgb, var(--rail-color, var(--accent)) 38%, var(--rule));
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--rail-color, var(--accent)) 15%, transparent) inset,
+    0 8px 24px -8px color-mix(in srgb, var(--rail-color, var(--accent)) 35%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: var(--font-ui);
+  white-space: nowrap;
+  user-select: none;
+}
+.density-rail-tooltip-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--rail-color, var(--accent)) 95%, var(--text));
+}
+.density-rail-tooltip-score {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.density-rail-tooltip-descriptor {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--muted);
+}
+.density-rail-tooltip[data-descriptor="strong"] .density-rail-tooltip-descriptor {
+  color: color-mix(in srgb, var(--rail-color, var(--accent)) 80%, var(--text));
+}
+.density-rail-tooltip[data-descriptor="weak"] .density-rail-tooltip-descriptor {
+  color: color-mix(in srgb, var(--rail-color, var(--accent)) 70%, var(--text));
+  opacity: 0.85;
+}
+.density-rail-tooltip[data-descriptor="unremarkable"] .density-rail-tooltip-descriptor {
+  color: var(--muted);
+  opacity: 0.7;
+}
+/* Description variant: triggered by hovering a column header (info, arg, …).
+ * Wider, multi-line, paragraph-shaped so the explanation has room to breathe. */
+.density-rail-tooltip[data-kind="description"] {
+  display: block;
+  max-width: 260px;
+  padding: 0.55rem 0.75rem 0.6rem;
+  white-space: normal;
+}
+.density-rail-tooltip[data-kind="description"] .density-rail-tooltip-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.74rem;
+}
+.density-rail-tooltip-description {
+  margin: 0;
+  font-family: var(--font-prose);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text);
 }
 
 /* Embedded, set-aside blocks: hidden in plain sight, not edit targets. */
@@ -431,6 +641,34 @@ function onMouseUp(): void {
   font-size: 1em;
   color: var(--muted);
 }
+/* Frontmatter toggle: same visual presence as the static label, but acts as
+ * a button. Caret rotates the visual cue between collapsed and expanded. */
+.md-aside-toggle {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  width: 100%;
+  text-align: left;
+}
+.md-aside-toggle:hover { color: var(--text); }
+.md-aside-toggle .md-aside-caret {
+  display: inline-block;
+  width: 0.9em;
+  font-size: 0.85em;
+  color: color-mix(in srgb, var(--muted) 70%, var(--text));
+  transition: transform 120ms ease;
+}
+.md-frontmatter.collapsed {
+  padding-top: 0.4em;
+  padding-bottom: 0.45em;
+}
+.md-frontmatter.collapsed .md-aside-toggle { margin-bottom: 0; }
 .md-aside pre {
   margin: 0;
   background: transparent;

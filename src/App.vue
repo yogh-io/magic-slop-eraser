@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import ThemePicker from './components/ThemePicker.vue'
+
+const gitHash = __GIT_HASH__
 </script>
 
 <template>
@@ -26,6 +28,10 @@ import ThemePicker from './components/ThemePicker.vue'
     <main class="main">
       <RouterView />
     </main>
+
+    <footer class="build-meta" aria-label="build version">
+      <code class="git-hash" :title="`build ${gitHash}`">{{ gitHash }}</code>
+    </footer>
 
     <div class="theme-overlay" aria-hidden="true" />
   </div>
@@ -82,5 +88,24 @@ import ThemePicker from './components/ThemePicker.vue'
   inset: 0;
   pointer-events: none;
   z-index: -1;
+}
+
+.build-meta {
+  margin-top: auto;
+  padding: 0.6rem 1.25rem 0.8rem;
+  display: flex;
+  justify-content: flex-end;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  opacity: 0.55;
+  transition: opacity 160ms ease;
+  user-select: text;
+}
+.build-meta:hover { opacity: 0.85; }
+.build-meta .git-hash {
+  background: transparent;
+  padding: 0;
+  letter-spacing: 0.04em;
 }
 </style>

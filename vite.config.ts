@@ -1,10 +1,25 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 const SLOPMOP_API = process.env.SLOPMOP_API ?? 'http://localhost:8787'
 
+// Short git hash captured at build/dev-server start. Surfaced in the footer
+// so the running site can be tied back to a commit without poking around.
+function resolveGitHash(): string {
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+  } catch {
+    return 'unknown'
+  }
+}
+const GIT_HASH = resolveGitHash()
+
 export default defineConfig({
   plugins: [vue()],
+  define: {
+    __GIT_HASH__: JSON.stringify(GIT_HASH),
+  },
   server: {
     port: 5180,
     strictPort: false,

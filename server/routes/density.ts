@@ -5,7 +5,7 @@ import { appendEvents } from '../types'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
 import { fail } from '../auth'
-import { computeParagraphInfo, mergeDensity } from '../density'
+import { computeParagraphInfo, mergeDensity, migrateDensitySchema, DENSITY_SCHEMA } from '../density'
 
 interface PostDensityBody {
   scores?: Array<{ paragraphHash: string; axes: DensityAxes }>
@@ -36,6 +36,9 @@ export async function handleDensity(
   if (!state) return notFound()
   // Backfill for docs persisted before the density field existed.
   if (!state.density) state.density = {}
+  // Legacy 0..10 scores are dropped on first read after the schema bump so
+  // the drafter re-scores against the symmetric-v1 (internet-average) anchor.
+  if (migrateDensitySchema(state)) await store.writeState(docId, state)
 
   if (req.method === 'GET') {
     return json({

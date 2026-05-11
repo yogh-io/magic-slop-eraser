@@ -2,6 +2,23 @@ import { splitParagraphs, type Paragraph } from '../src/markdown/paragraphs'
 import { sha256Hex } from './hash'
 import type { DensityAxes, DocState } from './types'
 
+export const DENSITY_SCHEMA = 'symmetric-v1'
+
+/**
+ * Force a re-score on any doc whose density was written under the legacy
+ * 0..10 distribution-relative scheme. The symmetric-v1 schema uses an
+ * external (internet-average) baseline; the two scales aren't compatible,
+ * so the safe thing is to drop the cached scores and let the drafter
+ * re-score against the new anchor. Returns true if state was mutated and
+ * needs persisting.
+ */
+export function migrateDensitySchema(state: DocState): boolean {
+  if (state.densitySchemaVersion === DENSITY_SCHEMA) return false
+  state.density = {}
+  state.densitySchemaVersion = DENSITY_SCHEMA
+  return true
+}
+
 export interface ParagraphInfo {
   hash: string
   start: number
@@ -66,7 +83,7 @@ export function mergeDensity(
     for (const [k, v] of Object.entries(entry.axes)) {
       if (typeof v !== 'number' || !Number.isFinite(v)) continue
       if (typeof k !== 'string' || k.length === 0 || k.length > 32) continue
-      sanitised[k] = clamp(v, 0, 10)
+      sanitised[k] = clamp(v, -10, 10)
     }
     if (Object.keys(sanitised).length === 0) {
       skipped++

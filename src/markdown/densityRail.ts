@@ -9,11 +9,11 @@ export type DensityAxes = Record<string, number>
 
 /**
  * Canonical axis order. Each axis renders as its own parallel lane in the
- * left gutter. Per-paragraph score is converted to a position relative to
- * the document's distribution on that axis (median + MAD); the lane draws
- * a horizontal bar that extends left of the centerline for below-median
- * paragraphs (weak) and right for above-median (strong). Length encodes
- * magnitude. Colour is constant (the accent); direction is geometric.
+ * left gutter. Per-paragraph score is taken as raw deviation from an
+ * external (internet-average) baseline at 0; the lane's silhouette bulges
+ * outward for positive scores (convex bump) and caves inward for negative
+ * scores (concave dent). Direction is geometric (left=baseline, right=bulge);
+ * colour carries axis identity.
  *
  * See docs/density-rail.md for the full spec.
  */
@@ -25,50 +25,44 @@ export const CANONICAL_AXES: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'voice', label: 'voice' },
 ]
 
-/** Half-width of a lane in px at |dev|=1 (one normalised unit of deviation).
- *  A paragraph one normalised unit from the median sits this far from the
- *  centerline; smaller magnitudes scale proportionally below, larger
- *  magnitudes can extend further (see LANE_MAX_DEV + the explosion pass). */
-const LANE_HALF_PX = 6
-/** Cap on |dev| used for bar length. Magnitudes above this clip at the same
- *  visible length, so a freak outlier doesn't shoot past everything. With
- *  LANE_HALF_PX=6 and LANE_MAX_DEV=3, the longest a bar wants to be is 18px
- *  (before the neighbour-aware explosion pass trims it to fit the actual
- *  available space). */
-const LANE_MAX_DEV = 3
-/** Multiplier on MAD when normalising deviation. (score - median) is
- *  divided by (K_MAD * MAD); k = 2 puts a 2-MAD-from-median paragraph at
- *  one normalised unit (= one LANE_HALF_PX). */
-const K_MAD = 2
-/** Below this normalised |deviation|, the bar isn't drawn - the paragraph
- *  reads as "near median on this axis" and the lane stays empty there. */
-const SPARSITY_THRESHOLD = 0.2
-/** Visible width of a single lane column (px). The centerline runs down its
- *  middle. Inner gap between lanes governs how much room a bar has to
- *  "explode" past its own lane edge into a neighbour's empty half. */
-const LANE_WIDTH_PX = 13
-const LANE_GAP_PX = 3
-const LANE_SPACING_PX = LANE_WIDTH_PX + LANE_GAP_PX
-/** Buffer kept between two bars in adjacent lanes so they never touch even
- *  when both lanes go full-throttle in opposing directions. */
+/** Visible width of a single lane column (px). The silhouette's baseline
+ *  sits at this lane's natural right edge; bumps extend right past it and
+ *  dents cave left into the lane interior. */
+const LANE_WIDTH_PX = 14
+/** Horizontal gap between adjacent lane containers (px). Big enough that
+ *  a max-positive bump from lane i can extend its full depth without
+ *  touching lane i+1, with INNER_GAP_PX of buffer left over. */
+const LANE_GAP_PX = 10
+/** Max amplitude of a bump (positive score) or a dent (negative score) in px.
+ *  Symmetric: score=+10 produces an 8px outward bulge, score=-10 produces an
+ *  8px inward dent. Picked so dents leave a visible sliver of lane material
+ *  on the left even at the strongest negative score (14 - 8 = 6px left of
+ *  the dent peak). */
+const MAX_DEPTH_PX = 8
+/** Min buffer kept between a bump's tip and the next lane's left edge. */
 const INNER_GAP_PX = 2
-const AVAILABLE_BETWEEN_CENTERS = LANE_SPACING_PX - INNER_GAP_PX
-/** Slack the outermost lanes get to spill into. The left side of the
- *  leftmost lane faces the page gutter (lots of room); the right side of
- *  the rightmost lane faces the prose (just a thin breathing margin). */
-const OUTER_LEFT_MAX_PX = 28
-const OUTER_RIGHT_MAX_PX = 10
+/** Below this absolute score, the bump/dent isn't drawn at all - the
+ *  paragraph reads as flat on this axis, anchored at the baseline. */
+const SPARSITY_SCORE = 0.5
+/** Bezier control multiplier so a cubic curve with control points at
+ *  `peak_x` actually reaches `displacement` at the midpoint. Derived from
+ *  the t=0.5 value of a cubic Bezier with P0.x=P3.x=baseline and
+ *  P1.x=P2.x=peak_x:  x(0.5) = baseline + (3/4) * (peak_x - baseline). */
+const BEZIER_PEAK_K = 4 / 3
+/** Max effective depth (lane interior dent or outward bump) the silhouette
+ *  may show even before per-axis scaling, used to size the SVG overflow box. */
 
 /**
- * Walk the rendered article and paint a parallel set of vertical lanes
- * in the left gutter, one per axis. Each lane runs a faint centerline
- * (the doc's median on that axis); each paragraph contributes one bar
- * per axis whose direction and length encode how far that paragraph
- * deviates from the doc's median, normalised against the doc's MAD on
- * that axis.
+ * Walk the rendered article and paint a parallel set of vertical lanes in
+ * the left gutter, one per axis. Each lane is a single SVG closed path: the
+ * left edge is straight at x=0, the right edge is a wavy silhouette that
+ * bulges outward (convex) at paragraphs scoring positive against the
+ * internet-average baseline and caves inward (concave) at paragraphs
+ * scoring negative. Length of bulge/dent encodes |score|/10 * MAX_DEPTH.
  *
- * Lanes for axes with zero spread (MAD = 0) render empty: there is no
- * comparison to draw, so the rail stays quiet.
+ * The scoring range is symmetric (-10..+10) with 0 as "internet-average".
+ * Server clears legacy 0..10 scores on first read after the schema bump,
+ * so old data renders as a flat lane until the drafter re-scores.
  *
  * Idempotent: removes any prior rails container before re-attaching.
  */
@@ -119,149 +113,122 @@ export function applyDensityRails(
   }
 
   if (!Number.isFinite(trackTop) || segments.length === 0) return
+  const trackHeight = trackBottom - trackTop
 
-  // Per-axis statistics across this doc's scored paragraphs. Median + MAD
-  // is robust to short docs and to single outliers - mean + SD would
-  // misbehave on the typical 10-40 paragraph range.
-  const stats = new Map<string, { median: number; mad: number }>()
-  for (const ax of axes) {
-    const values: number[] = []
-    for (const seg of segments) {
-      const v = seg.scores[ax.key]
-      if (typeof v === 'number' && Number.isFinite(v)) values.push(v)
-    }
-    if (values.length === 0) {
-      stats.set(ax.key, { median: 0, mad: 0 })
-      continue
-    }
-    const median = medianOf(values)
-    const mad = medianOf(values.map((v) => Math.abs(v - median)))
-    stats.set(ax.key, { median, mad })
-  }
-
-  // Now that we have stats, attach per-paragraph tooltips with direction.
+  // Per-paragraph tooltips: list each axis's score with a weak/strong
+  // descriptor derived from the score's sign (not from any doc-local
+  // distribution - the baseline is external).
   for (const seg of segments) {
-    seg.pEl.title = formatTooltip(seg.scores, axes, stats)
+    seg.pEl.title = formatTooltip(seg.scores, axes)
   }
-
-  // Per-segment raw demand on each lane: how long the bar would want to be
-  // if it could stretch freely, and which direction it extends. Then resolve
-  // pairs (lane i, lane i+1) so adjacent bars never collide. Lanes with no
-  // neighbour at all (leftmost left side, rightmost right side) spill into
-  // the outer slack instead.
-  type LaneDemand = { raw: number; dir: 'left' | 'right' | null; dev: number }
-  const N = axes.length
-  const demandBySeg: LaneDemand[][] = segments.map((seg) =>
-    axes.map((ax) => {
-      const stat = stats.get(ax.key)
-      if (!stat || stat.mad <= 0) return { raw: 0, dir: null, dev: 0 }
-      const v = seg.scores[ax.key]
-      if (typeof v !== 'number' || !Number.isFinite(v)) return { raw: 0, dir: null, dev: 0 }
-      let dev = (v - stat.median) / (K_MAD * stat.mad)
-      if (dev > LANE_MAX_DEV) dev = LANE_MAX_DEV
-      else if (dev < -LANE_MAX_DEV) dev = -LANE_MAX_DEV
-      const mag = Math.abs(dev)
-      if (mag < SPARSITY_THRESHOLD) return { raw: 0, dir: null, dev }
-      return { raw: mag * LANE_HALF_PX, dir: dev < 0 ? 'left' : 'right', dev }
-    }),
-  )
-
-  // For each (segment, lane), trim the raw demand using neighbouring lanes'
-  // demand at the same row. Two bars facing each other across a gap share
-  // the available between-centerline space proportionally; a bar facing an
-  // empty neighbour gets the whole gap. Outermost edges (lane 0 left,
-  // lane N-1 right) clip to the outer slack budgets.
-  const lengthBySeg: number[][] = demandBySeg.map((row) => {
-    const out = new Array<number>(N).fill(0)
-    for (let i = 0; i < N; i++) {
-      const me = row[i]
-      if (me.dir === null || me.raw === 0) continue
-      if (me.dir === 'left') {
-        if (i === 0) {
-          out[i] = Math.min(me.raw, OUTER_LEFT_MAX_PX)
-        } else {
-          const neighbour = row[i - 1]
-          const neighbourPush = neighbour.dir === 'right' ? neighbour.raw : 0
-          const total = me.raw + neighbourPush
-          out[i] = total <= AVAILABLE_BETWEEN_CENTERS
-            ? me.raw
-            : (me.raw * AVAILABLE_BETWEEN_CENTERS) / total
-        }
-      } else {
-        if (i === N - 1) {
-          out[i] = Math.min(me.raw, OUTER_RIGHT_MAX_PX)
-        } else {
-          const neighbour = row[i + 1]
-          const neighbourPush = neighbour.dir === 'left' ? neighbour.raw : 0
-          const total = me.raw + neighbourPush
-          out[i] = total <= AVAILABLE_BETWEEN_CENTERS
-            ? me.raw
-            : (me.raw * AVAILABLE_BETWEEN_CENTERS) / total
-        }
-      }
-    }
-    return out
-  })
 
   const rails = document.createElement('div')
   rails.className = 'density-rails'
   rails.setAttribute('aria-hidden', 'true')
   rails.style.top = `${trackTop}px`
-  rails.style.height = `${trackBottom - trackTop}px`
+  rails.style.height = `${trackHeight}px`
   rails.style.setProperty('--rail-axis-count', String(axes.length))
 
-  // Column headers, rendered once at the top and once at the bottom. A long
-  // article scrolls past the top labels - the bottom set re-anchors identity
-  // when the writer is at the end. Each header carries its axis's hue so the
-  // colour mapping survives even when both label rows are off-screen.
   rails.appendChild(buildHeaders(axes, 'top'))
 
   const lanesEl = document.createElement('div')
   lanesEl.className = 'density-rail-lanes'
 
-  for (let i = 0; i < N; i++) {
-    const ax = axes[i]
+  for (const ax of axes) {
     const lane = document.createElement('div')
     lane.className = 'density-rail'
     lane.dataset.axis = ax.key
     lane.title = ax.label
     lane.style.setProperty('--rail-color', `var(--rail-${ax.key}, var(--accent))`)
 
-    const stat = stats.get(ax.key)
-    if (!stat || stat.mad <= 0) {
-      lane.dataset.noSpread = '1'
+    // Quiet when an axis has no signal across the whole doc - lane renders
+    // as a thin baseline column only, no silhouette path.
+    if (!hasSignal(segments, ax.key)) {
+      lane.dataset.noSignal = '1'
       lanesEl.appendChild(lane)
       continue
     }
 
-    for (let s = 0; s < segments.length; s++) {
-      const seg = segments[s]
-      const d = demandBySeg[s][i]
-      if (d.dir === null) continue
-      const px = lengthBySeg[s][i]
-      if (px <= 0) continue
+    const pathD = buildLanePath(segments, trackTop, trackHeight, ax.key)
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('class', 'density-rail-svg')
+    svg.setAttribute('viewBox', `0 0 ${LANE_WIDTH_PX} ${trackHeight}`)
+    svg.setAttribute('preserveAspectRatio', 'none')
+    svg.setAttribute('width', String(LANE_WIDTH_PX))
+    svg.setAttribute('height', String(trackHeight))
+    svg.style.overflow = 'visible'
 
-      const sliver = document.createElement('div')
-      sliver.className = 'density-rail-seg'
-      sliver.dataset.dir = d.dir === 'left' ? 'weak' : 'strong'
-      // A bar that exceeds the base half-width has "exploded" into the
-      // neighbour's empty half - flag it so the CSS can lift its opacity
-      // to read as the outlier it is.
-      if (px > LANE_HALF_PX + 0.5) sliver.dataset.exploded = '1'
-      sliver.style.top = `${seg.top - trackTop}px`
-      sliver.style.height = `${seg.height}px`
-      sliver.style.width = `${px}px`
-      if (d.dir === 'left') sliver.style.right = '50%'
-      else sliver.style.left = '50%'
-      lane.appendChild(sliver)
-    }
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('d', pathD)
+    path.setAttribute('class', 'density-rail-silhouette')
+    svg.appendChild(path)
 
+    lane.appendChild(svg)
     lanesEl.appendChild(lane)
   }
 
   rails.appendChild(lanesEl)
   rails.appendChild(buildHeaders(axes, 'bottom'))
   root.appendChild(rails)
+}
+
+/**
+ * Build the SVG path string for one lane's silhouette. The path is a closed
+ * polygon: straight left edge at x=0, wavy right edge that hovers at the
+ * baseline (x=LANE_WIDTH) and deflects through each paragraph row by a
+ * cubic Bezier whose midpoint sits at baseline + (score/10)*MAX_DEPTH.
+ */
+function buildLanePath(
+  segments: ReadonlyArray<{ top: number; height: number; scores: DensityAxes }>,
+  trackTop: number,
+  trackHeight: number,
+  axisKey: string,
+): string {
+  const baseline = LANE_WIDTH_PX
+  let path = `M 0 0 L ${baseline} 0`
+  let lastY = 0
+
+  for (const seg of segments) {
+    const v = seg.scores[axisKey]
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    const py_start = seg.top - trackTop
+    const py_end = py_start + seg.height
+    if (py_start > lastY) path += ` L ${baseline} ${py_start.toFixed(2)}`
+
+    if (Math.abs(v) < SPARSITY_SCORE) {
+      // Sparse: skip the bump, draw a flat segment through the paragraph.
+      path += ` L ${baseline} ${py_end.toFixed(2)}`
+      lastY = py_end
+      continue
+    }
+
+    // Map score linearly onto MAX_DEPTH; clamp at +/- 10 so freak inputs
+    // can't push the silhouette outside the lane's overflow allowance.
+    const clamped = v > 10 ? 10 : v < -10 ? -10 : v
+    const displacement = (clamped / 10) * MAX_DEPTH_PX
+    const peakX = baseline + BEZIER_PEAK_K * displacement
+    const ctrlY1 = py_start + (py_end - py_start) / 3
+    const ctrlY2 = py_start + (2 * (py_end - py_start)) / 3
+    path += ` C ${peakX.toFixed(2)} ${ctrlY1.toFixed(2)}, ${peakX.toFixed(2)} ${ctrlY2.toFixed(2)}, ${baseline} ${py_end.toFixed(2)}`
+    lastY = py_end
+  }
+
+  if (lastY < trackHeight) path += ` L ${baseline} ${trackHeight.toFixed(2)}`
+  path += ` L 0 ${trackHeight.toFixed(2)} Z`
+  return path
+}
+
+function hasSignal(
+  segments: ReadonlyArray<{ scores: DensityAxes }>,
+  axisKey: string,
+): boolean {
+  for (const seg of segments) {
+    const v = seg.scores[axisKey]
+    if (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) >= SPARSITY_SCORE) {
+      return true
+    }
+  }
+  return false
 }
 
 function buildHeaders(
@@ -308,7 +275,6 @@ function unionOfAxes(
 function formatTooltip(
   scores: DensityAxes,
   axes: ReadonlyArray<{ key: string; label: string }>,
-  stats: Map<string, { median: number; mad: number }>,
 ): string {
   const parts: string[] = []
   for (const ax of axes) {
@@ -317,27 +283,11 @@ function formatTooltip(
       parts.push(`${ax.label}: –`)
       continue
     }
-    const stat = stats.get(ax.key)
     let descriptor = ''
-    if (stat && stat.mad > 0) {
-      let dev = (v - stat.median) / (K_MAD * stat.mad)
-      if (dev > 1) dev = 1
-      else if (dev < -1) dev = -1
-      if (Math.abs(dev) >= SPARSITY_THRESHOLD) {
-        descriptor = dev < 0 ? ' (weak)' : ' (strong)'
-      }
-    }
+    if (Math.abs(v) >= SPARSITY_SCORE) descriptor = v < 0 ? ' (weak)' : ' (strong)'
     parts.push(`${ax.label}: ${v.toFixed(1)}${descriptor}`)
   }
   return parts.join(' · ')
-}
-
-function medianOf(values: readonly number[]): number {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  if (sorted.length % 2 === 1) return sorted[mid]
-  return (sorted[mid - 1] + sorted[mid]) / 2
 }
 
 function canonical(s: string): string {

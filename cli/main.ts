@@ -101,6 +101,7 @@ Work:
   cancel <rid>                            user rescinded
   density [--json]                        show paragraph density cache
   density-post @file.json | -             submit per-paragraph scores
+                                          (axes in [-10, +10]; 0 = baseline)
 
 Events:
   events [--since N]                      stream SSE as NDJSON

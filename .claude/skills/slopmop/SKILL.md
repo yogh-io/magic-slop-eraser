@@ -394,12 +394,13 @@ Pack them into your prompt as few-shot examples. Voice converges over the sessio
 
 ## 7. density scoring
 
-Slop catalogue tells the author what's *wrong* with a passage. Density is the other lens: per-paragraph numeric scores along a few axes, rendered as a thin gradient rail in the article margin so the author can see at a glance where the prose is alive vs dead. **Information**, **argument**, **impact**, **specificity**, **voice** are the canonical defaults; you can drop any that don't fit a piece, and you can add your own (e.g. *humour*, *tension*, *stakes*) when the work calls for it. The client renders the union it sees, with extras getting a neutral fallback color.
+Slop catalogue tells the author what's *wrong* with a passage. Density is the other lens: per-paragraph numeric scores along a few axes, rendered as a wavy silhouette in the article margin - one lane per axis, convex bumps where the paragraph is above ambient noise on that axis and concave dents where it's below. **Information**, **argument**, **impact**, **specificity**, **voice** are the canonical defaults; you can drop any that don't fit a piece, and you can add your own (e.g. *humour*, *tension*, *stakes*) when the work calls for it. The client renders the union it sees, with extras getting a neutral fallback color.
 
 **When to score:**
 - Once at session start, after you post flags. Most paragraphs land their scores here.
 - After a fullSource push (Rung 3 editorial rewrite): every paragraph hash that doesn't already exist in the cache needs re-scoring. Per-flag patches that stay inside an anchor window don't change the paragraph hash, so existing scores carry over for free.
 - Whenever the author asks ("re-score density", "the scores are stale").
+- On any doc whose `slopmop density --json` returns an empty `density` map. The server clears legacy 0..10 scores on first read after the symmetric schema bump, so an empty cache on a doc that obviously needs scoring is a re-score prompt, not a fresh doc.
 
 **The flow:**
 
@@ -409,17 +410,27 @@ slopmop density --json
 # -> { paragraphs: [{ hash, start, end, text }], density: { hash: { axis: score } } }
 ```
 
-For each paragraph whose `hash` is missing from `density`, score it. Use a single LLM call that takes the paragraph (with surrounding paragraph context for voice judgement) and returns the axis scores. Score 0..10:
+For each paragraph whose `hash` is missing from `density`, score it. Use a single LLM call that takes the paragraph (with surrounding paragraph context for voice judgement) and returns the axis scores.
 
-- **information**: density of facts, named entities, numbers. Hand-wavy abstractions = low; concrete claims = high.
-- **argument**: is a claim being made and supported here, or is the paragraph just sitting there? Inert connective tissue = low; load-bearing = high.
-- **impact**: does this hit. Punchline-quality, specific imagery, payoff. Filler = low; lands = high.
-- **specificity**: concrete nouns vs abstractions. "Three counties" beats "many areas." Specific = high.
-- **voice**: does this sound like the writer (per voice samples) or like a model. Signature voice = high; generic = low.
+**Score range: -10 to +10. The calibration anchor is external.** Zero is *not* the midpoint of the current piece - zero is "average article on the internet" on this axis. A typical Atlantic paragraph, a typical blog post, a typical AI-generated passage: those are the baseline. Score each paragraph against that external reference:
+
+- **+8** = very good relative to the baseline. Reads like top-decile prose on this axis.
+- **+4** = noticeably better than baseline. The writer is doing something here.
+- **0** = unremarkable. Indistinguishable from baseline prose, neither carrying nor sinking the paragraph.
+- **-4** = noticeably worse. The paragraph is underperforming on this axis.
+- **-8** = very bad relative to baseline. Reads like a paragraph that gave up on this axis.
+
+The axes themselves are unchanged:
+
+- **information**: density of facts, named entities, numbers. Hand-wavy abstractions = negative; concrete claims = positive.
+- **argument**: is a claim being made and supported here, or is the paragraph just sitting there? Inert connective tissue = negative; load-bearing = positive.
+- **impact**: does this hit. Punchline-quality, specific imagery, payoff. Filler = negative; lands = positive.
+- **specificity**: concrete nouns vs abstractions. "Three counties" beats "many areas." Specific = positive.
+- **voice**: does this sound like the writer (per voice samples) or like a model. Signature voice = positive; generic = negative.
 
 Drop any axis that genuinely doesn't apply (e.g. voice=N/A on a piece with no voice samples yet). Add an axis if you've got a strong take ("Tension - is something at stake here").
 
-**Score for contrast, not calibration.** There is no objectively correct number for "information=6.5" - the scale is subjective and that's fine. The signal the author wants is *relative*: which paragraphs are alive vs dim along each axis, where the prose dies and where it carries weight. Use the full 0-10 range across the piece. If your scores all cluster between 6 and 8, the rail looks uniform and tells the author nothing - rescore with sharper contrast: pin the weakest paragraph low and the strongest high, then place the rest between them. Embrace the subjectivity; the rail is a *visual diff* against the writer's own piece, not an absolute grade.
+**Score for contrast, AND keep the baseline calibrated.** The author wants two signals from the rail at once: (1) where this piece is above vs below the typical internet paragraph (the baseline anchors that read), and (2) where the piece's own peaks and troughs sit (contrast across paragraphs makes that visible). Don't cluster everything in the middle "to be safe"; use the full range. A piece where every paragraph scores between +1 and +3 is telling the author either "the agent is sandbagging" or "this prose is genuinely middling on every axis" - if the second is true, that itself is the signal.
 
 Build a `scores.json`:
 
@@ -427,11 +438,14 @@ Build a `scores.json`:
 {
   "modelTag": "claude-opus-4-7",
   "scores": [
-    { "paragraphHash": "h1", "axes": { "information": 7.5, "argument": 4, "impact": 6.5, "specificity": 8, "voice": 5 } },
-    { "paragraphHash": "h2", "axes": { "information": 2, "argument": 1, "impact": 1.5, "specificity": 2, "voice": 3, "tension": 0.5 } }
+    { "paragraphHash": "h1", "axes": { "information":  6, "argument":  3, "impact":  7, "specificity":  8, "voice":  2 } },
+    { "paragraphHash": "h2", "axes": { "information": -7, "argument": -4, "impact": -8, "specificity": -6, "voice": -3, "tension": -5 } },
+    { "paragraphHash": "h3", "axes": { "information":  0, "argument":  1, "impact": -1, "specificity":  0, "voice":  0 } }
   ]
 }
 ```
+
+The first paragraph reads as solidly above baseline on most axes (a paragraph carrying its weight); the second is broadly below baseline (a paragraph the author probably wants to rebuild); the third is unremarkable in either direction (the rail goes flat against the centerline at this row).
 
 Post it:
 
@@ -439,9 +453,9 @@ Post it:
 slopmop density-post @scores.json
 ```
 
-Server stores by hash, so unchanged paragraphs keep their scores across edits forever - re-running density on a second pass only spends tokens on the paragraphs that drifted.
+Server stores by hash, so unchanged paragraphs keep their scores across edits forever - re-running density on a second pass only spends tokens on the paragraphs that drifted. Scores are clamped to [-10, +10] server-side.
 
-The author can read the rail to decide where prose is dying ("this whole section is dim") - that's a higher-leverage signal than nudging individual lexical flags. Don't lecture about it; just score.
+The author can read the rail to decide where prose is dying ("this whole section is denting in") or carrying weight ("the silhouette bulges through here") - that's a higher-leverage signal than nudging individual lexical flags. Don't lecture about it; just score.
 
 ## 8. wrap up
 

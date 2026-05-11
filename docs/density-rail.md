@@ -20,10 +20,12 @@ see, at a glance:
   signal that the model has misread).
 
 It is not a verdict, and it is not absolute. The drafter's per-paragraph
-0..10 scores are subjective and model-dependent; the rail does not assume
-that any particular number means anything. It only reads relations - "this
-paragraph is less / more than its peers on this axis, by this much" -
-against the document's own distribution.
+scores are subjective and model-dependent. Since v3.2 the calibration
+anchor is **external** (an internet-average paragraph at score 0) rather
+than the doc's own distribution - so a flat rail through a section now
+means "this section reads as unremarkable vs. the broader population of
+prose," not "this section is consistent with the other sections in this
+specific piece."
 
 ## What the v2 design (currently shipped) gets wrong
 
@@ -48,9 +50,28 @@ Two failures, observable on any real document:
 
 The fix isn't a tweak; the encoding has to change.
 
-## The v3 spec: divergent lanes, distribution-relative
+## The v3 spec: divergent lanes, distribution-relative (superseded by v3.2)
 
-### Geometry
+The v3 design rendered each paragraph's per-axis score as a horizontal
+bar whose direction and length encoded **deviation from the document's
+own median**, normalised against the document's MAD on that axis. The
+bar extended left of a centerline for below-median paragraphs and right
+for above-median; same-side fold for sparsity-near-median.
+
+v3.2 retired this in favour of:
+
+1. an **external** scoring anchor (internet-average at 0, see "Scoring"
+   below) - so the rail tells the writer "this paragraph is below
+   typical-prose quality," not just "this paragraph is below the other
+   paragraphs in this piece."
+2. a per-axis **silhouette** rendered with SVG paths - convex bumps for
+   positive scores, concave dents for negative ones, replacing the
+   left/right bars.
+
+The historical v3 geometry text below is preserved for context; the
+implementation no longer follows it.
+
+### Geometry (historical, v3)
 
 One **lane** per axis, vertical, in the left gutter. Lanes are arranged in
 canonical axis order (information, argument, impact, specificity, voice)
@@ -76,23 +97,14 @@ centerline. Five lanes plus gaps fit in ~80px of gutter on desktop. The
 rail hides under a viewport-width breakpoint where the gutter is too tight
 to be useful.
 
-### Statistics
+### Statistics (superseded - see v3.2)
 
-Per axis, computed once per render across all scored paragraphs in the doc:
-
-- **Centre**: the median score.
-- **Spread**: the **MAD** (median absolute deviation) - robust to short
-  documents and to single-paragraph outliers. If MAD is zero (every
-  scored paragraph has the same score on this axis), the lane renders
-  empty: there's nothing to compare.
-- **Normalised magnitude**: `(score - median) / (k * MAD)`, clamped to
-  `[-1, +1]`. `k` is a small constant (~2) so the most-deviant paragraph
-  in a normal distribution fills its lane; pathological outliers cap at
-  the lane edge instead of bursting out.
-
-Mean + SD would be wrong for this: documents are short (often 10-40
-paragraphs), one extreme paragraph would skew the centre and inflate the
-spread. Median + MAD stays steady.
+The original v3 design computed a per-axis median + MAD across the scored
+paragraphs and rendered each bar as the paragraph's normalised deviation
+from that doc-local median. v3.2 dropped this in favour of an external
+(internet-average) baseline at 0 - see "Scoring (v3.2 amendment)" below.
+The MAD machinery and the distribution-relative logic are no longer in
+the implementation.
 
 ### Sparsity
 
@@ -108,33 +120,40 @@ drop the ticks.
 
 ### Direction encoding
 
-Direction (weak vs. strong) is **geometric**, not colour-coded:
+Direction (above vs. below baseline) is **geometric**, not colour-coded:
 
-- Left of centerline = below median = weak on this axis in this doc.
-- Right of centerline = above median = strong on this axis in this doc.
+- **Right of baseline** = score positive = paragraph reads above the
+  internet-average baseline on this axis (convex bump outward).
+- **Left of baseline** = score negative = paragraph reads below the
+  internet-average baseline on this axis (concave dent inward into
+  the lane).
+- **Flat at baseline** = score near zero = unremarkable on this axis.
 
-The geometric channel is the one that must survive colourblindness,
+The baseline is the lane's natural right edge; a faint vertical guide
+renders behind the silhouette so the writer can see exactly where it
+sits. The geometric channel is the one that must survive colourblindness,
 faded screens, and theme swaps; nothing else encodes direction.
 
 ### Colour (v3.1 amendment)
 
-Colour now carries **axis identity**, not direction. Each axis renders in
-its own hue (theme tokens `--rail-information`, `--rail-argument`,
-`--rail-impact`, `--rail-specificity`, `--rail-voice`); centerlines and
-bars within a lane share that hue. Reason: in practice the all-accent
-v3 rail forced the writer to count lanes left-to-right against a header
-row that scrolls out of view, which is the wrong cognitive load to ask
-for. Colour lets the writer recognise the rail at a glance once the
-mapping is learned; the colour-blind / faded-theme case is still
-served by the (now twice-rendered, see Labels) text headers.
+Colour carries **axis identity**, not direction. Each axis renders in its
+own hue (theme tokens `--rail-information`, `--rail-argument`,
+`--rail-impact`, `--rail-specificity`, `--rail-voice`); the silhouette
+fills with that hue at ~62% opacity and a slightly darker stroke for
+definition. Reason: in practice the all-accent v3 rail forced the writer
+to count lanes left-to-right against a header row that scrolls out of
+view, which is the wrong cognitive load to ask for. Colour lets the
+writer recognise the rail at a glance once the mapping is learned; the
+colour-blind / faded-theme case is still served by the (twice-rendered,
+see Labels) text headers.
 
 Pick hues that are mid-saturation and similar in lightness so no axis
 dominates visually; theme files may override per palette.
 
 ### Labels
 
-Axis identity has to be legible. A fat bar in lane 2 is useless if the
-writer can't translate "lane 2" into "argument."
+Axis identity has to be legible. A fat silhouette in lane 2 is useless
+if the writer can't translate "lane 2" into "argument."
 
 - **Column headers**, one per lane, in vertical text (writing-mode
   `vertical-rl`) so the full short word fits inside the lane width.
@@ -145,54 +164,83 @@ writer can't translate "lane 2" into "argument."
   long article scrolls past the top set; the bottom set re-anchors
   identity when the writer reaches the end.
 - Per-paragraph **hover** on the article side surfaces a tooltip:
-  *"argument: weak (-1.4 MAD); impact: strong (+0.8 MAD); ..."* - the
-  axis names and the relative position. Numeric MAD values aren't shown
-  to the writer in normal use; they're useful for debugging the rail.
+  *"argument: 4 (strong); impact: -7 (weak); ..."* - the axis names,
+  the symmetric scores, and weak/strong descriptors derived from sign.
 - Eventually (not in scope here, but worth designing toward): hover
   surfaces an axis-specific *directive* - "argument is weak: what claim
   are you making here?" - so the rail teaches, not just diagnoses.
 
-### Explosion (v3.1 amendment)
+### Scoring (v3.2 amendment)
 
-A bar's length is `|dev| * LANE_HALF_PX`, clamped at `LANE_MAX_DEV` (≈2.5).
-At `|dev|=1` the bar reaches the lane edge as before; beyond that, the
-bar **may extend into the neighbouring lane's empty half** if that
-neighbour's row is quiet or extends in the same direction. Two facing
-bars across a gap share the gap's available width proportionally - they
-will never collide, and an `INNER_GAP_PX` buffer is preserved between
-them. Outermost lanes get a separate slack budget (`OUTER_LEFT_MAX_PX`
-on the left of the leftmost lane, `OUTER_RIGHT_MAX_PX` on the right of
-the rightmost).
+The score range is **symmetric, -10 to +10**, calibrated against an
+**external** baseline. Zero is "average article on the internet" on this
+axis - the prose-quality reference is the typical Atlantic paragraph,
+the typical blog post, the typical AI-generated passage. The drafter
+scores each paragraph against that anchor, not against the other
+paragraphs in this piece:
 
-The CSS lifts an exploded bar's opacity (and adds a faint same-hue
-outline shadow) so the outlier reads as one without further markup.
+- **+8** = very good relative to baseline.
+- **+4** = noticeably above baseline.
+- **0** = unremarkable, neither carrying nor sinking the paragraph.
+- **-4** = noticeably below baseline.
+- **-8** = very bad relative to baseline.
 
-### What renders
+Why: positive-only scoring forced "average" into the middle of the range
+(5 of 10), so every paragraph looked at least moderately strong - the
+rail had no way to say "this paragraph is worse than typical prose." The
+signal we want is deviation from baseline in either direction; symmetric
+scoring carries that directly.
 
-Pseudocode for the rendering pass:
+The drafter is still expected to use the full range across the piece -
+clustering everything in `[-2, +2]` either means the agent is sandbagging
+or the prose is genuinely middling on every axis. Either way the rail
+flattens, and the writer reads "no signal here" rather than "noise."
 
-```
-for each axis in CANONICAL_AXES present in this doc:
-    scores = [paragraph.score[axis] for paragraph in scored_paragraphs]
-    median = median(scores)
-    mad = median(abs(s - median) for s in scores)
-    if mad == 0:
-        render empty lane (centerline only)
-        continue
-    for each paragraph in the rendered article:
-        if paragraph has no score on this axis: skip
-        deviation = (score - median) / (k * mad)
-        deviation = clamp(deviation, -1, +1)
-        if abs(deviation) < SPARSITY_THRESHOLD:
-            skip (or draw faint tick)
-            continue
-        bar_length = abs(deviation) * LANE_HALF_WIDTH_PX
-        bar_direction = "left" if deviation < 0 else "right"
-        draw bar at paragraph's vertical position
-```
+Legacy 0..10 scores from before this amendment are dropped server-side
+on first read (see `migrateDensitySchema` / `densitySchemaVersion`), so
+the drafter is forced to re-score against the symmetric anchor rather
+than letting the old data render under the new geometry.
 
-`SPARSITY_THRESHOLD` is a small fraction (~0.2 of normalised magnitude) so
-the rail stays quiet for paragraphs close to median. Tune in practice.
+### Geometry (v3.2 amendment)
+
+Replaces the bar-per-paragraph design. Each lane is one SVG closed path:
+
+- **Left edge**: straight at `x = 0` (the lane's left margin).
+- **Right edge**: wavy, baseline at `x = LANE_WIDTH_PX` (the lane's
+  natural right edge). Per paragraph row, the right edge deflects:
+  - **Positive score**: the edge bumps **outward** (right of baseline),
+    a convex bulge of depth `(score / 10) * MAX_DEPTH_PX`.
+  - **Negative score**: the edge caves **inward** (left of baseline,
+    into the lane interior), a concave dent of depth
+    `(|score| / 10) * MAX_DEPTH_PX`.
+  - **Near-zero score** (`|score| < SPARSITY_SCORE`): the edge stays at
+    baseline through that paragraph row - the rail goes flat.
+- **Bottom and top edges**: close the path symmetrically.
+
+The deflection is rendered as a cubic Bezier across the paragraph row:
+`M (baseline, py_start) C (peak_x, ctrl_y_top) (peak_x, ctrl_y_bot)
+(baseline, py_end)` with `peak_x = baseline + (4/3) * displacement` so
+the curve's midpoint actually reaches `baseline + displacement` (the
+Bezier under-shoots its control points by 25% on the principal axis).
+
+`MAX_DEPTH_PX = 8`, so a `+10` paragraph bumps 8px outward and a `-10`
+paragraph dents 8px inward. With `LANE_WIDTH_PX = 14`, a `-10` dent
+leaves a 6px sliver of lane material on the left - thin but visible,
+which keeps the silhouette readable at the most-negative extreme.
+
+`LANE_GAP_PX = 10` keeps the rightmost lane's max bump (8px) safely
+clear of the next lane's left edge (`INNER_GAP_PX = 2` buffer). The
+outermost lanes spill into the gutter / prose margin per their slack.
+
+### Colour and labels
+
+Unchanged from v3.1: each lane carries its own hue via theme tokens
+(`--rail-information`, …, `--rail-voice`); the silhouette fills with
+that hue at ~62% opacity and a slightly darker stroke for definition.
+A faint vertical baseline at `x = LANE_WIDTH_PX` sits behind the
+silhouette so the writer can read deflections as "to the left of the
+line = dent, to the right = bump." Vertical-text headers render at the
+top and bottom of the rail block.
 
 ## Goals
 

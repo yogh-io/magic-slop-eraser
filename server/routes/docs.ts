@@ -9,7 +9,7 @@ import { json, notFound } from '../shared'
 import { fail } from '../auth'
 import { sha256Hex } from '../hash'
 import { reconcile } from '../reconcile'
-import { computeParagraphInfo } from '../density'
+import { computeParagraphInfo, migrateDensitySchema, DENSITY_SCHEMA } from '../density'
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -59,6 +59,7 @@ export async function handleDocs(
       history: [initial],
       agentHints: {},
       density: {},
+      densitySchemaVersion: DENSITY_SCHEMA,
       agentActivity: { tasks: {}, notes: {} },
       events: [],
     }
@@ -71,6 +72,8 @@ export async function handleDocs(
   const state = await store.readState(docId)
   if (!state) return notFound()
   ensureSchema(state)
+  // Legacy 0..10 scores are cleared on first read after the schema bump.
+  if (migrateDensitySchema(state)) await store.writeState(docId, state)
 
   // GET /docs/:id
   if (verb === null && req.method === 'GET') {

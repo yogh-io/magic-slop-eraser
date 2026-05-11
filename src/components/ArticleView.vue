@@ -289,17 +289,17 @@ function onMouseUp(): void {
 }
 
 /* Density rails: N parallel vertical lanes in the left gutter, one per     */
-/* axis. Each lane has its own hue (--rail-color, set per-axis by JS) so   */
-/* identity is carried both by colour AND by the labels above + below the */
-/* rail block. Centerline = doc's median on this axis; per-paragraph bars */
-/* extend left of the centerline for weak (below median) and right for    */
-/* strong (above median). Length encodes deviation magnitude. A bar may   */
-/* "explode" past its lane's half-width when the adjacent lane is quiet   */
-/* at that row, so outlier paragraphs read as the outliers they are. See  */
-/* docs/density-rail.md for the spec.                                     */
+/* axis. Each lane is an SVG silhouette - left edge straight at the lane's */
+/* baseline, right edge wavy. Convex bumps protrude outward at paragraphs */
+/* scoring positive against the internet-average baseline (0); concave    */
+/* dents cave inward at paragraphs scoring negative. Symmetric: |+6| and  */
+/* |-6| produce mirror-image deflections of equal depth. Colour carries   */
+/* axis identity (via --rail-color set per-lane by JS) so the rail is a   */
+/* literal silhouette of where the prose is above vs below ambient noise. */
+/* See docs/density-rail.md for the spec.                                 */
 .article-view :deep(.density-rails) {
   position: absolute;
-  left: -5.5rem;
+  left: -8rem;
   pointer-events: none;
   z-index: 0;
 }
@@ -307,20 +307,20 @@ function onMouseUp(): void {
   position: absolute;
   left: 0;
   display: flex;
-  gap: 3px;
+  gap: 10px;
   pointer-events: auto;
 }
 .article-view :deep(.density-rail-headers-top) {
   bottom: 100%;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .article-view :deep(.density-rail-headers-bottom) {
   top: 100%;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 .article-view :deep(.density-rail-header) {
-  width: 13px;
-  min-height: 44px;
+  width: 14px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -345,71 +345,42 @@ function onMouseUp(): void {
 }
 .article-view :deep(.density-rail-lanes) {
   display: flex;
-  gap: 3px;
+  gap: 10px;
   height: 100%;
 }
 .article-view :deep(.density-rail) {
   position: relative;
-  width: 13px;
+  width: 14px;
   height: 100%;
   flex-shrink: 0;
   overflow: visible;
 }
+/* Baseline: a faint vertical guide at the lane's natural right edge so the
+ * writer can read deflections as "to the left of baseline = dent, to the
+ * right = bump". Drawn behind the silhouette via z-stacking. */
 .article-view :deep(.density-rail::before) {
   content: '';
   position: absolute;
-  left: 50%;
+  right: 0;
   top: 0;
   bottom: 0;
   width: 1px;
-  margin-left: -0.5px;
-  background: color-mix(in srgb, var(--rail-color, var(--accent)) 28%, transparent);
+  background: color-mix(in srgb, var(--rail-color, var(--accent)) 18%, transparent);
+  z-index: 0;
 }
-.article-view :deep(.density-rail[data-no-spread="1"]::before) {
-  background: color-mix(in srgb, var(--muted) 20%, transparent);
+.article-view :deep(.density-rail[data-no-signal="1"]::before) {
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
 }
-.article-view :deep(.density-rail-seg) {
-  position: absolute;
-  border-radius: 1.5px;
-  transition: opacity 200ms ease;
+.article-view :deep(.density-rail-svg) {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
-/* Bars fade from a soft anchor at the centerline outward toward the tip so
- * the eye reads them as pushing away from the median, not as solid blocks
- * pinned to the rail. Direction-aware gradient: right-extending strong
- * bars fade left-to-right, left-extending weak bars fade right-to-left. */
-.article-view :deep(.density-rail-seg[data-dir="strong"]) {
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--rail-color, var(--accent)) 55%, transparent) 0%,
-    color-mix(in srgb, var(--rail-color, var(--accent)) 95%, transparent) 100%
-  );
-}
-.article-view :deep(.density-rail-seg[data-dir="weak"]) {
-  background: linear-gradient(
-    to left,
-    color-mix(in srgb, var(--rail-color, var(--accent)) 55%, transparent) 0%,
-    color-mix(in srgb, var(--rail-color, var(--accent)) 95%, transparent) 100%
-  );
-}
-/* Exploded bars - the lane neighbour at this row was quiet, so the bar
- * extends past the lane's half-width to express its magnitude in full.
- * Push the tip-end opacity to fully saturated so the outlier visibly reads
- * as one, and add a faint same-hue halo to lift it off the page. */
-.article-view :deep(.density-rail-seg[data-exploded="1"][data-dir="strong"]) {
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--rail-color, var(--accent)) 50%, transparent) 0%,
-    var(--rail-color, var(--accent)) 100%
-  );
-  box-shadow: 0 0 6px -1px color-mix(in srgb, var(--rail-color, var(--accent)) 45%, transparent);
-}
-.article-view :deep(.density-rail-seg[data-exploded="1"][data-dir="weak"]) {
-  background: linear-gradient(
-    to left,
-    color-mix(in srgb, var(--rail-color, var(--accent)) 50%, transparent) 0%,
-    var(--rail-color, var(--accent)) 100%
-  );
-  box-shadow: 0 0 6px -1px color-mix(in srgb, var(--rail-color, var(--accent)) 45%, transparent);
+.article-view :deep(.density-rail-silhouette) {
+  fill: color-mix(in srgb, var(--rail-color, var(--accent)) 62%, transparent);
+  stroke: color-mix(in srgb, var(--rail-color, var(--accent)) 88%, transparent);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
 }
 .article-view :deep(p.has-density-rail) {
   cursor: help;

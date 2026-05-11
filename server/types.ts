@@ -46,9 +46,16 @@ export interface DocState {
   /** Bounded ring buffer of prior source states for revert. Newest last. */
   history: SourceVersion[]
   agentHints: AgentHints
-  /** density[paragraphHash] = { axisName -> score (0-10) }. Cached across edits; */
-  /** entries whose hash is no longer present in the source are GC'd on reconcile. */
+  /** density[paragraphHash] = { axisName -> score in [-10, +10] }. Symmetric:
+   *  0 is "average article on the internet", +10 = great vs that external
+   *  baseline, -10 = bad vs that baseline. Cached across edits; entries
+   *  whose hash is no longer present in the source are GC'd on reconcile. */
   density: Record<string, DensityAxes>
+  /** Marker for the score-range schema. Old docs (pre-v3.2) stored scores in
+   *  0..10 against the doc's own distribution; the rail renders symmetric now,
+   *  so any state without the new marker has its density cleared on read so
+   *  the drafter re-scores against the symmetric baseline. */
+  densitySchemaVersion?: 'symmetric-v1'
   /** Drafter-reported activity: heartbeat, declared tasks, free-form notes. */
   agentActivity: AgentActivity
   /** Append-only event log. Lives in-state because object stores can't append;

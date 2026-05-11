@@ -18,6 +18,15 @@
   --accent: #8a1a1a;
   --accent-fg: #f1e6cc;
 
+  /* monograph rail palette - ink-tinged, sympathetic to parchment. The
+   * impact hue is left close to the page accent so the strongest signal
+   * reads in the same iron-red ink the rest of the theme leans on. */
+  --rail-information: #3f5a72;
+  --rail-argument: #634780;
+  --rail-impact: #9a5a26;
+  --rail-specificity: #4a6a48;
+  --rail-voice: #7e3e58;
+
   --font-prose: 'Iowan Old Style', 'Charter', 'Source Serif Pro', Georgia, serif;
   --font-display: 'Cormorant SC', 'EB Garamond', Georgia, serif;
   --font-ui: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;

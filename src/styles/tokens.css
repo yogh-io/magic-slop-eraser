@@ -27,6 +27,18 @@
    * from catalog/categories.ts (one --cat-<id> per category, swapped per
    * theme). Keep no hard-coded category vars here. */
 
+  /* Density-rail palette: one hue per axis so identity is carried by colour
+   * as well as label. Mid-saturation, similar lightness so no axis dominates;
+   * themes override below for theme-appropriate variants. The spec at
+   * docs/density-rail.md was originally colour-agnostic - v3.1 admits
+   * colour as identity since labels alone proved hard to keep in working
+   * memory while scanning. Direction (weak/strong) stays geometric. */
+  --rail-information: #4a7a96;
+  --rail-argument: #7d5fa1;
+  --rail-impact: #d28739;
+  --rail-specificity: #5a9270;
+  --rail-voice: #c06485;
+
   /* Type */
   --font-prose: 'Charter', 'Iowan Old Style', 'Source Serif Pro', Georgia, serif;
   --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;

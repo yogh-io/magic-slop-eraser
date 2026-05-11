@@ -20,6 +20,15 @@
   --accent: #ec4f96;
   --accent-fg: #ffffff;
 
+  /* fairyland-pastel rail palette - same hue family as the sky/clouds/sun
+   * gradients on body, slightly more saturated so the rails still register
+   * against the cream backdrop. */
+  --rail-information: #6cb3d6;
+  --rail-argument: #b48ddb;
+  --rail-impact: #f0a361;
+  --rail-specificity: #80c79c;
+  --rail-voice: #e89db8;
+
   --font-prose: 'Cormorant Garamond', 'EB Garamond', Charter, Georgia, serif;
   --font-display: 'Cormorant Garamond', 'EB Garamond', Charter, serif;
   --font-ui: 'Inter', system-ui, sans-serif;

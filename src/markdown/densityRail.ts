@@ -25,16 +25,39 @@ export const CANONICAL_AXES: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'voice', label: 'voice' },
 ]
 
-/** Half-width of a lane in px. A paragraph at the lane edge sits this far
- *  from the centerline; smaller magnitudes scale proportionally. */
+/** Half-width of a lane in px at |dev|=1 (one normalised unit of deviation).
+ *  A paragraph one normalised unit from the median sits this far from the
+ *  centerline; smaller magnitudes scale proportionally below, larger
+ *  magnitudes can extend further (see LANE_MAX_DEV + the explosion pass). */
 const LANE_HALF_PX = 6
+/** Cap on |dev| used for bar length. Magnitudes above this clip at the same
+ *  visible length, so a freak outlier doesn't shoot past everything. With
+ *  LANE_HALF_PX=6 and LANE_MAX_DEV=3, the longest a bar wants to be is 18px
+ *  (before the neighbour-aware explosion pass trims it to fit the actual
+ *  available space). */
+const LANE_MAX_DEV = 3
 /** Multiplier on MAD when normalising deviation. (score - median) is
  *  divided by (K_MAD * MAD); k = 2 puts a 2-MAD-from-median paragraph at
- *  the lane edge before clamping. */
+ *  one normalised unit (= one LANE_HALF_PX). */
 const K_MAD = 2
 /** Below this normalised |deviation|, the bar isn't drawn - the paragraph
  *  reads as "near median on this axis" and the lane stays empty there. */
 const SPARSITY_THRESHOLD = 0.2
+/** Visible width of a single lane column (px). The centerline runs down its
+ *  middle. Inner gap between lanes governs how much room a bar has to
+ *  "explode" past its own lane edge into a neighbour's empty half. */
+const LANE_WIDTH_PX = 13
+const LANE_GAP_PX = 3
+const LANE_SPACING_PX = LANE_WIDTH_PX + LANE_GAP_PX
+/** Buffer kept between two bars in adjacent lanes so they never touch even
+ *  when both lanes go full-throttle in opposing directions. */
+const INNER_GAP_PX = 2
+const AVAILABLE_BETWEEN_CENTERS = LANE_SPACING_PX - INNER_GAP_PX
+/** Slack the outermost lanes get to spill into. The left side of the
+ *  leftmost lane faces the page gutter (lots of room); the right side of
+ *  the rightmost lane faces the prose (just a thin breathing margin). */
+const OUTER_LEFT_MAX_PX = 28
+const OUTER_RIGHT_MAX_PX = 10
 
 /**
  * Walk the rendered article and paint a parallel set of vertical lanes
@@ -121,6 +144,65 @@ export function applyDensityRails(
     seg.pEl.title = formatTooltip(seg.scores, axes, stats)
   }
 
+  // Per-segment raw demand on each lane: how long the bar would want to be
+  // if it could stretch freely, and which direction it extends. Then resolve
+  // pairs (lane i, lane i+1) so adjacent bars never collide. Lanes with no
+  // neighbour at all (leftmost left side, rightmost right side) spill into
+  // the outer slack instead.
+  type LaneDemand = { raw: number; dir: 'left' | 'right' | null; dev: number }
+  const N = axes.length
+  const demandBySeg: LaneDemand[][] = segments.map((seg) =>
+    axes.map((ax) => {
+      const stat = stats.get(ax.key)
+      if (!stat || stat.mad <= 0) return { raw: 0, dir: null, dev: 0 }
+      const v = seg.scores[ax.key]
+      if (typeof v !== 'number' || !Number.isFinite(v)) return { raw: 0, dir: null, dev: 0 }
+      let dev = (v - stat.median) / (K_MAD * stat.mad)
+      if (dev > LANE_MAX_DEV) dev = LANE_MAX_DEV
+      else if (dev < -LANE_MAX_DEV) dev = -LANE_MAX_DEV
+      const mag = Math.abs(dev)
+      if (mag < SPARSITY_THRESHOLD) return { raw: 0, dir: null, dev }
+      return { raw: mag * LANE_HALF_PX, dir: dev < 0 ? 'left' : 'right', dev }
+    }),
+  )
+
+  // For each (segment, lane), trim the raw demand using neighbouring lanes'
+  // demand at the same row. Two bars facing each other across a gap share
+  // the available between-centerline space proportionally; a bar facing an
+  // empty neighbour gets the whole gap. Outermost edges (lane 0 left,
+  // lane N-1 right) clip to the outer slack budgets.
+  const lengthBySeg: number[][] = demandBySeg.map((row) => {
+    const out = new Array<number>(N).fill(0)
+    for (let i = 0; i < N; i++) {
+      const me = row[i]
+      if (me.dir === null || me.raw === 0) continue
+      if (me.dir === 'left') {
+        if (i === 0) {
+          out[i] = Math.min(me.raw, OUTER_LEFT_MAX_PX)
+        } else {
+          const neighbour = row[i - 1]
+          const neighbourPush = neighbour.dir === 'right' ? neighbour.raw : 0
+          const total = me.raw + neighbourPush
+          out[i] = total <= AVAILABLE_BETWEEN_CENTERS
+            ? me.raw
+            : (me.raw * AVAILABLE_BETWEEN_CENTERS) / total
+        }
+      } else {
+        if (i === N - 1) {
+          out[i] = Math.min(me.raw, OUTER_RIGHT_MAX_PX)
+        } else {
+          const neighbour = row[i + 1]
+          const neighbourPush = neighbour.dir === 'left' ? neighbour.raw : 0
+          const total = me.raw + neighbourPush
+          out[i] = total <= AVAILABLE_BETWEEN_CENTERS
+            ? me.raw
+            : (me.raw * AVAILABLE_BETWEEN_CENTERS) / total
+        }
+      }
+    }
+    return out
+  })
+
   const rails = document.createElement('div')
   rails.className = 'density-rails'
   rails.setAttribute('aria-hidden', 'true')
@@ -128,53 +210,48 @@ export function applyDensityRails(
   rails.style.height = `${trackBottom - trackTop}px`
   rails.style.setProperty('--rail-axis-count', String(axes.length))
 
-  // Column headers above the rail block, one per lane. Full axis name lives
-  // in the title attribute; visible text is a short form so a lane stays
-  // ~13px wide. The CSS truncates with ellipsis if the label still overflows.
-  const headers = document.createElement('div')
-  headers.className = 'density-rail-headers'
-  for (const ax of axes) {
-    const h = document.createElement('div')
-    h.className = 'density-rail-header'
-    h.textContent = shortLabel(ax.label)
-    h.title = ax.label
-    headers.appendChild(h)
-  }
-  rails.appendChild(headers)
+  // Column headers, rendered once at the top and once at the bottom. A long
+  // article scrolls past the top labels - the bottom set re-anchors identity
+  // when the writer is at the end. Each header carries its axis's hue so the
+  // colour mapping survives even when both label rows are off-screen.
+  rails.appendChild(buildHeaders(axes, 'top'))
 
   const lanesEl = document.createElement('div')
   lanesEl.className = 'density-rail-lanes'
 
-  for (const ax of axes) {
+  for (let i = 0; i < N; i++) {
+    const ax = axes[i]
     const lane = document.createElement('div')
     lane.className = 'density-rail'
     lane.dataset.axis = ax.key
     lane.title = ax.label
+    lane.style.setProperty('--rail-color', `var(--rail-${ax.key}, var(--accent))`)
 
     const stat = stats.get(ax.key)
     if (!stat || stat.mad <= 0) {
-      // No spread - nothing to compare. Lane renders as centerline only.
       lane.dataset.noSpread = '1'
       lanesEl.appendChild(lane)
       continue
     }
 
-    for (const seg of segments) {
-      const v = seg.scores[ax.key]
-      if (typeof v !== 'number' || !Number.isFinite(v)) continue
-      let dev = (v - stat.median) / (K_MAD * stat.mad)
-      if (dev > 1) dev = 1
-      else if (dev < -1) dev = -1
-      if (Math.abs(dev) < SPARSITY_THRESHOLD) continue
+    for (let s = 0; s < segments.length; s++) {
+      const seg = segments[s]
+      const d = demandBySeg[s][i]
+      if (d.dir === null) continue
+      const px = lengthBySeg[s][i]
+      if (px <= 0) continue
 
-      const barPx = Math.abs(dev) * LANE_HALF_PX
       const sliver = document.createElement('div')
       sliver.className = 'density-rail-seg'
-      sliver.dataset.dir = dev < 0 ? 'weak' : 'strong'
+      sliver.dataset.dir = d.dir === 'left' ? 'weak' : 'strong'
+      // A bar that exceeds the base half-width has "exploded" into the
+      // neighbour's empty half - flag it so the CSS can lift its opacity
+      // to read as the outlier it is.
+      if (px > LANE_HALF_PX + 0.5) sliver.dataset.exploded = '1'
       sliver.style.top = `${seg.top - trackTop}px`
       sliver.style.height = `${seg.height}px`
-      sliver.style.width = `${barPx}px`
-      if (dev < 0) sliver.style.right = '50%'
+      sliver.style.width = `${px}px`
+      if (d.dir === 'left') sliver.style.right = '50%'
       else sliver.style.left = '50%'
       lane.appendChild(sliver)
     }
@@ -183,7 +260,28 @@ export function applyDensityRails(
   }
 
   rails.appendChild(lanesEl)
+  rails.appendChild(buildHeaders(axes, 'bottom'))
   root.appendChild(rails)
+}
+
+function buildHeaders(
+  axes: ReadonlyArray<{ key: string; label: string }>,
+  position: 'top' | 'bottom',
+): HTMLElement {
+  const el = document.createElement('div')
+  el.className = `density-rail-headers density-rail-headers-${position}`
+  for (const ax of axes) {
+    const h = document.createElement('div')
+    h.className = 'density-rail-header'
+    h.dataset.axis = ax.key
+    h.style.setProperty('--rail-color', `var(--rail-${ax.key}, var(--accent))`)
+    h.title = ax.label
+    const span = document.createElement('span')
+    span.textContent = ax.label
+    h.appendChild(span)
+    el.appendChild(h)
+  }
+  return el
 }
 
 function unionOfAxes(
@@ -240,10 +338,6 @@ function medianOf(values: readonly number[]): number {
   const mid = Math.floor(sorted.length / 2)
   if (sorted.length % 2 === 1) return sorted[mid]
   return (sorted[mid - 1] + sorted[mid]) / 2
-}
-
-function shortLabel(label: string): string {
-  return label.slice(0, 3)
 }
 
 function canonical(s: string): string {

@@ -113,26 +113,59 @@ Direction (weak vs. strong) is **geometric**, not colour-coded:
 - Left of centerline = below median = weak on this axis in this doc.
 - Right of centerline = above median = strong on this axis in this doc.
 
-This keeps the rail monochrome (accent colour for everything) and means
-the signal survives colourblindness, faded screens, dark/light themes.
+The geometric channel is the one that must survive colourblindness,
+faded screens, and theme swaps; nothing else encodes direction.
 
-Colour is *available* if a future iteration finds that geometric encoding
-alone isn't enough - but it should not be the primary carrier, and any
-colour split has to remain legible against all themes.
+### Colour (v3.1 amendment)
+
+Colour now carries **axis identity**, not direction. Each axis renders in
+its own hue (theme tokens `--rail-information`, `--rail-argument`,
+`--rail-impact`, `--rail-specificity`, `--rail-voice`); centerlines and
+bars within a lane share that hue. Reason: in practice the all-accent
+v3 rail forced the writer to count lanes left-to-right against a header
+row that scrolls out of view, which is the wrong cognitive load to ask
+for. Colour lets the writer recognise the rail at a glance once the
+mapping is learned; the colour-blind / faded-theme case is still
+served by the (now twice-rendered, see Labels) text headers.
+
+Pick hues that are mid-saturation and similar in lightness so no axis
+dominates visually; theme files may override per palette.
 
 ### Labels
 
 Axis identity has to be legible. A fat bar in lane 2 is useless if the
 writer can't translate "lane 2" into "argument."
 
-- Small monospace **column headers** above the rail block: `info  arg  impact  spec  voice` (or short forms).
+- **Column headers**, one per lane, in vertical text (writing-mode
+  `vertical-rl`) so the full short word fits inside the lane width.
+  Background is a low-opacity swatch in the lane's own hue, text is the
+  same hue at higher saturation - the swatch alone is enough on its
+  own once colour identity is learned.
+- Headers render **at the top AND at the bottom** of the rail block. A
+  long article scrolls past the top set; the bottom set re-anchors
+  identity when the writer reaches the end.
 - Per-paragraph **hover** on the article side surfaces a tooltip:
   *"argument: weak (-1.4 MAD); impact: strong (+0.8 MAD); ..."* - the
   axis names and the relative position. Numeric MAD values aren't shown
   to the writer in normal use; they're useful for debugging the rail.
-- Eventually (not v3 scope, but worth designing toward): hover surfaces
-  an axis-specific *directive* - "argument is weak: what claim are you
-  making here?" - so the rail teaches, not just diagnoses.
+- Eventually (not in scope here, but worth designing toward): hover
+  surfaces an axis-specific *directive* - "argument is weak: what claim
+  are you making here?" - so the rail teaches, not just diagnoses.
+
+### Explosion (v3.1 amendment)
+
+A bar's length is `|dev| * LANE_HALF_PX`, clamped at `LANE_MAX_DEV` (≈2.5).
+At `|dev|=1` the bar reaches the lane edge as before; beyond that, the
+bar **may extend into the neighbouring lane's empty half** if that
+neighbour's row is quiet or extends in the same direction. Two facing
+bars across a gap share the gap's available width proportionally - they
+will never collide, and an `INNER_GAP_PX` buffer is preserved between
+them. Outermost lanes get a separate slack budget (`OUTER_LEFT_MAX_PX`
+on the left of the leftmost lane, `OUTER_RIGHT_MAX_PX` on the right of
+the rightmost).
+
+The CSS lifts an exploded bar's opacity (and adds a faint same-hue
+outline shadow) so the outlier reads as one without further markup.
 
 ### What renders
 

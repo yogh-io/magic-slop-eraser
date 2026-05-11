@@ -6,7 +6,7 @@ This file is the framework definition. Read it before working on the catalogue, 
 
 ## What this project is
 
-Slopmop identifies AI-slop patterns in prose and walks the writer through fixing them one at a time. The catalogue is a generalisation of the in-house deslop infrastructure built for `` (analytical-prose project), itself derived from the patterns one notices when one has read enough LLM output to be annoyed by it.
+Slopmop identifies AI-slop patterns in prose and walks the writer through fixing them one at a time. The catalogue is a generalisation of in-house deslop infrastructure first built for analytical-prose work, itself derived from the patterns one notices when one has read enough LLM output to be annoyed by it.
 
 The project organises every catalogued pattern into one of three **rungs**, ordered by *depth* (the *fix-shape* the pattern requires). Rung 1 is the bottom (lexical, word-and-phrase swap) and Rung 3 is the top (structural, whole-piece editorial rewrite). The rung governs the user-facing workflow.
 
@@ -34,7 +34,7 @@ The numbering is **layer, not order**. An agent or author picks the entry rung b
 
 - **Scope**: the piece as a piece. The question is whether its substance - the actual arguments, values, internal merits of what is being said - is coming through to the reader. Frame stacking buries the thesis under preamble; performative balance dilutes the position into nothing; header inflation pads scaffolding where the argument should carry weight. These are the moves a chief editor catches on the second read.
 - **Fix**: substantial rewrite focused on what the piece is *saying*, not just where it sits on the page. Outside the scope of an autonomous fixer. Slopmop flags positions where the presentation of the content needs reworking and gets out of the way.
-- **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the drafter reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the drafter drafts the prose, the author re-directs. The relevant references in `` are `.claude/commands/workshop.md` (interactive multi-pass diagnostic + author-driven rewriting) and `.claude/commands/chief-edit.md` (the ship gate / blurb / preamble drafter). Rung 3 in slopmop is positioned as the entry point to that kind of workflow.
+- **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the drafter reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the drafter drafts the prose, the author re-directs. Rung 3 in slopmop is positioned as the entry point to that kind of workflow (interactive multi-pass diagnostics + author-driven rewriting; a separate chief-edit / ship-gate pass for the close and the preamble).
 - **Patterns currently here**: `frame-stacking`, `kicker-paraphrase`, `redundant-abstraction`, `lens-fits-everything`, `header-inflation`.
 
 ## The loop: paired writing in batched turns
@@ -209,7 +209,7 @@ When writing prose for this project (essays in `patterns.ts` and `categories.ts`
 - **Funny where the pattern is funny.** "A fortune cookie that lost its ticker." "An uncle's kitchen drawer full of dashes." "The literary equivalent of a politician saying we need to have a conversation."
 - **Always useful.** Every essay should land what the pattern is, why the model produces it, and what the fix looks like.
 
-The reference voice is the DESLOP-GUIDE itself in ``, plus the early ruminations on ``. When examples are sourced from real prose (the way several Rung 2 examples were), generalise so the source is unidentifiable.
+The reference voice lives in the DESLOP-GUIDE this project generalises from. When examples are sourced from real prose (the way several Rung 2 examples were), generalise so the source is unidentifiable.
 
 ## What does NOT belong here
 
@@ -298,7 +298,7 @@ When in doubt: cut.
 
 ## Inspirations
 
-- `/DESLOP-GUIDE.md` - the canonical pattern catalogue this project generalises from.
-- `/.claude/commands/workshop.md` - the interactive one-flag-at-a-time author-driven editing loop. Rung 1 borrows the shape; Rung 2 borrows the BETTER/WORSE/CLOSE evaluation; Rung 3 is the workshop, basically.
-- `/.claude/commands/chief-edit.md` - the ship gate. Rung 3 patterns are roughly what chief-edit catches.
-- `` - source for several anonymised real-world Rung 2 example sentences.
+- A prior DESLOP-GUIDE from in-house analytical-prose work - the canonical pattern catalogue this project generalises from.
+- An interactive one-flag-at-a-time author-driven editing loop carried over from the same source - Rung 1 borrows the shape, Rung 2 borrows the BETTER/WORSE/CLOSE evaluation, Rung 3 is that workshop, basically.
+- A chief-edit / ship-gate pass - Rung 3 patterns are roughly what such a pass catches.
+- Several anonymised real-world sentences sourced from public ruminations and generalised so the source is unidentifiable.

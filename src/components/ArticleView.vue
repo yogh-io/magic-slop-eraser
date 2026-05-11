@@ -262,6 +262,12 @@ function onMouseUp(): void {
   border-bottom-style: solid;
   border-bottom-width: 2px;
 }
+/* Secondary marks of a multi-segment flag fold into the first mark during a
+ * preview - hidden, not removed, so the original prose can be restored when
+ * the preview ends. */
+.article-view :deep(mark.slop-flag.is-preview-hidden) {
+  display: none;
+}
 /* Hover-from-card: full opaque highlight in the flag's category color so the
  * writer can immediately see which span the annotation refers to. */
 .article-view :deep(mark.slop-flag.is-hovered) {
@@ -282,34 +288,73 @@ function onMouseUp(): void {
   border-radius: 2px;
 }
 
-/* Density rails: N parallel vertical tracks in the left gutter, one per     */
-/* axis. Each paragraph contributes a centered sliver per rail whose width   */
-/* scales with the axis score (thickness, not color, carries the signal -    */
-/* color is a constant accent across all rails). Unscored paragraphs leave   */
-/* gaps within the track rather than truncating it.                          */
+/* Density rails: N parallel vertical lanes in the left gutter, one per     */
+/* axis. Each lane runs a faint vertical centerline = the doc's median on   */
+/* that axis. Per paragraph, a horizontal bar extends LEFT of the           */
+/* centerline (weak, below median) or RIGHT (strong, above median); length  */
+/* encodes deviation magnitude (median + MAD, per axis). Quiet by default - */
+/* near-median paragraphs render nothing. Colour stays a constant accent;   */
+/* direction is geometric. See docs/density-rail.md for the spec.           */
 .article-view :deep(.density-rails) {
   position: absolute;
-  left: -2.4rem;
-  display: flex;
-  gap: 3px;
+  left: -5.5rem;
   pointer-events: none;
   z-index: 0;
 }
+.article-view :deep(.density-rail-headers) {
+  position: absolute;
+  top: -1.5em;
+  left: 0;
+  display: flex;
+  gap: 3px;
+}
+.article-view :deep(.density-rail-header) {
+  width: 13px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  line-height: 1;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  opacity: 0.7;
+}
+.article-view :deep(.density-rail-lanes) {
+  display: flex;
+  gap: 3px;
+  height: 100%;
+}
 .article-view :deep(.density-rail) {
   position: relative;
-  width: 6px;
+  width: 13px;
   height: 100%;
   flex-shrink: 0;
 }
-.article-view :deep(.density-rail-seg) {
+.article-view :deep(.density-rail::before) {
+  content: '';
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: -0.5px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.article-view :deep(.density-rail[data-no-spread="1"]::before) {
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+}
+.article-view :deep(.density-rail-seg) {
+  position: absolute;
   background: var(--accent);
   border-radius: 1px;
 }
 .article-view :deep(p.has-density-rail) {
   cursor: help;
+}
+@media (max-width: 900px) {
+  .article-view :deep(.density-rails) { display: none; }
 }
 
 /* Embedded, set-aside blocks: hidden in plain sight, not edit targets. */

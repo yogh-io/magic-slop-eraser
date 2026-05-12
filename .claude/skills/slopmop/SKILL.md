@@ -1,6 +1,6 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-09.6
+skillVersion: 2026-05-12.1
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -39,7 +39,7 @@ After either, `.slopmop/session.json` exists in cwd and every other command "jus
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-09.6` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
+This file declares `skillVersion: 2026-05-12.1` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
 
 The CLI sends `X-Skill-Version` on every call. The server flags two failure modes via response headers:
 
@@ -185,88 +185,133 @@ slopmop task phase-b open "Phase B: drive steering loop"
 
 Skipping this is a regression - the writer is staring at a blank pill wondering whether anything is wired.
 
-## 1. analysis (BYOM)
+## 1. analysis
 
-You are the **drafter**. All detection - Rung 1 (lexical), Rung 2 (judgment), Rung 3 (editorial) - is yours. The server stores the catalogue, the docs, the flags, and orchestrates the steering loop, but it does not read prose. That's you.
+You are the **drafter**. All detection is yours - Rung 1, 2, and 3. The server stores the catalogue, the docs, and the flags; it does not read prose, dedupe findings, or cluster anything. The clustering is yours too.
 
-### 1a. framing pass
+Phase A is four steps: read, dispatch a small set of detection subagents in parallel (each a specialist for a *kindred group* of patterns), dispatch a synthesis subagent that clusters their findings, post the consolidated flag set. ~7 subagents fan out, one synthesizes, you post. Done in a couple of minutes.
 
-Before the catalogue walk, take one read for *what kind of fix this piece needs*. Not every piece needs slopmop. Some need to be shorter. Some need a structural argument before any prose polish makes sense. Slopmop's loop is most useful on prose that is roughly the right shape and length - if the piece is bloated or in the wrong format, polishing it is sanding a board you're about to throw out.
-
-One LLM read of the source. Note:
-
-- **Word count** (raw - source split on whitespace).
-- **Stage** - rough draft (argument still settling), polished (argument settled, prose loose), near-ship (would survive light edits and you're looking for the last 10%).
-- **Length-fit** - is the piece earning its words? A 5400-word piece arguing at 2500-word density should be 2500. If you can name the cuts, name them.
-- **Format-fit** - is the shape right? Essay-as-bullets, reference-as-essay, a thread that should be three pieces.
-
-Post one `observation` note. If the framing assessment is mild (length is earned, shape is right), say so briefly and proceed to 1b. If it surfaces something - bloat, structural drift, wrong shape - lay out the options:
-
-```bash
-slopmop note observation "5400 words, polished. Argues at ~2500-word density - the third section restates the second. Three options before slopmop: (1) /distill - a clean ~2400-word version that loses nothing essential; (2) /compress - keep structure, trim repetition (~15%); (3) proceed and slopmop the piece as-is. /distill and /compress are Claude Code commands you run yourself from the terminal; I cannot trigger them. I default to (3) unless you tell me to wait."
-```
-
-You do not run `/distill` or `/compress` - those are sibling Claude Code commands the author invokes from the terminal. You're surfacing the option. Then proceed to the catalogue walk; the author decides whether to interrupt and take a different path first. If they do, they'll tell you to pause; otherwise, your work continues to be useful even if they later run `/compress` (anchored flags relocate against minor edits) - it's only a wholesale `/distill` that would moot the catalogue walk.
-
-The framing pass is a one-time read at session start. Don't re-do it on subsequent passes - the author owns the structural-vs-polish decision once the session is running.
-
-### 1b. pull the catalogue
+### 1a. read
 
 ```bash
 slopmop catalogue > /tmp/slopmop-catalogue.json
+slopmop doc --json | jq -r .doc.source > /tmp/slopmop-source.md
+mkdir -p /tmp/slopmop-findings && rm -f /tmp/slopmop-findings/*
 ```
 
-`{ categories, patterns }`. Each pattern carries `whyItsSlop`, `fix`, `examples` (sloppy / better pairs), `skipRule`, and often a long-form `essay`. That's your detection spec.
+`catalogue.json` is `{ categories, patterns }`. Each pattern carries `whyItsSlop`, `fix`, `examples`, `skipRule`, and often an `essay`. That is the detection spec.
 
-**`skipRule` is a severity weight, not a skip.** It describes when the pattern shape is doing legitimate work, so you score it *lower* - not when to drop the flag from the walk. A flag that matches `skipRule` still gets posted, often at severity 0.1-0.3; the author reads the rationale and decides what to keep or discard. "Doesn't bite here" is a *low-severity* verdict, not a missing flag. A piece with broad deliberate devices tempts detection agents to treat the shields as blanket immunity - resist that. The shield says "weigh carefully," not "look away."
+### 1b. dispatch detection subagents per kindred group (parallel)
 
-### 1c. detect
+One Task subagent per *cluster* of structurally kindred patterns. ~6 detection dispatches plus one voice-memo dispatch, all in parallel.
 
-Walk the catalogue against the source. The detection walk should be **catalogue-neutral**: dispatch detection subagents with the catalogue spec + the source only. Don't seed them with the voice memo. The voice memo describes the piece's deliberate devices, which is exactly the context that lets a detection agent over-shield - reading "the piece deliberately uses negative-definition and institutional vocabulary" as "skip absent-actor and allusive-construct entirely." Detection sees the shapes; severity-weighting sees the shields.
+The clusters group patterns that share a detection skill - a subagent looking at sentence openers is also the right reader for sentence closers; a subagent reading for dead vocabulary is the right reader for inflated vocabulary. Within a cluster the subagent's intra-pattern reasoning is fine (the patterns are kindred). Across clusters, no agent has visibility - which is what prevents the "section X is protocol shape, skip everything in it" cross-pattern shielding move.
 
-A practical shape: a voice-memo subagent runs *in parallel* with detection (not before), producing the register / formal-devices / lookalike-but-isn't note. Detection subagents (one per rung is the sweet spot, ~8-10 patterns each, source loaded once per call) walk the catalogue blind. Then a third pass folds the voice memo into severity weights and into the rationale on patterns the memo touches - lowering severity, never dropping the flag. Voice-coupled patterns (allusive-construct, performative-humility, the voice axis on the density score) are the exception: those can take the voice memo at detection time too, because the memo *is* the pattern's reference.
+Default cluster table for the current catalogue (16 patterns → 6 subagents):
 
-**When Phase A is done.** Walk the catalogue *once* - every pattern considered against the source at least once, even when the verdict is "doesn't bite here." Flag the matches; for non-matches the *decision* is what counts (don't quietly drop patterns from the walk and don't post no-op flags either - it's a private completeness check). Per-rung subagent dispatch is the sweet spot for most pieces: three or four calls (voice memo + one per rung) of ~8-10 patterns each, source loaded once per call. Per-pattern dispatch is overkill; single-call whole-catalogue walks only fit for short pieces (under ~1000 words) where source + catalogue + reasoning fit comfortably in one context. You're done when each rung has been walked once and the Phase A summary `finding` note is posted - then flip `phase-b` to in-progress and start the loop. Don't re-walk to second-guess yourself; the catalogue is incremental, and if the author wants another pass on a section they'll ask.
+| Cluster | Patterns | What this agent is hunting |
+|---|---|---|
+| dead-vocabulary | tier1-lexicon, enthusiasm-inflation, vague-gravitas | Words and phrases that are inflated, abstract, or LLM-typical |
+| openers-closers | throat-clearing, closers | Sentence-position empties at paragraph head and tail |
+| stacked-constructions | antithesis, suffocation | Mirror constructs and stacked hedges |
+| actor-reference | absent-actor, allusive-construct | Passages where the agent is hidden or the referent doesn't earn itself |
+| argument-position | hedged-confidence, performative-balance, synthesis-of-nothing | Authorial stance that avoids commitment, and paragraphs that synthesise nothing |
+| editorial-piece-level | frame-stacking, kicker-paraphrase, redundant-abstraction, lens-fits-everything | Rung 3 piece-level reads on the whole composition |
 
-What each detected flag should carry:
+When new patterns land in the catalogue, slot them into the closest existing cluster, or create a new one if no existing cluster captures the detection skill. Don't let the table go stale - a pattern that isn't in any cluster won't get walked.
 
-- `patternId` from the catalogue
-- `text` - the verbatim substring
-- `start`, `end` - character offsets if you have them; omit if you don't and the server will locate the text
-- `rationale` - why *this* passage is *that* pattern. The author reads it in the UI. "Matches throat-clearing" is dead weight; "the sentence opens with 'It's important to note that' before the substance, asking the reader's permission to make the point" is useful.
-- `severity` - **your subjective weight, 0 to 1.** This is the scoring mechanism: the server aggregates per-flag severity into the overall score and per-rung breakdown. The catalogue's `severity` (`primary` / `high` / `medium` / `low`) is a starting point, not a verdict. Adjust per instance: a deliberate move named in the voice memo gets a low number *and the flag still posts* - the author sweeps low-severity flags fast and dismisses what doesn't bother them; you don't get to make that call for them. An egregious instance of a usually-mild pattern gets a high one. Voice memo informs every weight, but never zeroes out a flag's existence. Omit `severity` only if you genuinely can't weigh - the server falls back to a per-pattern default.
-- `suggestion` - optional inline candidate. Include when the fix is mechanical and short (a substitute, a cut, a clear active-voice rewrite). Omit when the rewrite needs the author's voice or judgment, and leave those for the steering loop.
+Each subagent gets:
+- The specs for its cluster's patterns (`whyItsSlop`, `fix`, `examples`, `skipRule`, `essay`).
+- The whole source.
+- Brief: "walk the source for instances of any of these patterns. Return JSON to `/tmp/slopmop-findings/<cluster>.json`. Score severity per instance, 0 to 1 - passages where a pattern shape is doing legitimate work get *low* severity, never skipped."
 
-### 1d. submit
+The subagent is deeply primed on a small family of patterns, knows the edge cases from the essays, and walks blind to everything outside its cluster. It produces:
 
-Build a `flags.json` (typically by writing it from a subagent's output) and post it:
+```json
+{
+  "cluster": "openers-closers",
+  "findings": [
+    {
+      "patternId": "throat-clearing",
+      "text": "The leverage is the question.",
+      "start": 7041, "end": 7070,
+      "rationale": "Announces a topic before any substance; the next sentence carries the actual claim.",
+      "severity": 0.55,
+      "suggestion": null
+    }
+  ]
+}
+```
+
+In parallel, dispatch one **voice-memo subagent**: whole source, no catalogue. Brief: "write a short note on the piece's register and any obviously deliberate devices (anaphora, protocol-shape sections, signature voice tics). Return to `/tmp/slopmop-findings/_voice-memo.txt`."
+
+The cluster table is a default; if the catalogue grows or a piece type calls for a different split, regroup - but keep the invariant: no single subagent sees the whole catalogue, and groupings stay within structural kinship. Bundling structurally-unlike patterns (e.g. `antithesis` + `absent-actor` + `synthesis-of-nothing`) re-opens cross-pattern reasoning and re-introduces the section-shielding failure.
+
+### 1c. dispatch the synthesis subagent
+
+Once all detection subagents return, dispatch one synthesis subagent.
+
+The synthesis subagent gets:
+- All cluster findings JSONs from `/tmp/slopmop-findings/*.json` (each carries findings tagged with `patternId`; the cluster is just routing).
+- The voice memo from `/tmp/slopmop-findings/_voice-memo.txt`.
+- The source from `/tmp/slopmop-source.md`.
+- The flag-post schema (below).
+- The brief: clustering rules + severity weighting + the no-skip directive.
+
+It writes `/tmp/slopmop-flags.json` ready to post. Two cluster passes:
+
+**Pass 1 - same-anchor merge.** Group findings whose anchor spans overlap (text-substring containment, or character ranges within ~20 chars). Emit one flag per group:
+- Primary `patternId` = the finding with highest severity.
+- Other patternIds → `relatedPatterns`.
+- Severity = max of the group.
+- Rationale = one synthesized sentence covering all the pattern angles ("opens with throat-clearing *and* trails into vague-gravitas - both wrapping a sentence that says nothing").
+- `suggestion` = the primary's if present; otherwise omit.
+
+**Pass 2 - shape recurrence.** For each `patternId` with 3+ findings across distant anchors (>~500 chars apart, non-adjacent paragraphs), ask: same construction or unrelated instances of the same pattern? If same (parallel paragraph openers, repeated tic across a section), emit one flag at the first anchor with `relatedAnchors` listing the rest. Rationale names the construction once. If unsure, leave as separate flags - over-clustering is worse than under-clustering.
+
+**Voice memo folds in here, severity-side only.** A passage where the pattern shape is doing legitimate work scores *low* (0.1-0.3). It **still posts**. The author dismisses what doesn't bother them; the synthesis subagent does not get to make that call.
+
+If the synthesis subagent finds itself dropping findings because "the section is deliberate" or "this is protocol shape, not slop", that *is* the failure mode. Severity is the vote; posting is the contract. Drop nothing. The brief to the synthesis subagent should restate this in those words.
+
+### 1d. coverage check
+
+Before posting, look at `/tmp/slopmop-flags.json`:
+- Did every cluster subagent return a file? Crashed clusters, or clusters that returned empty on a piece where you'd expect hits (e.g. `openers-closers` empty on a polished essay, `stacked-constructions` empty on dense analytical prose) are suspicious - re-dispatch.
+- Are the consolidated flags spread across the whole source, or clustered in <30% of it? That kind of clustering = sections were missed = re-dispatch the suspicious cluster(s), or re-run synthesis with a "you skipped section X" hint.
+- Did a whole rung come back empty on a piece of meaningful length? Re-dispatch the relevant cluster (Rung 3 lives in `editorial-piece-level`; Rung 1/2 are spread across the others).
+
+A small re-dispatch round is fine. Shipping a half-walk is not.
+
+### 1e. post
 
 ```bash
-slopmop flag-post @flags.json
+slopmop flag-post @/tmp/slopmop-flags.json
 ```
 
-Schema (the file the CLI passes to `POST /flags`):
+Schema:
 
 ```json
 {
   "flags": [
     {
-      "patternId": "absent-actor",
-      "text": "It was decided that the framework would be revised",
-      "rationale": "Passive plus \"it was decided\" hides who decided. The actor is unnamed.",
-      "severity": 0.85,
-      "suggestion": "The committee revised the framework on Tuesday."
+      "patternId": "throat-clearing",
+      "text": "The leverage is the question.",
+      "rationale": "Opens with a topic announcement before any substance; the next sentence carries the actual claim. Also reads as vague-gravitas - an abstract noun with no concrete content.",
+      "severity": 0.55,
+      "suggestion": null,
+      "relatedPatterns": ["vague-gravitas"],
+      "relatedAnchors": [
+        { "text": "The summit is the venue at which the frame either gets produced or does not." }
+      ]
     }
   ],
   "modelTag": "claude-opus-4-7"
 }
 ```
 
-Server validates against the catalogue, relocates anchors if the offsets don't fit, dedupes, and reports `added N, skipped M`. Skipped entries print their `reason`; check them.
+`relatedPatterns` and `relatedAnchors` are optional. Server validates patternIds (primary + related) against the catalogue, relocates the primary anchor and each related anchor by text matching, and reports `added N, skipped M`. Skipped entries print their reason. The server does **not** dedupe or merge - any clustering decisions live in the synthesis subagent. If you re-walk later and synthesis produces overlapping output, that's a synthesis bug; don't expect the server to absorb it.
 
-Flags without `suggestion` go to `open` - the author sweeps and directs. Flags with `suggestion` go to `awaiting-accept` - the author takes or redirects. `flag-post` is incremental: re-run later (after re-reading a section, after the author asks for another pass) and dedupe is automatic.
-
-After Phase A lands, mark its task done and post a `finding` note summarising what the catalogue walk turned up - what dominates, what's absent, what surprised you. Then flip `phase-b` to `in-progress` and start the loop.
+After posting, send a `finding` note: what dominated, what was absent, what surprised you. Then mark `phase-a` done, flip `phase-b` to `in-progress`, and start the steering loop.
 
 ## 2. honour agent-hints
 
@@ -476,8 +521,9 @@ For the full command list run `slopmop --help`. Body conventions for write comma
 ## constraints
 
 - **All detection is yours.** Rung 1, 2, and 3 - the server doesn't read prose. The catalogue is the spec; you walk it.
-- **Detection walks blind; the voice memo enters at severity-weighting.** Don't seed detection subagents with the voice memo - it primes them to skip whole patterns. Detection sees catalogue + source. Voice memo lands in a separate severity-adjust pass on top of the flag set.
-- **Shields lower severity, they don't drop the flag.** `skipRule` and the voice memo describe when a pattern shape is doing legitimate work - that's a *low* number, not a missing flag. The author dismisses what doesn't bother them; you don't get to make that call. Zero flags across a whole rung on a piece of any meaningful length is a failure signal, not a clean verdict - the shields swallowed the walk.
+- **Detection walks blind in kindred clusters; synthesis applies the voice memo.** No single detection subagent sees the whole catalogue - each gets one structural family of patterns. The voice memo is a separate subagent in parallel; the synthesis subagent is the only one that sees everything and folds the memo into severity. Don't seed detection subagents with the memo; it primes them to skip.
+- **Server stores; drafter clusters.** Same-anchor merge and shape-recurrence rollup happen in the synthesis subagent before `flag-post`. The server doesn't dedupe or merge - it just validates patternIds against the catalogue, relocates anchors, stores. If overlapping flags land, that's a synthesis bug to fix client-side.
+- **Shields lower severity, they don't drop the flag.** `skipRule` and the voice memo describe when a pattern shape is doing legitimate work - that's a *low* number, not a missing flag. The author dismisses what doesn't bother them; you don't get to make that call. Zero flags across a whole rung, or flags clustered in <30% of the source, is a failure signal, not a clean verdict - the shields swallowed the walk.
 - **Severity is your scoring vote.** Per-flag `severity` is the score. The voice memo informs the weight - a deliberate move scores low even if it matches a catalogued pattern (and the flag still posts). Don't autopilot the catalogue's nominal severity through; adjust per instance.
 - **The author shapes; you write.** Slopmop's loop is: you draft, author redirects via shape directives. Never ask the author to write the sentence.
 - **Pull, don't push.** The author submits directives whenever they want; you pull when you have capacity. The queue holds work for you - none of it is missed if you're slow.
@@ -493,7 +539,7 @@ For the full command list run `slopmop --help`. Body conventions for write comma
 
 ## appendix: raw HTTP
 
-The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-05-09.6`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
+The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-05-12.1`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
 
 Routes (full schemas: read the CLI source at `cli/client.ts` + `cli/commands/*.ts`, or `slopmop --help`):
 
@@ -513,3 +559,8 @@ Breaking changes from prior versions (skill v2026-05-09.5 and earlier):
 - `POST /flags/:fid/{accept,discard,skip,keep-deliberate}` -> `POST /responses { flagId, kind: 'accept' | 'discard' | 'skip' | 'keep' }`
 - `POST /responses/:rid/punt` and `/cancel` -> `POST /responses/:rid/transition { to: 'stuck' | 'cancelled', reason? }`
 - `GET /events/poll` -> dropped; use the SSE stream
+
+Changes in skill v2026-05-12.1 (from v2026-05-09.6; not breaking on the wire):
+- Phase A reorganised: per-rung dispatch replaced by **clustered detection subagents** (kindred-pattern groups, ~6 for the current catalogue, plus a voice-memo subagent in parallel) and a dedicated **synthesis subagent** that produces the consolidated flag set before `flag-post`.
+- Flag schema gained two optional fields: `relatedPatterns: string[]` (other patternIds the synthesis pass folded into this flag) and `relatedAnchors: TextAnchor[]` (other places the same construction recurs). Old clients and old flags work unchanged.
+- `POST /flags` no longer dedupes server-side. Drafter clusters before posting.

@@ -55,12 +55,14 @@ export async function handleFlags(
 
   // POST /docs/:id/flags - agent submits LLM-detected flags (BYOM analysis)
   // with optional inline suggestions. Each input flag carries patternId +
-  // anchor (start/end/text) + rationale; the server validates the anchor
-  // against current source (relocates if needed), dedupes against existing
-  // open flags, and creates Flag records. If `suggestion` is present, the
-  // server also creates a Suggestion (no respondedTo - agent-initial), and
-  // the flag goes straight to awaiting-accept so the author can take it
-  // without issuing a directive first.
+  // anchor (start/end/text) + rationale; the server validates the patternId
+  // against the catalogue, relocates the anchor against the current source,
+  // optionally validates / relocates relatedPatterns and relatedAnchors, and
+  // creates a Flag record. The server does NOT dedupe or cluster - those are
+  // drafter-side decisions made in the synthesis subagent before posting. If
+  // `suggestion` is present, the server also creates a Suggestion (no
+  // respondedTo - agent-initial), and the flag goes straight to
+  // awaiting-accept so the author can take it without a directive first.
   if (segs.length === 0 && req.method === 'POST') {
     const ifMatch = req.headers.get('if-match') ?? ''
     if (ifMatch && ifMatch !== state.doc.sourceHash) {
@@ -101,10 +103,20 @@ export async function handleFlags(
       }
       const anchor = makeAnchor(state.doc.source, located.start, located.end)
 
-      if (existsOpenFlag(state, inp.patternId, anchor)) {
-        skipped.push({ reason: 'duplicate of existing open flag', patternId: inp.patternId })
-        continue
-      }
+      const relatedPatterns = Array.isArray(inp.relatedPatterns)
+        ? inp.relatedPatterns.filter((id) => typeof id === 'string' && id !== inp.patternId && patternMap.has(id))
+        : undefined
+
+      const relatedAnchors = Array.isArray(inp.relatedAnchors)
+        ? inp.relatedAnchors
+            .map((r) => {
+              if (!r || typeof r.text !== 'string' || r.text.length === 0) return null
+              const loc = locateAnchor(state.doc.source, { patternId: inp.patternId, text: r.text, rationale: '', start: r.start, end: r.end })
+              if (!loc) return null
+              return makeAnchor(state.doc.source, loc.start, loc.end)
+            })
+            .filter((a): a is TextAnchor => a !== null)
+        : undefined
 
       const flagId = `llm-${crypto.randomUUID().slice(0, 8)}`
       const stored: Flag = {
@@ -119,6 +131,8 @@ export async function handleFlags(
         rung: meta.rung,
         status: 'open',
         createdAt: nowIso(),
+        ...(relatedPatterns && relatedPatterns.length > 0 ? { relatedPatterns } : {}),
+        ...(relatedAnchors && relatedAnchors.length > 0 ? { relatedAnchors } : {}),
       }
       state.flags[flagId] = stored
 
@@ -206,6 +220,14 @@ interface AgentFlagInput {
   rationale: string
   severity?: number
   suggestion?: string
+  /** Other patternIds the drafter's synthesis pass merged into this flag at the
+   *  same anchor. Server validates each against the catalogue; unknown ids are
+   *  dropped silently. */
+  relatedPatterns?: string[]
+  /** Other anchors where the same construction recurs. Each is relocated by
+   *  text match against the current source; anchors that can't be located
+   *  are dropped, the flag stands. */
+  relatedAnchors?: Array<{ text: string; start?: number; end?: number }>
 }
 
 /**
@@ -237,12 +259,3 @@ function locateAnchor(source: string, inp: AgentFlagInput): { start: number; end
   return relocateAnchor(source, provisional)
 }
 
-function existsOpenFlag(state: DocState, patternId: string, anchor: TextAnchor): boolean {
-  for (const f of Object.values(state.flags)) {
-    const status = f.status ?? 'open'
-    if (status !== 'open' && status !== 'awaiting-accept') continue
-    if (f.patternId !== patternId) continue
-    if (f.anchor.start === anchor.start && f.anchor.end === anchor.end) return true
-  }
-  return false
-}

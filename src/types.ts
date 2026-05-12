@@ -85,6 +85,14 @@ export interface Flag {
   status?: FlagStatus
   userNote?: string
   createdAt: string
+  /** Other patternIds the drafter's synthesis pass folded into this flag at the
+   *  same anchor. Primary `patternId` is the most load-bearing of the group;
+   *  these are the secondary angles that hit the same span. */
+  relatedPatterns?: string[]
+  /** Other anchors where the same construction recurs (parallel paragraph
+   *  openers, repeated tic across a section). The primary `anchor` is the first
+   *  instance; these are additional locations of the same shape. */
+  relatedAnchors?: TextAnchor[]
 }
 
 export interface Suggestion {

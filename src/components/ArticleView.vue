@@ -221,11 +221,14 @@ watch(
       m.classList.remove('is-selected')
     }
     if (!id) return
-    const el = containerRef.value.querySelector(`[data-flag-id="${id}"]`)
-    if (el instanceof HTMLElement) {
-      el.classList.add('is-selected')
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+    const marks = containerRef.value.querySelectorAll<HTMLElement>(
+      `mark.slop-flag[data-flag-id="${id}"]`,
+    )
+    for (const m of marks) m.classList.add('is-selected')
+    // Scroll to the primary anchor only. Related anchors still light up via
+    // is-selected, but scrolling to multiple places is meaningless.
+    const primary = Array.from(marks).find((m) => m.dataset.related !== '1')
+    primary?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   },
 )
 
@@ -345,6 +348,12 @@ function onMouseUp(): void {
   max-width: 68ch;
   margin: 0 auto;
   position: relative;
+  /* New block formatting context so the H1's 1.2em top margin doesn't
+   * collapse through the container and offset .doc from its grid row top.
+   * Without this, getMarkBoxes returns positions relative to an article-view
+   * that sits ~40px below the gutter, so cards land 40px above their
+   * anchors. */
+  display: flow-root;
 }
 .article-view :deep(h1),
 .article-view :deep(h2),
@@ -427,6 +436,30 @@ function onMouseUp(): void {
   outline: 2px solid color-mix(in srgb, var(--flag-color, var(--accent)) 50%, transparent);
   outline-offset: 1px;
   border-radius: 2px;
+}
+/* Related-anchor marks: same flag id, secondary location of the same
+ * construction. Rest state is a dashed underline at slightly reduced opacity
+ * so the primary instance reads as canonical. Hover and select states keep
+ * the dashed signal: a paler fill plus a dashed outline, instead of the
+ * solid fill primary marks get. That way when the writer hovers a card with
+ * recurrences, the primary anchor is obvious and the others read as "+N
+ * more like this one". */
+.article-view :deep(mark.slop-flag.is-related) {
+  border-bottom-style: dashed;
+  opacity: 0.85;
+}
+.article-view :deep(mark.slop-flag.is-related.is-hovered) {
+  background: color-mix(in srgb, var(--flag-color, var(--accent)) 28%, transparent);
+  color: inherit;
+  outline: 1px dashed var(--flag-color, var(--accent));
+  outline-offset: 1px;
+  border-bottom-color: var(--flag-color, var(--accent));
+  border-radius: 2px;
+}
+.article-view :deep(mark.slop-flag.is-related.is-selected) {
+  background: color-mix(in srgb, var(--flag-color, var(--accent)) 10%, transparent);
+  outline: 1px dashed var(--flag-color, var(--accent));
+  outline-offset: 1px;
 }
 
 /* Density rails: N parallel vertical lanes in the left gutter, one per     */

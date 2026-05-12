@@ -880,6 +880,17 @@ function dismissShare(): void {
                   {{ rungLabel(v.flag.rung) }}
                 </span>
                 <span class="pattern" :title="v.flag.patternId">{{ v.flag.patternId }}</span>
+                <span
+                  v-for="rp in v.flag.relatedPatterns"
+                  :key="rp"
+                  class="related-pattern"
+                  :title="`also matches: ${rp}`"
+                >+{{ rp }}</span>
+                <span
+                  v-if="(v.flag.relatedAnchors?.length ?? 0) > 0"
+                  class="recurrence"
+                  :title="`same construction recurs in ${v.flag.relatedAnchors?.length} more place${v.flag.relatedAnchors?.length === 1 ? '' : 's'}`"
+                >×{{ (v.flag.relatedAnchors?.length ?? 0) + 1 }}</span>
                 <span :class="['state-badge', `state-${v.state}`]">{{ v.state }}</span>
               </header>
 
@@ -1745,10 +1756,34 @@ function dismissShare(): void {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--muted);
-  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Secondary patternIds the synthesis pass folded into this flag at the same
+ * anchor. Smaller chips, sitting next to the primary pattern label. */
+.related-pattern {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+  padding: 0.04rem 0.32rem;
+  border-radius: 999px;
+  border: 1px dashed var(--rule);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+/* Recurrence indicator: same construction shows up in N more anchors in the
+ * piece. Count includes the primary, so ×4 means "this shape appears 4 times". */
+.recurrence {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 0.04rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .state-badge {
   font-family: var(--font-ui);
@@ -1759,6 +1794,7 @@ function dismissShare(): void {
   border-radius: 999px;
   border: 1px solid var(--rule);
   color: var(--muted);
+  margin-left: auto;
 }
 .state-pending { color: #b88f3e; border-color: color-mix(in srgb, #b88f3e 50%, var(--rule)); }
 .state-awaiting { color: #2f8f6a; border-color: color-mix(in srgb, #2f8f6a 50%, var(--rule)); }

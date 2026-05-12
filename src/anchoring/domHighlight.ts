@@ -1,4 +1,4 @@
-import type { Flag } from '../types'
+import type { Flag, TextAnchor } from '../types'
 
 interface Segment {
   node: Text
@@ -55,22 +55,12 @@ export function highlightFlagsInDom(
   if (scopes.length === 0) return
 
   for (const flag of flags) {
-    const segments = collectSegments(scopes)
-    const fullText = segments.map((s) => s.node.data).join('')
-    const probe = flag.anchor.prefix + flag.anchor.text + flag.anchor.suffix
-    let idx = -1
-    if (probe.length > 0) idx = fullText.indexOf(probe)
-    let textIdx: number
-    if (idx >= 0) {
-      textIdx = idx + flag.anchor.prefix.length
-    } else {
-      const fallback = fullText.indexOf(flag.anchor.text)
-      if (fallback < 0) continue
-      const second = fullText.indexOf(flag.anchor.text, fallback + 1)
-      if (second >= 0) continue
-      textIdx = fallback
+    paintAnchor(scopes, flag, flag.anchor, false)
+    if (flag.relatedAnchors && flag.relatedAnchors.length > 0) {
+      for (const rel of flag.relatedAnchors) {
+        paintAnchor(scopes, flag, rel, true)
+      }
     }
-    wrapRange(segments, textIdx, textIdx + flag.anchor.text.length, flag)
   }
 
   if (opts?.candidates && opts.candidates.size > 0) {
@@ -94,7 +84,26 @@ function collectSegments(roots: HTMLElement[]): Segment[] {
   return segments
 }
 
-function wrapRange(segments: Segment[], start: number, end: number, flag: Flag): void {
+function paintAnchor(scopes: HTMLElement[], flag: Flag, anchor: TextAnchor, isRelated: boolean): void {
+  const segments = collectSegments(scopes)
+  const fullText = segments.map((s) => s.node.data).join('')
+  const probe = anchor.prefix + anchor.text + anchor.suffix
+  let idx = -1
+  if (probe.length > 0) idx = fullText.indexOf(probe)
+  let textIdx: number
+  if (idx >= 0) {
+    textIdx = idx + anchor.prefix.length
+  } else {
+    const fallback = fullText.indexOf(anchor.text)
+    if (fallback < 0) return
+    const second = fullText.indexOf(anchor.text, fallback + 1)
+    if (second >= 0) return
+    textIdx = fallback
+  }
+  wrapRange(segments, textIdx, textIdx + anchor.text.length, flag, isRelated)
+}
+
+function wrapRange(segments: Segment[], start: number, end: number, flag: Flag, isRelated: boolean): void {
   const ops: { node: Text; nodeStart: number; nodeEnd: number }[] = []
   for (const seg of segments) {
     if (seg.end <= start) continue
@@ -115,11 +124,12 @@ function wrapRange(segments: Segment[], start: number, end: number, flag: Flag):
       target.splitText(innerLen)
     }
     const mark = document.createElement('mark')
-    mark.className = `slop-flag flag-pat-${flag.patternId}`
+    mark.className = `slop-flag flag-pat-${flag.patternId}${isRelated ? ' is-related' : ''}`
     mark.dataset.flagId = flag.id
     mark.dataset.patternId = flag.patternId
     mark.dataset.category = flag.category
     mark.dataset.severity = String(flag.severity)
+    if (isRelated) mark.dataset.related = '1'
     mark.style.setProperty('--flag-color', `var(--cat-${flag.category})`)
     target.parentNode?.insertBefore(mark, target)
     mark.appendChild(target)
@@ -144,6 +154,7 @@ function applyCandidateOverrides(
   for (const m of root.querySelectorAll<HTMLElement>('mark.slop-flag')) {
     const id = m.dataset.flagId
     if (!id) continue
+    if (m.dataset.related === '1') continue
     if (!groups.has(id)) groups.set(id, [])
     groups.get(id)!.push(m)
   }

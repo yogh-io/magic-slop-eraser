@@ -15,18 +15,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(__dirname, '..')
 
 async function main(): Promise<void> {
-  // 1. Sanity-check: cli/version.ts and SKILL.md frontmatter agree.
-  const cliVersion = readCliVersion()
+  // SKILL.md is the single source of truth; cli/version.ts derives from it
+  // (runtime read in source mode; sentinel substitution in the bundle).
   const skillVersion = readSkillVersion()
-  if (cliVersion !== skillVersion) {
-    console.error(
-      `build-cli: version mismatch: cli/version.ts says ${cliVersion}, ` +
-        `SKILL.md frontmatter says ${skillVersion}. Bump them in lockstep.`,
-    )
-    process.exit(1)
-  }
 
-  // 2. Bundle the CLI.
+  // Bundle the CLI.
   const outDir = resolve(repoRoot, 'dist/cli')
   mkdirSync(outDir, { recursive: true })
   // Bun.build emits its own `#!/usr/bin/env bun` shebang automatically when
@@ -46,7 +39,31 @@ async function main(): Promise<void> {
   }
   // Bun.build doesn't chmod the output; do it ourselves so the file is
   // directly invocable when copied into ~/.local/bin.
-  chmodSync(resolve(outDir, 'slopmop.js'), 0o755)
+  const bundlePath = resolve(outDir, 'slopmop.js')
+  chmodSync(bundlePath, 0o755)
+
+  // Bake the skill version into the bundle. cli/version.ts ships a sentinel
+  // (`'BUILD_VERSION_SENTINEL'`) which we replace post-build so the shipped
+  // CLI doesn't depend on SKILL.md being present on the user's machine.
+  // Refuse to ship a bundle where the sentinel didn't appear - that would
+  // mean the CLI silently falls back to a runtime SKILL.md lookup and fails
+  // wherever the file is missing.
+  const bundle = readFileSync(bundlePath, 'utf8')
+  const sentinel = '"BUILD_VERSION_SENTINEL"'
+  const altSentinel = "'BUILD_VERSION_SENTINEL'"
+  let patched: string
+  if (bundle.includes(sentinel)) {
+    patched = bundle.replace(sentinel, JSON.stringify(skillVersion))
+  } else if (bundle.includes(altSentinel)) {
+    patched = bundle.replace(altSentinel, JSON.stringify(skillVersion))
+  } else {
+    console.error(
+      'build-cli: BUILD_VERSION_SENTINEL not found in bundle - did cli/version.ts get refactored without updating this script?',
+    )
+    process.exit(1)
+  }
+  writeFileSync(bundlePath, patched, 'utf8')
+  chmodSync(bundlePath, 0o755)
 
   // 3. Copy install.sh into dist/cli.
   copyFileSync(
@@ -55,25 +72,15 @@ async function main(): Promise<void> {
   )
   chmodSync(resolve(outDir, 'install.sh'), 0o755)
 
-  // 4. Stamp a manifest with the version so curl-then-extract flows can
-  //    sanity-check.
+  // Stamp a manifest with the version so curl-then-extract flows can
+  // sanity-check.
   writeFileSync(
     resolve(outDir, 'manifest.json'),
-    JSON.stringify({ version: cliVersion, builtAt: new Date().toISOString() }, null, 2) + '\n',
+    JSON.stringify({ version: skillVersion, builtAt: new Date().toISOString() }, null, 2) + '\n',
     'utf8',
   )
 
-  console.log(`build-cli: dist/cli/slopmop.js (v${cliVersion})`)
-}
-
-function readCliVersion(): string {
-  const path = resolve(repoRoot, 'cli/version.ts')
-  const raw = readFileSync(path, 'utf8')
-  const m = raw.match(/SKILL_VERSION\s*=\s*'([^']+)'/)
-  if (!m) {
-    throw new Error(`build-cli: could not read SKILL_VERSION from ${path}`)
-  }
-  return m[1]
+  console.log(`build-cli: dist/cli/slopmop.js (v${skillVersion})`)
 }
 
 function readSkillVersion(): string {

@@ -6,4 +6,4 @@
  * `skillVersion` field. `scripts/build-cli.ts` asserts they match before
  * bundling.
  */
-export const SKILL_VERSION = '2026-05-09.6'
+export const SKILL_VERSION = '2026-05-12.1'

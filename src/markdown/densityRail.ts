@@ -1,8 +1,23 @@
+import MarkdownIt from 'markdown-it'
+
 export interface ParagraphInfo {
   hash: string
   start: number
   end: number
   text: string
+}
+
+/** Render-config must match ArticleView's so source paragraphs canonicalise
+ *  to the same plaintext the DOM produces. Without this, any paragraph that
+ *  contains markdown inline syntax (`**bold**`, `[link](url)`, backticks)
+ *  has different keys on each side and the rail can't anchor to it. */
+const SOURCE_MD = new MarkdownIt({ html: false, linkify: true, typographer: false })
+
+function sourcePlainText(text: string): string {
+  if (typeof document === 'undefined') return text
+  const div = document.createElement('div')
+  div.innerHTML = SOURCE_MD.render(text)
+  return div.textContent ?? ''
 }
 
 export type DensityAxes = Record<string, number>
@@ -124,7 +139,7 @@ export function applyDensityRails(
 
   const byCanonical = new Map<string, ParagraphInfo>()
   for (const p of paragraphs) {
-    const key = canonical(p.text)
+    const key = canonical(sourcePlainText(p.text))
     if (key) byCanonical.set(key, p)
   }
 

@@ -418,17 +418,22 @@ function onMouseUp(): void {
 .article-view :deep(mark.slop-flag.is-preview-hidden) {
   display: none;
 }
-/* Hover-from-card: full opaque highlight in the flag's category color so the
- * writer can immediately see which span the annotation refers to. */
+/* Hover-from-card: paint the span in the flag's category colour so the writer
+ * can immediately see which run the annotation refers to. We keep the prose
+ * colour intact and use a translucent fill + matching outline so the indicator
+ * reads the same way against both themes (the dark theme's pastel category
+ * hues have terrible contrast with light text and the prior var(--bg) override
+ * made the prose go near-black on a dark surface). */
 .article-view :deep(mark.slop-flag.is-hovered) {
-  background: var(--flag-color, var(--accent));
-  color: var(--bg);
+  background: color-mix(in srgb, var(--flag-color, var(--accent)) 42%, transparent);
+  outline: 2px solid var(--flag-color, var(--accent));
+  outline-offset: 1px;
   border-bottom-color: var(--flag-color, var(--accent));
   border-radius: 2px;
 }
 .article-view :deep(mark.slop-flag.is-hovered.is-previewing) {
-  background: #2f8f6a;
-  color: #fff;
+  background: color-mix(in srgb, #2f8f6a 42%, transparent);
+  outline-color: #2f8f6a;
   border-bottom-color: #2f8f6a;
 }
 .article-view :deep(mark.slop-flag.is-selected) {

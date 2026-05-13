@@ -151,7 +151,26 @@ export function applyDensityRails(
   interface Seg { top: number; height: number; scores: DensityAxes; pEl: HTMLElement; hash: string }
   const segments: Seg[] = []
 
-  for (const pEl of Array.from(root.querySelectorAll<HTMLElement>('.md-prose p'))) {
+  // Walk top-level paragraph-like blocks in document order: direct-child
+  // `<p>` of each `.md-prose` (skipping nested `<p>` inside `<li>` of loose
+  // lists so they don't double-count), plus the list items themselves at the
+  // outermost level. Nested list items aren't surfaced separately - the
+  // outermost item's textContent already covers them, matching how
+  // `extractListItems` folds them into the parent on the source side.
+  const blocks: HTMLElement[] = []
+  for (const host of Array.from(root.querySelectorAll<HTMLElement>('.md-prose'))) {
+    for (const child of Array.from(host.children) as HTMLElement[]) {
+      if (child.tagName === 'P') {
+        blocks.push(child)
+      } else if (child.tagName === 'UL' || child.tagName === 'OL') {
+        for (const li of Array.from(child.children) as HTMLElement[]) {
+          if (li.tagName === 'LI') blocks.push(li)
+        }
+      }
+    }
+  }
+
+  for (const pEl of blocks) {
     const top = pEl.offsetTop
     const bottom = top + pEl.offsetHeight
     if (top < trackTop) trackTop = top

@@ -31,7 +31,7 @@ function bumpCursor(state: DocState): number {
  * Preserved:
  *   - source text + history (untouched - reverts go through /source/revert)
  *   - resolved/skipped/kept-deliberate/stale flags (durable record)
- *   - accepted suggestions (calibration data; voice samples)
+ *   - accepted suggestions (anchored to resolved flags)
  *   - resolved/cancelled/stuck responses (history)
  *   - density scores (paragraph-hash keyed; still valid)
  *   - agent-hints (author preferences survive the reset)
@@ -67,7 +67,7 @@ export async function handleReset(
   }
 
   // 2. Drop unaccepted suggestions tied to dropped flags. Keep accepted ones
-  // (they're anchored to resolved flags and feed voice-samples).
+  // (they're anchored to resolved flags and stay as durable history).
   let droppedSuggestions = 0
   for (const [id, sug] of Object.entries(state.suggestions)) {
     if (sug.accepted) continue

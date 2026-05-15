@@ -11,9 +11,9 @@ The rail is a teaching surface. A writer scanning a draft should be able to
 see, at a glance:
 
 - **Where the prose is unusually weak** on each of the catalogued density
-  axes (information, argument, impact, specificity, voice), so they know
+  axes (information, argument, impact, specificity), so they know
   which paragraphs to tighten, where to introduce a claim, where to make
-  things concrete, where to bring their voice in, where to raise stakes.
+  things concrete, where to raise stakes.
 - **Where the prose is unusually strong** on each axis, so they can learn
   from their own good paragraphs, and so they can audit the drafter's
   scoring (a strong-marker on a paragraph that doesn't feel strong is a
@@ -74,7 +74,7 @@ implementation no longer follows it.
 ### Geometry (historical, v3)
 
 One **lane** per axis, vertical, in the left gutter. Lanes are arranged in
-canonical axis order (information, argument, impact, specificity, voice)
+canonical axis order (information, argument, impact, specificity)
 side by side, with a small gap between them.
 
 Each lane has a **centerline** running its full height. The centerline
@@ -138,7 +138,7 @@ faded screens, and theme swaps; nothing else encodes direction.
 
 Colour carries **axis identity**, not direction. Each axis renders in its
 own hue (theme tokens `--rail-information`, `--rail-argument`,
-`--rail-impact`, `--rail-specificity`, `--rail-voice`); the silhouette
+`--rail-impact`, `--rail-specificity`); the silhouette
 fills with that hue at ~62% opacity and a slightly darker stroke for
 definition. Reason: in practice the all-accent v3 rail forced the writer
 to count lanes left-to-right against a header row that scrolls out of
@@ -235,7 +235,7 @@ outermost lanes spill into the gutter / prose margin per their slack.
 ### Colour and labels
 
 Unchanged from v3.1: each lane carries its own hue via theme tokens
-(`--rail-information`, …, `--rail-voice`); the silhouette fills with
+(`--rail-information`, …, `--rail-specificity`); the silhouette fills with
 that hue at ~62% opacity and a slightly darker stroke for definition.
 A faint vertical baseline at `x = LANE_WIDTH_PX` sits behind the
 silhouette so the writer can read deflections as "to the left of the

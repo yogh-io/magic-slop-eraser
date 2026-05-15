@@ -181,14 +181,6 @@ export async function handleDocs(
     return fail(405, 'method not allowed')
   }
 
-  // GET /docs/:id/voice-samples
-  if (verb === 'voice-samples' && req.method === 'GET') {
-    const url = new URL(req.url)
-    const n = Number(url.searchParams.get('n') ?? '20')
-    const samples = collectVoiceSamples(state, Number.isFinite(n) ? n : 20)
-    return json({ samples })
-  }
-
   // GET /docs/:id/companion
   if (verb === 'companion' && req.method === 'GET') {
     return json({
@@ -246,38 +238,6 @@ function sanitiseHints(body: Partial<AgentHints>): AgentHints {
   if (Array.isArray(body.severities)) out.severities = body.severities
   if (Array.isArray(body.patternIds)) out.patternIds = body.patternIds
   if (typeof body.paused === 'boolean') out.paused = body.paused
-  return out
-}
-
-interface VoiceSample {
-  pre: string
-  post: string
-  directive: string
-  patternId: string
-  rung: number
-}
-
-function collectVoiceSamples(state: DocState, n: number): VoiceSample[] {
-  const out: VoiceSample[] = []
-  // Walk suggestions where accepted=true; pull the directive that produced it.
-  const accepted = Object.values(state.suggestions).filter((s) => s.accepted)
-  accepted.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)) // newest first
-  for (const s of accepted) {
-    const flag = state.flags[s.flagId]
-    if (!flag) continue
-    // Voice memory feeds the catalogue-scoring drafter; brush flags have no
-    // patternId and aren't useful here.
-    if (!flag.patternId) continue
-    const directive = s.respondedTo ? state.responses[s.respondedTo]?.body ?? '' : ''
-    out.push({
-      pre: s.pre,
-      post: s.post,
-      directive,
-      patternId: flag.patternId,
-      rung: flag.rung ?? 1,
-    })
-    if (out.length >= n) break
-  }
   return out
 }
 

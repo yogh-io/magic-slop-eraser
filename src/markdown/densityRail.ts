@@ -67,12 +67,6 @@ export const CANONICAL_AXES: ReadonlyArray<AxisMeta> = [
     description:
       'Concrete nouns vs abstractions. "Three counties" beats "many areas." Specific reads high.',
   },
-  {
-    key: 'voice',
-    label: 'voice',
-    description:
-      "Does this sound like the writer (per voice samples) or like a model. Signature voice reads high; generic reads low.",
-  },
 ]
 
 /** Visible width of a single lane column (px). Centerline runs through its

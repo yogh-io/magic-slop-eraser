@@ -7,7 +7,6 @@ import {
   cmdDoc,
   cmdCatalogue,
   cmdCompanion,
-  cmdVoice,
   cmdHints,
   cmdSource,
   cmdRevert,
@@ -40,7 +39,6 @@ const COMMANDS: Record<string, CommandFn> = {
   doc: cmdDoc,
   catalogue: cmdCatalogue,
   companion: cmdCompanion,
-  voice: cmdVoice,
   hints: cmdHints,
   source: cmdSource,
   revert: cmdRevert,
@@ -78,7 +76,6 @@ Lifecycle:
   doc [--json]                            show doc summary
   catalogue                               dump the pattern catalogue
   companion [--out path]                  fetch the wrap-up bundle
-  voice [-n 20]                           pull voice samples
   hints get | hints set [--rungs ...]     read or set agent hints
   source <file>                           replace source (If-Match)
   revert [--to-version N]                 roll back to prior source

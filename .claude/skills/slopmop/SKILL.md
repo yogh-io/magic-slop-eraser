@@ -1,6 +1,6 @@
 ---
-description: Walk a markdown document through the slopmop deslop loop - serve brush-mode reader concerns and (when invoked) scan the catalogue, drafting candidates from author directives
-skillVersion: 2026-05-14.1
+description: Walk a markdown document through the slopmop deslop loop - serve brush-mode reader concerns first; scan the catalogue with subagents when the author asks for it
+skillVersion: 2026-05-15.1
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -8,12 +8,12 @@ allowed-tools: Bash, Read, Edit, Write, Monitor
 
 A *steering loop* for fixing AI-slop in prose. The author defines shape; you (the **drafter**) draft the prose; the author re-directs until the sentence lands. The work is the author's; you are the keyboard.
 
-slopmop has **two modes** the drafter serves:
+slopmop has **two modes**, and they are not symmetric:
 
-- **Brush** (default). The reader highlights a passage in the article and types what bothers them. You discover those user-sourced flags, draft **~3 candidate fixes per flag**, and post them back. The reader picks one. No catalogue walk required, no detection on your side - the reader has already done the detection.
-- **Scan**. The full catalogue walk (Phase A) plus the directive-driven steering loop (Phase B) - what slopmop did before brush mode. You catch what the reader misses. Only run scan when the author invokes it explicitly (terminal prompt, browser button, hints).
+- **Brush is the default and the primary surface.** The reader highlights a passage and types what bothers them. You discover those user-sourced flags, draft **~3 candidate fixes per flag**, and post them back. The reader picks one. No catalogue walk required - the reader is the detector.
+- **Scan is supplementary, opt-in.** When the author asks for a starting punch-list ("run a scan", "walk the catalogue"), you read the catalogue, hunt for instances with detection subagents, and post flags into a parallel track. Brush still runs; scan complements it, never replaces it.
 
-The slopmop site is the source of truth and the steering surface. You push prose, find slop, draft candidates from author directives, post resolutions. The author sweeps in the browser at their own pace; you grind in the background. Written for Claude Code; the CLI is the same elsewhere, the subagent dispatch below assumes the Task tool.
+Push prose, encourage the author to read and brush, run scan only when invited. The slopmop site is the source of truth; the author sweeps in the browser at their own pace. Written for Claude Code; the CLI works the same elsewhere, the subagent dispatch below assumes the Task tool.
 
 ## the slopmop CLI
 
@@ -44,7 +44,7 @@ After either, `.slopmop/session.json` exists in cwd and every other command "jus
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-14.1` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
+This file declares `skillVersion: 2026-05-15.1` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
 
 The CLI sends `X-Skill-Version` on every call. The server flags two failure modes via response headers:
 
@@ -194,13 +194,13 @@ Your brush loop:
 
 A brush flag whose reader complaint matches a catalogue pattern (e.g. "this is too vague" → vague-gravitas) is *still* posted as a brush flag in v1. The v2 reflection layer is what later proposes catalogue refinements; v1 just stores cleanly.
 
-## the shape of scan work (opt-in mode)
+## the shape of scan work (supplementary, opt-in)
 
-Scan is the catalogue-walk mode - what slopmop did before brush. Run it only when the author invokes it explicitly: terminal prompt ("run a scan"), or an agent-hint that targets specific rungs/patterns. Don't auto-run scan on every session.
+Scan is the catalogue-walk mode. **Run it only when the author asks for it** - "run a scan", "walk the catalogue", "give me a punch-list" - or when an agent hint pre-pins specific rungs/patterns. Don't auto-run scan on every session; brush is the default surface, scan is the supplementary catalogue track that runs alongside it.
 
 Two phases. The first runs once when scan is invoked; the second runs on a loop.
 
-**Phase A - analysis (once, at scan start).** Two beats: a quick *framing pass* (is slopmop the right tool for this piece, or does it want `/distill` or `/compress` first?), then the catalogue walk - bring-your-own-model, all detection is yours. Subagents (Task tool) parallelise the catalogue walk well; shape the dispatch as suits the prose.
+**Phase A - analysis (once, at scan start).** Catalogue walk only - bring-your-own-model, all detection is yours. You already posted the brief framing note at session start; Phase A goes straight to the dispatch. Subagents (Task tool) parallelise the catalogue walk; one per kindred-pattern cluster keeps each subagent deeply primed on a small family and blind to the rest.
 
 **Phase B - the steering loop (until the author says done).**
 
@@ -215,7 +215,11 @@ If you're mid-sweep and a pull happens to come back empty for a moment (the auth
 
 **Run both loops if both have work.** A drafter attached to a session can serve brush and scan in alternation: `pull --source user` for brush, default `pull` for scan responses. Brush is usually the lighter loop; scan only runs when invoked.
 
-## 0. bootstrap
+## starting a session
+
+The opening five beats. Brush is the default - **don't auto-walk the catalogue**. Encourage the author to read and brush; offer scan as a supplementary option they can pull on.
+
+### 1. push the doc
 
 If given a file path:
 
@@ -223,40 +227,64 @@ If given a file path:
 slopmop init "./article.md"
 ```
 
-Tell the author: "Open the printed URL in your browser. I'll wait."
-
 If given a URL:
 
 ```bash
 slopmop attach "https://slopmop.io/d/abc123"
 ```
 
-Either way, the session lands at `.slopmop/session.json` in cwd. Treat the doc URL as the capability - anyone with it can drive the session, that's intentional.
+The session lands at `.slopmop/session.json` in cwd. The doc URL is the capability - anyone with it can drive the session, that's intentional.
 
-**Right after the bootstrap**, send a heartbeat and declare the initial task list.
-
-If the author invoked scan explicitly (e.g. "run a scan", or session opened with a scan-rung agent hint), declare the scan tasks:
-
-```bash
-slopmop heartbeat
-slopmop task phase-a in-progress "Phase A: framing pass + catalogue walk"
-slopmop task phase-b open "Phase B: drive steering loop"
-```
-
-If the author just opened a session and started brushing (default - no explicit scan invocation), declare a brush task instead:
+### 2. heartbeat and declare a brush task
 
 ```bash
 slopmop heartbeat
 slopmop task brush in-progress "serving brush-mode reader concerns"
 ```
 
-Either way, skipping the heartbeat is a regression - the writer is staring at a blank pill wondering whether anything is wired.
+Skipping the heartbeat is a regression - the writer is staring at a blank pill wondering whether anything is wired.
 
-## 1. analysis
+### 3. read the source yourself
+
+Read the source straight, in a single pass. No subagents at this stage - the brief judgement is yours, not a synthesised committee read. Form an opinion: what is this piece, how does it sound, where do you suspect slop sits.
+
+### 4. post a brief framing note
+
+Post your first impression as an `observation` note so it lands on the activity panel before the author has even opened the URL:
+
+```bash
+slopmop note observation --stdin <<EOF
+A working note on dual-mode editing tooling. Three sections, clear claims,
+unusually committal voice for the genre. First-pass suspicions: a couple
+of throat-clearing openers in section two, one antithesis-shaped pivot
+near the close, vague-gravitas thick in the abstract. Brush over those
+spots first if they bother you - or tell me to run a scan and I'll walk
+the whole catalogue in parallel.
+EOF
+```
+
+What goes in the note:
+
+- **What the piece is.** One sentence on shape, genre, length.
+- **Your honest first read.** Register, what the piece is doing, whether it lands. If it reads as slop on first pass, say so - don't soften.
+- **A couple of spots that already stand out** as plausible brush targets. Concrete, anchored to phrases the reader can find. Don't pre-flag (no `flag-post` yet) - the reader is the detector in brush mode; you're just pointing.
+- **The invitation.** "Brush whatever bothers you, or ask for a scan."
+
+Don't dump the whole catalogue at the reader and don't manufacture flags pre-emptively. The framing note is the author's onboarding to the loop, not a verdict.
+
+### 5. hand the URL to the author
+
+Tell them in chat:
+
+> "Open the printed URL in your browser. Read through; highlight any passage that bothers you and type a sentence about why - I'll draft fixes (~3 candidates per flag). Say *run a scan* if you want me to walk the catalogue in parallel."
+
+Then enter the brush pull loop (next section) and wait. New brush flags arrive whenever the reader keeps reading; you process them and post resolutions back. Scan only kicks off if the author asks.
+
+## 1. analysis (scan mode only)
 
 You are the **drafter**. All detection is yours - Rung 1, 2, and 3. The server stores the catalogue, the docs, and the flags; it does not read prose, dedupe findings, or cluster anything. The clustering is yours too.
 
-Phase A is four steps: read, dispatch a small set of detection subagents in parallel (each a specialist for a *kindred group* of patterns), dispatch a synthesis subagent that clusters their findings, post the consolidated flag set. ~7 subagents fan out, one synthesizes, you post. Done in a couple of minutes.
+Phase A is four steps: read the catalogue and the source, dispatch a small set of detection subagents in parallel (each a specialist for a *kindred group* of patterns), dispatch a synthesis subagent that clusters their findings, post the consolidated flag set. ~6 subagents fan out, one synthesises, you post. Done in a couple of minutes.
 
 ### 1a. read
 
@@ -270,7 +298,7 @@ mkdir -p /tmp/slopmop-findings && rm -f /tmp/slopmop-findings/*
 
 ### 1b. dispatch detection subagents per kindred group (parallel)
 
-One Task subagent per *cluster* of structurally kindred patterns. ~6 detection dispatches plus one voice-memo dispatch, all in parallel.
+One Task subagent per *cluster* of structurally kindred patterns. ~6 detection dispatches, all in parallel.
 
 The clusters group patterns that share a detection skill - a subagent looking at sentence openers is also the right reader for sentence closers; a subagent reading for dead vocabulary is the right reader for inflated vocabulary. Within a cluster the subagent's intra-pattern reasoning is fine (the patterns are kindred). Across clusters, no agent has visibility - which is what prevents the "section X is protocol shape, skip everything in it" cross-pattern shielding move.
 
@@ -310,8 +338,6 @@ The subagent is deeply primed on a small family of patterns, knows the edge case
 }
 ```
 
-In parallel, dispatch one **voice-memo subagent**: whole source, no catalogue. Brief: "write a short note on the piece's register and any obviously deliberate devices (anaphora, protocol-shape sections, signature voice tics). Return to `/tmp/slopmop-findings/_voice-memo.txt`."
-
 The cluster table is a default; if the catalogue grows or a piece type calls for a different split, regroup - but keep the invariant: no single subagent sees the whole catalogue, and groupings stay within structural kinship. Bundling structurally-unlike patterns (e.g. `antithesis` + `absent-actor` + `synthesis-of-nothing`) re-opens cross-pattern reasoning and re-introduces the section-shielding failure.
 
 ### 1c. dispatch the synthesis subagent
@@ -320,10 +346,9 @@ Once all detection subagents return, dispatch one synthesis subagent.
 
 The synthesis subagent gets:
 - All cluster findings JSONs from `/tmp/slopmop-findings/*.json` (each carries findings tagged with `patternId`; the cluster is just routing).
-- The voice memo from `/tmp/slopmop-findings/_voice-memo.txt`.
 - The source from `/tmp/slopmop-source.md`.
 - The flag-post schema (below).
-- The brief: clustering rules + severity weighting + the no-skip directive.
+- The brief: clustering rules + the no-skip directive.
 
 It writes `/tmp/slopmop-flags.json` ready to post. Two cluster passes:
 
@@ -331,14 +356,12 @@ It writes `/tmp/slopmop-flags.json` ready to post. Two cluster passes:
 - Primary `patternId` = the finding with highest severity.
 - Other patternIds → `relatedPatterns`.
 - Severity = max of the group.
-- Rationale = one synthesized sentence covering all the pattern angles ("opens with throat-clearing *and* trails into vague-gravitas - both wrapping a sentence that says nothing").
+- Rationale = one synthesised sentence covering all the pattern angles ("opens with throat-clearing *and* trails into vague-gravitas - both wrapping a sentence that says nothing").
 - `suggestion` = the primary's if present; otherwise omit.
 
 **Pass 2 - shape recurrence.** For each `patternId` with 3+ findings across distant anchors (>~500 chars apart, non-adjacent paragraphs), ask: same construction or unrelated instances of the same pattern? If same (parallel paragraph openers, repeated tic across a section), emit one flag at the first anchor with `relatedAnchors` listing the rest. Rationale names the construction once. If unsure, leave as separate flags - over-clustering is worse than under-clustering.
 
-**Voice memo folds in here, severity-side only.** A passage where the pattern shape is doing legitimate work scores *low* (0.1-0.3). It **still posts**. The author dismisses what doesn't bother them; the synthesis subagent does not get to make that call.
-
-If the synthesis subagent finds itself dropping findings because "the section is deliberate" or "this is protocol shape, not slop", that *is* the failure mode. Severity is the vote; posting is the contract. Drop nothing. The brief to the synthesis subagent should restate this in those words.
+**Severity is the vote; posting is the contract.** Each detection subagent already scored its findings per-instance - a passage where the pattern shape is doing legitimate work comes back at *low* severity (0.1-0.3), not omitted. Synthesis preserves that signal. If the synthesis subagent finds itself dropping findings because "the section is deliberate" or "this is protocol shape, not slop", that *is* the failure mode. The author dismisses what doesn't bother them; the synthesis subagent does not get to make that call. Drop nothing. The brief to the synthesis subagent should restate this in those words.
 
 ### 1d. coverage check
 
@@ -485,7 +508,7 @@ slopmop reset "angry literary critic lens; the piece sounds eager"
 
 Server-side this drops your `open` and `awaiting-accept` flags, the unaccepted suggestions tied to them, the comments anchored to them, all your tasks, all your notes, and cancels any pending responses. Source, accepted suggestions, resolved/skipped/kept flags, density scores, and agent-hints survive - the *durable* record of decisions the author already landed stays put. A `drafter-reset` event with the reason hits the activity timeline so the writer sees the breadcrumb.
 
-Then re-run Phase A. Heartbeat, declare fresh `phase-a` / `phase-b` tasks, walk the catalogue with the new lens folded in, post the new flag set. The author's voice samples (from accepted rewrites) are still there - keep using them.
+Then re-run Phase A. Heartbeat, declare fresh `phase-a` / `phase-b` tasks, walk the catalogue with the new lens folded in, post the new flag set.
 
 What this is *not*: a source revert. If the author wants the prose itself rolled back (undo a Rung 3 push), that's `slopmop revert` - a separate command. Reset is purely about your analysis hypothesis.
 
@@ -497,20 +520,9 @@ When to use it (the trigger phrases vary; the shape is the same):
 
 When *not*: incremental redirection on a single flag is a directive, not a reset. "More committal on this one" stays in the response loop. Reset is for "throw out the map and re-draw it".
 
-## 6. voice samples
+## 6. density scoring
 
-The author's accepted rewrites are the calibration samples for their voice. Pull a batch on session start, and again every dozen resolutions or so:
-
-```bash
-slopmop voice -n 20
-# -> { samples: [{ pre, post, directive, patternId, rung }, ...] }
-```
-
-Pack them into your prompt as few-shot examples. Voice converges over the session if you use them; stays generic if you don't.
-
-## 7. density scoring
-
-Slop catalogue tells the author what's *wrong* with a passage. Density is the other lens: per-paragraph numeric scores along a few axes, rendered as a wavy silhouette in the article margin - one lane per axis, convex bumps where the paragraph is above ambient noise on that axis and concave dents where it's below. **Information**, **argument**, **impact**, **specificity**, **voice** are the canonical defaults; you can drop any that don't fit a piece, and you can add your own (e.g. *humour*, *tension*, *stakes*) when the work calls for it. The client renders the union it sees, with extras getting a neutral fallback color.
+Slop catalogue tells the author what's *wrong* with a passage. Density is the other lens: per-paragraph numeric scores along a few axes, rendered as a wavy silhouette in the article margin - one lane per axis, convex bumps where the paragraph is above ambient noise on that axis and concave dents where it's below. **Information**, **argument**, **impact**, **specificity** are the canonical defaults; you can drop any that don't fit a piece, and you can add your own (e.g. *humour*, *tension*, *stakes*) when the work calls for it. The client renders the union it sees, with extras getting a neutral fallback color.
 
 **When to score:**
 - Once at session start, after you post flags. Most paragraphs land their scores here.
@@ -526,7 +538,7 @@ slopmop density --json
 # -> { paragraphs: [{ hash, start, end, text }], density: { hash: { axis: score } } }
 ```
 
-For each paragraph whose `hash` is missing from `density`, score it. Use a single LLM call that takes the paragraph (with surrounding paragraph context for voice judgement) and returns the axis scores.
+For each paragraph whose `hash` is missing from `density`, score it. Use a single LLM call that takes the paragraph (with surrounding paragraph context) and returns the axis scores.
 
 **Score range: -10 to +10. The calibration anchor is external.** Zero is *not* the midpoint of the current piece - zero is "average article on the internet" on this axis. A typical Atlantic paragraph, a typical blog post, a typical AI-generated passage: those are the baseline. Score each paragraph against that external reference:
 
@@ -542,9 +554,8 @@ The axes themselves are unchanged:
 - **argument**: is a claim being made and supported here, or is the paragraph just sitting there? Inert connective tissue = negative; load-bearing = positive.
 - **impact**: does this hit. Punchline-quality, specific imagery, payoff. Filler = negative; lands = positive.
 - **specificity**: concrete nouns vs abstractions. "Three counties" beats "many areas." Specific = positive.
-- **voice**: does this sound like the writer (per voice samples) or like a model. Signature voice = positive; generic = negative.
 
-Drop any axis that genuinely doesn't apply (e.g. voice=N/A on a piece with no voice samples yet). Add an axis if you've got a strong take ("Tension - is something at stake here").
+Drop any axis that genuinely doesn't apply on a given piece. Add an axis if you've got a strong take ("Tension - is something at stake here").
 
 **Score for contrast, AND keep the baseline calibrated.** The author wants two signals from the rail at once: (1) where this piece is above vs below the typical internet paragraph (the baseline anchors that read), and (2) where the piece's own peaks and troughs sit (contrast across paragraphs makes that visible). Don't cluster everything in the middle "to be safe"; use the full range. A piece where every paragraph scores between +1 and +3 is telling the author either "the agent is sandbagging" or "this prose is genuinely middling on every axis" - if the second is true, that itself is the signal.
 
@@ -554,9 +565,9 @@ Build a `scores.json`:
 {
   "modelTag": "claude-opus-4-7",
   "scores": [
-    { "paragraphHash": "h1", "axes": { "information":  6, "argument":  3, "impact":  7, "specificity":  8, "voice":  2 } },
-    { "paragraphHash": "h2", "axes": { "information": -7, "argument": -4, "impact": -8, "specificity": -6, "voice": -3, "tension": -5 } },
-    { "paragraphHash": "h3", "axes": { "information":  0, "argument":  1, "impact": -1, "specificity":  0, "voice":  0 } }
+    { "paragraphHash": "h1", "axes": { "information":  6, "argument":  3, "impact":  7, "specificity":  8 } },
+    { "paragraphHash": "h2", "axes": { "information": -7, "argument": -4, "impact": -8, "specificity": -6, "tension": -5 } },
+    { "paragraphHash": "h3", "axes": { "information":  0, "argument":  1, "impact": -1, "specificity":  0 } }
   ]
 }
 ```
@@ -573,7 +584,7 @@ Server stores by hash, so unchanged paragraphs keep their scores across edits fo
 
 The author can read the rail to decide where prose is dying ("this whole section is denting in") or carrying weight ("the silhouette bulges through here") - that's a higher-leverage signal than nudging individual lexical flags. Don't lecture about it; just score.
 
-## 8. wrap up
+## 7. wrap up
 
 When the author says `done`, or `slopmop pull` returns empty repeatedly, fetch the companion:
 
@@ -587,11 +598,12 @@ For the full command list run `slopmop --help`. Body conventions for write comma
 
 ## constraints
 
-- **All detection is yours.** Rung 1, 2, and 3 - the server doesn't read prose. The catalogue is the spec; you walk it.
-- **Detection walks blind in kindred clusters; synthesis applies the voice memo.** No single detection subagent sees the whole catalogue - each gets one structural family of patterns. The voice memo is a separate subagent in parallel; the synthesis subagent is the only one that sees everything and folds the memo into severity. Don't seed detection subagents with the memo; it primes them to skip.
+- **Brush is the default; scan is supplementary.** Don't auto-walk the catalogue on session start. Post the framing note, encourage the reader to brush, run scan only when the author asks for it.
+- **All detection is yours.** Rung 1, 2, and 3 - the server doesn't read prose. The catalogue is the spec; you walk it. In brush mode the reader has already done the detection - you only draft. In scan mode the detection subagents do the walk.
+- **Detection walks blind in kindred clusters; synthesis only clusters.** No single detection subagent sees the whole catalogue - each gets one structural family of patterns. The synthesis subagent merges anchor-overlap and shape-recurrence; it does not re-judge severity or drop findings.
 - **Server stores; drafter clusters.** Same-anchor merge and shape-recurrence rollup happen in the synthesis subagent before `flag-post`. The server doesn't dedupe or merge - it just validates patternIds against the catalogue, relocates anchors, stores. If overlapping flags land, that's a synthesis bug to fix client-side.
-- **Shields lower severity, they don't drop the flag.** `skipRule` and the voice memo describe when a pattern shape is doing legitimate work - that's a *low* number, not a missing flag. The author dismisses what doesn't bother them; you don't get to make that call. Zero flags across a whole rung, or flags clustered in <30% of the source, is a failure signal, not a clean verdict - the shields swallowed the walk.
-- **Severity is your scoring vote.** Per-flag `severity` is the score. The voice memo informs the weight - a deliberate move scores low even if it matches a catalogued pattern (and the flag still posts). Don't autopilot the catalogue's nominal severity through; adjust per instance.
+- **Shields lower severity, they don't drop the flag.** `skipRule` describes when a pattern shape is doing legitimate work - that's a *low* number, not a missing flag. The author dismisses what doesn't bother them; you don't get to make that call. Zero flags across a whole rung, or flags clustered in <30% of the source, is a failure signal, not a clean verdict - the shields swallowed the walk.
+- **Severity is your scoring vote.** Per-flag `severity` is the score, set by the detection subagent per instance. A deliberate move scores low even if it matches a catalogued pattern (and the flag still posts). Don't autopilot the catalogue's nominal severity through; adjust per instance.
 - **The author shapes; you write.** Slopmop's loop is: you draft, author redirects via shape directives. Never ask the author to write the sentence.
 - **Pull, don't push.** The author submits directives whenever they want; you pull when you have capacity. The queue holds work for you - none of it is missed if you're slow.
 - **Multiple candidates are fine.** Post one if there's a clear best take; post two or three when the directive admits real alternatives the author would want to compare. The author picks one, the rest become history. Don't manufacture filler variants - the bar is real difference, not coverage.
@@ -599,14 +611,13 @@ For the full command list run `slopmop --help`. Body conventions for write comma
 - **Hash is automatic.** The CLI tracks `If-Match` for you. On 412 (`exit 4`), re-pull and rebase - don't try to silently retry.
 - **Granularity is the feature.** Rung 1/2 are sentence-level (or smaller) patches. Rung 3 is the only path that touches paragraph structure. Never rewrite a paragraph as a per-flag patch - it won't fit in the anchor window and the call rejects 422.
 - **Punt rather than guess.** If you can't address a directive, punt with a reason. The author decides what to do.
-- **Voice memory accumulates.** Pull voice samples regularly. The session converges on the writer's voice if you use them.
 - **Skip / keep / let-me-try / accept / discard are user-side.** Self-resolve server-side. You will never see those kinds in the queue.
 - **The score is the catalogue score, all rungs.** Severity-weighted slop density across Rung 1, 2, and 3 - what the headline pill shows. Brush flags don't count toward it (they're a separate "reader concerns" track). Don't try to "fix" individual Rung-2 hits in isolation to chase the score; the byRung breakdown is what guides where to dig.
 - **Density is keyed by paragraph hash, not flag id.** Don't re-score paragraphs whose hash is already in the density cache - they haven't changed. Your token budget goes to the new and the drifted.
 
 ## appendix: raw HTTP
 
-The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-05-14.1`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
+The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-05-15.1`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
 
 Routes (full schemas: read the CLI source at `cli/client.ts` + `cli/commands/*.ts`, or `slopmop --help`):
 
@@ -615,7 +626,7 @@ Routes (full schemas: read the CLI source at `cli/client.ts` + `cli/commands/*.t
 - `POST /docs/:id/flags`, `POST /docs/:id/flags/:fid/comments`
 - `GET /docs/:id/responses?...`, `POST /docs/:id/responses`, `POST /docs/:id/responses/:rid/transition`
 - `POST /docs/:id/resolutions`
-- `GET /docs/:id/voice-samples`, `GET /docs/:id/companion`
+- `GET /docs/:id/companion`
 - `GET /docs/:id/density`, `POST /docs/:id/density`
 - `GET /docs/:id/events` (SSE)
 - `POST /docs/:id/agent/heartbeat`, `POST /docs/:id/agent/notes`, `POST /docs/:id/agent/tasks`, `DELETE /docs/:id/agent/tasks/:key`
@@ -628,7 +639,7 @@ Breaking changes from prior versions (skill v2026-05-09.5 and earlier):
 - `GET /events/poll` -> dropped; use the SSE stream
 
 Changes in skill v2026-05-12.1 (from v2026-05-09.6; not breaking on the wire):
-- Phase A reorganised: per-rung dispatch replaced by **clustered detection subagents** (kindred-pattern groups, ~6 for the current catalogue, plus a voice-memo subagent in parallel) and a dedicated **synthesis subagent** that produces the consolidated flag set before `flag-post`.
+- Phase A reorganised: per-rung dispatch replaced by **clustered detection subagents** (kindred-pattern groups, ~6 for the current catalogue) and a dedicated **synthesis subagent** that produces the consolidated flag set before `flag-post`.
 - Flag schema gained two optional fields: `relatedPatterns: string[]` (other patternIds the synthesis pass folded into this flag) and `relatedAnchors: TextAnchor[]` (other places the same construction recurs). Old clients and old flags work unchanged.
 - `POST /flags` no longer dedupes server-side. Drafter clusters before posting.
 
@@ -639,3 +650,7 @@ Changes in skill v2026-05-14.1 (from v2026-05-12.1; not breaking on the wire):
 - **Accept with explicit `suggestionId`**. `POST /responses { kind: 'accept', flagId, suggestionId? }` now requires `suggestionId` when the flag has >1 unaccepted candidates (replaces silent newest-wins behaviour). For single-candidate flags, `suggestionId` is optional.
 - **`DocResponse.resolvedSuggestionId`** (singular) → **`resolvedSuggestionIds: string[]`** (plural). Legacy single-id records normalise to a one-element array on read.
 - The catalogue score documentation now matches the implementation: severity-weighted across **all rungs** (not Rung 1 only).
+
+Changes in skill v2026-05-15.1 (from v2026-05-14.1):
+- **Brush is the canonical opening**. New "starting a session" section codifies the bootstrap flow: push doc → heartbeat → read source yourself → post a brief framing `observation` note → invite the author to brush. Scan is explicitly supplementary, run only when the author asks.
+- **Voice memo / voice samples removed.** The `voice-memo` detection subagent is gone; the synthesis subagent no longer folds a memo into severity (each detection subagent already scores per instance). `GET /docs/:id/voice-samples` and `slopmop voice` are dropped. The `voice` density axis is dropped from the canonical default set. Drafters that pulled voice samples or scored a `voice` axis should stop; old samples on disk are ignored.

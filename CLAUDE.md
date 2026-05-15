@@ -67,7 +67,6 @@ What this means for the surfaces and the API:
 - **Granularity is the feature.** Anchors are sentence-level for Rung 2, section-level for Rung 3. Rewrite affordances should match. Never rewrite a paragraph in one turn.
 - **The directive vocabulary matters.** Free text where free text is needed; common-case shortcuts ("more committal", "drop the qualifier", "punchline first", "cut to the verb", "their voice not yours") for the moves the author reaches for repeatedly. Sweep-speed.
 - **Batched submission, async resolution.** The API and the UI must let the author sweep a flag list, post directives, and walk away. The agent processes asynchronously and pushes results back via the event stream. The author re-engages at their cadence, not the agent's. This is a first-class API primitive, not a client-side optimisation.
-- **Voice memory accumulates over the session.** Every accepted rewrite is a calibration sample. The agent's candidates should converge on *this writer's* voice as the document goes on, not stay generic.
 - **BETTER / WORSE / CLOSE is a steering wheel, not a scorecard.** Per flag, the candidate trail records *direction of travel*, not a final ranking. A verdict on the latest candidate is fuel for the next nudge.
 
 Rung 1 is the simplest form (one substitution, one verdict, often resolvable in the same sweep). Rung 2 is the canonical form (multiple shape-nudges per flag until the sentence lands, sometimes across two or three sweeps). Rung 3 is the loop applied to whole sections, with the agent reading the surrounding piece between turns.
@@ -177,8 +176,6 @@ POST   /docs/:id/flags/:fid/comments  { body, author? }  # only flag-scoped verb
                                       # the matching `kind`; legacy per-flag verbs return 405.
 
 # read-only / context
-GET    /docs/:id/voice-samples?n=20   # derived from accepted suggestions; agent fetches as
-                                      # few-shot voice calibration on each work cycle
 GET    /docs/:id/companion            # resolution log + final source
 GET    /catalogue                     # patterns + categories (no auth)
 GET    /health
@@ -206,7 +203,7 @@ The API is the contract; the browser UI and any agent skill (Claude Code, Codex,
 
 The 0-10 score is computed from **all live catalogue flags across all three rungs** (`source: 'llm'`, status open + awaiting-accept). Brush flags don't feed the score - it's a *catalogue* score, not a "stuff readers dislike" tally. The panel header surfaces brush flag count separately as "N reader concerns".
 
-Per-flag `severity` is the load-bearing input - the drafter sets it at flag-detection time, weighted subjectively per instance and informed by the voice memo (a deliberate move scores low even if it matches a catalogued pattern). The server aggregates: density-based math, with pattern-specific ceilings for the worst offenders.
+Per-flag `severity` is the load-bearing input - the drafter sets it at flag-detection time, weighted subjectively per instance by the detection subagent (a deliberate move scores low even if it matches a catalogued pattern). The server aggregates: density-based math, with pattern-specific ceilings for the worst offenders.
 
 `scoreFromFlags` in `src/detectors/index.ts` returns:
 - `value` - the 0-10 number
@@ -298,7 +295,7 @@ server/                 # Bun-based API. Imports src/anchoring + src/detectors d
     disk.ts             # DiskStore: one state.json blob per doc on local fs
     s3.ts               # S3Store: one JSON blob per doc on any S3-compatible bucket
   routes/
-    docs.ts             # /docs, /docs/:id, source, companion, agent-hints, voice-samples
+    docs.ts             # /docs, /docs/:id, source, companion, agent-hints
     flags.ts            # /docs/:id/flags (POST: drafter-side detection) + per-flag actions
     events.ts           # SSE + long-poll
     catalogue.ts        # read-only catalogue dump (the drafter's detection spec)

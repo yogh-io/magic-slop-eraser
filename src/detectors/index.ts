@@ -1,8 +1,8 @@
 /**
  * Scoring helpers. Detection happens drafter-side via `POST /docs/:id/flags`;
- * the drafter sets `severity` per flag (subjectively, informed by the voice
- * memo) and that severity is what feeds the score. The server's job is to
- * aggregate, not to judge.
+ * the drafter sets `severity` per flag (subjectively, per-instance) and that
+ * severity is what feeds the score. The server's job is to aggregate, not to
+ * judge.
  *
  * `severityFor` is a fallback for drafters that omit `severity` in their
  * flag submissions. Real scoring quality comes from the drafter setting
@@ -45,9 +45,8 @@ export interface ScoreResult {
 
 /**
  * Compute the 0-10 score from a flag set across all three rungs. The drafter's
- * per-flag `severity` is the load-bearing input - if the drafter has voice-
- * memo-informed weights, they show up here. The math is density-based with
- * a few pattern-specific ceilings for the worst offenders.
+ * per-flag `severity` is the load-bearing input. The math is density-based
+ * with a few pattern-specific ceilings for the worst offenders.
  *
  * Returns the overall score plus per-rung and per-pattern breakdowns so the
  * UI can surface "where the slop is" without a second pass.

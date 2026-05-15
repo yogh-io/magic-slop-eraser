@@ -21,7 +21,7 @@ function nowIso(): string {
  * POST /docs/:id/density   { scores: [{ paragraphHash, axes }], modelTag? }
  *
  * Density is the agent's vibes signal: per-paragraph numeric scores along a
- * handful of axes (information, argument, impact, specificity, voice - the
+ * handful of axes (information, argument, impact, specificity - the
  * canonical default; the agent may add or drop axes, the client renders the
  * union it's seen). Scored paragraphs are keyed by their content hash, so a
  * paragraph the user hasn't touched keeps its score across edits and only

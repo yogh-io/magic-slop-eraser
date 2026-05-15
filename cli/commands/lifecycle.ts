@@ -183,17 +183,6 @@ export async function cmdCompanion(args: Args): Promise<void> {
   }
 }
 
-/* --------------------------------- voice -------------------------------- */
-
-export async function cmdVoice(args: Args): Promise<void> {
-  const c = await withClient(args)
-  const n = flagString(args, 'n') ?? '20'
-  const data = await c
-    .request({ method: 'GET', path: `/docs/${c.session.id}/voice-samples?n=${encodeURIComponent(n)}` })
-    .catch(exitOnHttpError)
-  emit(data, true)
-}
-
 /* --------------------------------- hints -------------------------------- */
 
 export async function cmdHints(args: Args): Promise<void> {

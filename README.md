@@ -40,8 +40,8 @@ starts at Rung 1 and climbs up. A tangled draft starts at Rung 3 and
 works down so polish does not get spent on prose about to be cut.
 
 Alongside the catalogue, a **density rail** in the article's left
-gutter shows per-paragraph scores along five axes (information,
-argument, impact, specificity, voice) as wavy silhouettes - convex
+gutter shows per-paragraph scores along four axes (information,
+argument, impact, specificity) as wavy silhouettes - convex
 bumps where the paragraph is above the internet-average baseline,
 concave dents where it's below. See [docs/density-rail.md](docs/density-rail.md).
 
@@ -85,9 +85,10 @@ the framework definition lives at [`CLAUDE.md`](CLAUDE.md).
   agent side. `slopmop pull`, `slopmop resolve`, `slopmop flag-post`,
   `slopmop density-post`, …
 - **Skill** (`.claude/skills/slopmop/SKILL.md`) - the agent's protocol
-  document. Detection walks blind (catalogue + source only); the voice
-  memo lands in a separate severity-adjust pass. Shields lower
-  severity, never drop the flag.
+  document. Detection walks blind in kindred-pattern clusters, one
+  subagent per cluster; a synthesis subagent merges anchor-overlap
+  and shape-recurrence before posting. Shields lower severity, never
+  drop the flag.
 
 The catalogue is intentionally portable. `src/catalog/patterns.ts` and
 `src/catalog/categories.ts` are a curated list of pattern entries with

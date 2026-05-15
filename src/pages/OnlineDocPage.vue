@@ -835,7 +835,7 @@ function dismissShare(): void {
           </li>
         </ol>
         <p class="score-note muted">
-          Weights come from the drafter at flag-detection time, informed by the voice memo.
+          Weights come from the drafter at flag-detection time, set per instance by the detection subagent.
           Score is the aggregate. Resolved flags drop out; the score updates as you sweep.
         </p>
       </section>

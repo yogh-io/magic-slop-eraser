@@ -62,6 +62,9 @@ export function scoreFromFlags(flags: Flag[], proseWordCount: number): ScoreResu
   }
   let totalWeighted = 0
   for (const f of flags) {
+    // Brush flags (no patternId) sit outside the catalogue score by design;
+    // call sites should filter them out, but guard here too for type safety.
+    if (!f.patternId) continue
     counts.set(f.patternId, (counts.get(f.patternId) ?? 0) + 1)
     weightedByPattern.set(f.patternId, (weightedByPattern.get(f.patternId) ?? 0) + f.severity)
     totalWeighted += f.severity

@@ -2,13 +2,21 @@
 
 Slopmop identifies AI-slop in prose and walks the writer through fixing each instance. The thing it is built for is *paired writing*: the author defines shape, the agent drafts the prose, the author re-directs until the sentence lands.
 
+## Two modes
+
+**Brush (the default).** Read the article in the browser. Highlight any passage that bothers you and type a sentence about why - *too vague*, *whose voice is this*, *cut the throat-clearing*, whatever. Your agent picks the highlight up out-of-band, drafts ~3 candidate fixes that respond to your complaint, and posts them back. You pick one, accept, source updates. No catalogue walk needed; the reader is the detector.
+
+**Scan (when you ask for it).** The drafter walks the curated catalogue against the source and posts catalogue-matched flags (`patternId`, severity, rung). You sweep with shape directives - *more committal*, *drop the qualifier*, *punchline first*. Scan catches what brushing misses (the lexical reflexes the reader sometimes reads past). Run it when you want a second opinion, not on every session.
+
+The two coexist. Brush flags live in their own "reader concerns" track in the panel; scan flags feed the catalogue score.
+
 ## What counts as slop
 
 The bar is *actually annoying*, not *AI-fingerprint*. We curate against "would a careful reader find this painful or empty to read?", not "would a hostile reader clock this as a chatbot?". Many AI tells overlap with the painful set (delve, throat-clearing, the mirror construct, synthesis-of-nothing closers); plenty do not (em-dashes, bullet lists, staccato runs - things skilled human writers do for effect). We flag the moves the model reaches for reflexively *and* that read as braindead LLM garbage to a careful reader. When in doubt, cut.
 
-## The rungs
+## The rungs (scan mode)
 
-The catalogue organises patterns by *depth* into three [Rungs](/rungs): lexical (word and phrase), passage-level judgment (sentence and small cluster), and presentation / editorial (whole-piece). The numbering is layer, not order - clean drafts climb from the bottom; tangled drafts start at the top and work down. Detection is the drafter's job; the catalogue is the spec.
+In scan mode the catalogue organises patterns by *depth* into three [Rungs](/rungs): lexical (word and phrase), passage-level judgment (sentence and small cluster), and presentation / editorial (whole-piece). The numbering is layer, not order - clean drafts climb from the bottom; tangled drafts start at the top and work down. Detection is the drafter's job; the catalogue is the spec. Brush flags live outside the rung structure - the reader's complaint doesn't have to map to a pattern.
 
 ## The loop
 

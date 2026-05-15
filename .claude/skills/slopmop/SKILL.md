@@ -1,12 +1,17 @@
 ---
-description: Walk a markdown document through the slopmop deslop loop - pull author directives, draft candidates, post resolutions, repeat
-skillVersion: 2026-05-12.1
+description: Walk a markdown document through the slopmop deslop loop - serve brush-mode reader concerns and (when invoked) scan the catalogue, drafting candidates from author directives
+skillVersion: 2026-05-14.1
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
 # slopmop
 
 A *steering loop* for fixing AI-slop in prose. The author defines shape; you (the **drafter**) draft the prose; the author re-directs until the sentence lands. The work is the author's; you are the keyboard.
+
+slopmop has **two modes** the drafter serves:
+
+- **Brush** (default). The reader highlights a passage in the article and types what bothers them. You discover those user-sourced flags, draft **~3 candidate fixes per flag**, and post them back. The reader picks one. No catalogue walk required, no detection on your side - the reader has already done the detection.
+- **Scan**. The full catalogue walk (Phase A) plus the directive-driven steering loop (Phase B) - what slopmop did before brush mode. You catch what the reader misses. Only run scan when the author invokes it explicitly (terminal prompt, browser button, hints).
 
 The slopmop site is the source of truth and the steering surface. You push prose, find slop, draft candidates from author directives, post resolutions. The author sweeps in the browser at their own pace; you grind in the background. Written for Claude Code; the CLI is the same elsewhere, the subagent dispatch below assumes the Task tool.
 
@@ -39,7 +44,7 @@ After either, `.slopmop/session.json` exists in cwd and every other command "jus
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-12.1` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
+This file declares `skillVersion: 2026-05-14.1` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
 
 The CLI sends `X-Skill-Version` on every call. The server flags two failure modes via response headers:
 
@@ -140,15 +145,66 @@ When to post a note (use judgement, but these are good moments):
 
 Don't spam. One note per real beat is the right cadence. The activity panel is the writer's window into your head; aim for the cadence of a colleague pinging Slack, not a verbose log.
 
-## the shape of the work
+## brush mode (default loop)
 
-Two phases. The first runs once at session start; the second runs on a loop.
+**Brush is the default.** A fresh slopmop session lands a reader on the article with no flags. They read, they highlight passages that bother them, they type a sentence about *why*. Each highlight becomes a user-sourced flag with `source: 'user'`, `status: 'open'`, no patternId, and a `userNote` carrying the complaint. The reader's been the detector. Your job is just to write the prose.
 
-**Phase A - analysis (once, at start).** Two beats: a quick *framing pass* (is slopmop the right tool for this piece, or does it want `/distill` or `/compress` first?), then the catalogue walk - bring-your-own-model, all detection is yours. Subagents (Task tool) parallelise the catalogue walk well; shape the dispatch as suits the prose.
+Your brush loop:
+
+1. **Pull** open user flags:
+   ```bash
+   slopmop pull --source user --status open --limit 10
+   ```
+   Prints one line per brush flag: `<fid>  "<excerpt>"  note=<the reader's complaint>`. Add `--json` for the structured form.
+
+2. **For each flag**, read three things:
+   - The flag's anchored span (`excerpt` / `anchor.text`) - the passage the reader pointed at.
+   - The surrounding paragraph - slice it out of the source by the anchor's character positions for context.
+   - The `userNote` - *what bothers them about that passage*. This is the directive. There's no separate Response in brush mode; the flag itself carries the complaint.
+
+3. **Draft ~3 candidates** that respond to the complaint. Three is the target - give the reader real alternatives to pick from, not three minor variants of the same line. If the directive admits only one good answer, post one; if it admits two, post two. The bar is real difference, not coverage.
+
+4. **Post the batch** as a single resolution. The wire shape is a `patches` array with `replacementTexts` (array) and **no** `respondedTo` - brush flags have no preceding Response. Build `brush.json`:
+   ```json
+   {
+     "patches": [
+       {
+         "flagId": "usr-1a2b3c4d",
+         "replacementTexts": [
+           "first candidate",
+           "second candidate",
+           "third candidate"
+         ]
+       }
+     ],
+     "modelTag": "claude-opus-4-7"
+   }
+   ```
+   Send it:
+   ```bash
+   slopmop resolve @brush.json
+   ```
+   The server attaches all three Suggestions to the flag, flips it to `awaiting-accept`, and pushes them to the reader via SSE. The browser shows a carousel with prev/next and an accept button on the currently-shown candidate.
+
+5. **The reader picks one and accepts.** That mutates the source via the Suggestion they chose; the others stay as history (for the v2 catalogue-reflection layer to mine). Or they re-direct ("none of these - try with X in mind") - which posts a free Response on the flag, you draft another batch, and the new candidates stack onto the carousel.
+
+6. **Loop back to pull.** New brush flags arrive whenever the reader keeps reading. When the queue empties, post a short `progress` note ("brush queue clear; pulling on the next ping") and stop. The reader re-engages by highlighting more passages.
+
+**Brush flags exist outside the catalogue.** No patternId, no rung. They don't contribute to the headline score. They live in their own "reader concerns" track in the panel.
+
+A brush flag whose reader complaint matches a catalogue pattern (e.g. "this is too vague" → vague-gravitas) is *still* posted as a brush flag in v1. The v2 reflection layer is what later proposes catalogue refinements; v1 just stores cleanly.
+
+## the shape of scan work (opt-in mode)
+
+Scan is the catalogue-walk mode - what slopmop did before brush. Run it only when the author invokes it explicitly: terminal prompt ("run a scan"), or an agent-hint that targets specific rungs/patterns. Don't auto-run scan on every session.
+
+Two phases. The first runs once when scan is invoked; the second runs on a loop.
+
+**Phase A - analysis (once, at scan start).** Two beats: a quick *framing pass* (is slopmop the right tool for this piece, or does it want `/distill` or `/compress` first?), then the catalogue walk - bring-your-own-model, all detection is yours. Subagents (Task tool) parallelise the catalogue walk well; shape the dispatch as suits the prose.
 
 **Phase B - the steering loop (until the author says done).**
 
-1. **Pull** open work: `slopmop pull --rung 1,2 --limit 10` (with whatever filters narrow the queue).
+1. **Pull** open work: `slopmop pull --rung 1,2 --limit 10` (with whatever filters narrow the queue). Default `pull` (no `--source`) returns pending scan Responses, not brush flags - use `pull --source user` for brush in a separate loop.
 2. **Process** each one: read the flag, the surrounding paragraph, the trail of prior directives + candidates on this flag. Pick a resolution path (per-flag patch or full-source push). Draft the candidate.
 3. **Post** the resolution: `slopmop patch <rid> <fid> "<replacement>"` for the common case, or `slopmop resolve @batch.json` for batches, or `slopmop fullsource ./new.md --responded-to rid1,rid2` for Rung 3 editorial.
 4. **Pull** again. The author may have submitted new directives while you worked; pick them up. Loop.
@@ -156,6 +212,8 @@ Two phases. The first runs once at session start; the second runs on a loop.
 **When the queue empties, hand the loop back to the author.** Don't spin or poll silently - the author is the wheel; if they have nothing in flight, you have nothing to do. Post a short `progress` note ("queue clear; ping me when you have more directives") and stop. They re-engage by sweeping more flags in the browser, or by prompting you in the terminal to pull again. Either way, the next move is theirs.
 
 If you're mid-sweep and a pull happens to come back empty for a moment (the author is typing the next directive), one or two short re-pulls (~5-10s apart) is fine before falling back to the handoff above. `slopmop events` is available as a wake-up optimisation if your runtime keeps long-lived connections cheap; pulling alone is sufficient.
+
+**Run both loops if both have work.** A drafter attached to a session can serve brush and scan in alternation: `pull --source user` for brush, default `pull` for scan responses. Brush is usually the lighter loop; scan only runs when invoked.
 
 ## 0. bootstrap
 
@@ -175,7 +233,9 @@ slopmop attach "https://slopmop.io/d/abc123"
 
 Either way, the session lands at `.slopmop/session.json` in cwd. Treat the doc URL as the capability - anyone with it can drive the session, that's intentional.
 
-**Right after the bootstrap**, send a heartbeat and declare the initial task list:
+**Right after the bootstrap**, send a heartbeat and declare the initial task list.
+
+If the author invoked scan explicitly (e.g. "run a scan", or session opened with a scan-rung agent hint), declare the scan tasks:
 
 ```bash
 slopmop heartbeat
@@ -183,7 +243,14 @@ slopmop task phase-a in-progress "Phase A: framing pass + catalogue walk"
 slopmop task phase-b open "Phase B: drive steering loop"
 ```
 
-Skipping this is a regression - the writer is staring at a blank pill wondering whether anything is wired.
+If the author just opened a session and started brushing (default - no explicit scan invocation), declare a brush task instead:
+
+```bash
+slopmop heartbeat
+slopmop task brush in-progress "serving brush-mode reader concerns"
+```
+
+Either way, skipping the heartbeat is a regression - the writer is staring at a blank pill wondering whether anything is wired.
 
 ## 1. analysis
 
@@ -534,12 +601,12 @@ For the full command list run `slopmop --help`. Body conventions for write comma
 - **Punt rather than guess.** If you can't address a directive, punt with a reason. The author decides what to do.
 - **Voice memory accumulates.** Pull voice samples regularly. The session converges on the writer's voice if you use them.
 - **Skip / keep / let-me-try / accept / discard are user-side.** Self-resolve server-side. You will never see those kinds in the queue.
-- **The score is Rung 1 only.** Rung 2 / Rung 3 are reported as counts, not folded into the headline. Don't try to "fix" Rung 2 hits to chase the score.
+- **The score is the catalogue score, all rungs.** Severity-weighted slop density across Rung 1, 2, and 3 - what the headline pill shows. Brush flags don't count toward it (they're a separate "reader concerns" track). Don't try to "fix" individual Rung-2 hits in isolation to chase the score; the byRung breakdown is what guides where to dig.
 - **Density is keyed by paragraph hash, not flag id.** Don't re-score paragraphs whose hash is already in the density cache - they haven't changed. Your token budget goes to the new and the drifted.
 
 ## appendix: raw HTTP
 
-The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-05-12.1`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
+The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-05-14.1`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
 
 Routes (full schemas: read the CLI source at `cli/client.ts` + `cli/commands/*.ts`, or `slopmop --help`):
 
@@ -564,3 +631,11 @@ Changes in skill v2026-05-12.1 (from v2026-05-09.6; not breaking on the wire):
 - Phase A reorganised: per-rung dispatch replaced by **clustered detection subagents** (kindred-pattern groups, ~6 for the current catalogue, plus a voice-memo subagent in parallel) and a dedicated **synthesis subagent** that produces the consolidated flag set before `flag-post`.
 - Flag schema gained two optional fields: `relatedPatterns: string[]` (other patternIds the synthesis pass folded into this flag) and `relatedAnchors: TextAnchor[]` (other places the same construction recurs). Old clients and old flags work unchanged.
 - `POST /flags` no longer dedupes server-side. Drafter clusters before posting.
+
+Changes in skill v2026-05-14.1 (from v2026-05-12.1; not breaking on the wire):
+- **Brush mode** added as the default loop. New endpoint shape on `POST /docs/:id/flags` (`source: 'user'`, no `patternId`, carries `userNote`); new filter `GET /docs/:id/flags?source=user`; new CLI flag `slopmop pull --source user`. Old scan-only drafters keep working; the staleness header nudges users to re-install for brush.
+- **Multi-candidate per flag is universal**. `POST /docs/:id/resolutions` per-flag patches now take `replacementTexts: string[]` (length ≥ 1). Legacy `replacementText: string` is accepted for back-compat. Scan-mode drafters can now post 2–3 candidates per directive when the directive admits real alternatives; brush mode always posts ~3.
+- **`respondedTo` is optional** on per-flag patches. Brush flags have no preceding Response - the flag itself is the directive (`userNote`).
+- **Accept with explicit `suggestionId`**. `POST /responses { kind: 'accept', flagId, suggestionId? }` now requires `suggestionId` when the flag has >1 unaccepted candidates (replaces silent newest-wins behaviour). For single-candidate flags, `suggestionId` is optional.
+- **`DocResponse.resolvedSuggestionId`** (singular) → **`resolvedSuggestionIds: string[]`** (plural). Legacy single-id records normalise to a one-element array on read.
+- The catalogue score documentation now matches the implementation: severity-weighted across **all rungs** (not Rung 1 only).

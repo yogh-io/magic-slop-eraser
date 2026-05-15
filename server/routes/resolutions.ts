@@ -1,6 +1,6 @@
 import type { DocState, SourceVersion } from '../types'
 import { SOURCE_HISTORY_LIMIT, appendEvents } from '../types'
-import type { ResolutionEvent, Suggestion } from '../../src/types'
+import type { DocResponse, ResolutionEvent, Suggestion } from '../../src/types'
 import type { DocStore } from '../store'
 import { bus } from '../bus'
 import { json, notFound } from '../shared'
@@ -20,9 +20,18 @@ function bumpCursor(state: DocState): number {
 }
 
 interface PatchInput {
-  respondedTo: string
   flagId: string
-  replacementText: string
+  /** Multi-candidate: the drafter can post N alternative replacements for one
+   *  flag. Required (length >= 1). Old wire format `replacementText: string`
+   *  is accepted and normalised to a one-element array for back-compat. */
+  replacementTexts?: string[]
+  /** Legacy singular form - back-compat only. Normalised into `replacementTexts`
+   *  on the way in. New clients should use `replacementTexts`. */
+  replacementText?: string
+  /** Optional. Scan-mode patches carry the Response the drafter is answering;
+   *  brush-mode patches have no preceding Response (the flag itself is the
+   *  complaint) so this is absent. */
+  respondedTo?: string
   prompt?: string
 }
 
@@ -106,11 +115,20 @@ function applyPatch(
   modelTag: string,
   events: ResolutionEvent[],
 ): ApplyResult {
-  if (!patch.flagId || !patch.respondedTo) {
-    return { ok: false, status: 400, reason: 'patch.flagId and patch.respondedTo required' }
+  if (!patch.flagId) {
+    return { ok: false, status: 400, reason: 'patch.flagId required' }
   }
-  if (typeof patch.replacementText !== 'string') {
-    return { ok: false, status: 400, reason: 'patch.replacementText required' }
+  // Normalise old singular form into the array.
+  const replacements: string[] = Array.isArray(patch.replacementTexts)
+    ? patch.replacementTexts
+    : typeof patch.replacementText === 'string'
+      ? [patch.replacementText]
+      : []
+  if (replacements.length === 0) {
+    return { ok: false, status: 400, reason: 'patch.replacementTexts must be a non-empty array' }
+  }
+  if (replacements.some((t) => typeof t !== 'string')) {
+    return { ok: false, status: 400, reason: 'patch.replacementTexts must be strings' }
   }
   const flag = state.flags[patch.flagId]
   if (!flag) return { ok: false, status: 404, reason: 'unknown flag' }
@@ -120,13 +138,21 @@ function applyPatch(
   if ((flag.status ?? 'open') === 'resolved') {
     return { ok: false, status: 409, reason: 'flag is already resolved' }
   }
-  const resp = state.responses[patch.respondedTo]
-  if (!resp) return { ok: false, status: 404, reason: 'unknown response' }
-  if (resp.flagId !== flag.id) {
-    return { ok: false, status: 400, reason: 'response does not belong to flag' }
-  }
-  if (resp.status !== 'pending') {
-    return { ok: false, status: 409, reason: 'response is not pending' }
+  // `respondedTo` is optional: scan-mode patches answer a Response, brush-mode
+  // patches answer a user-sourced flag directly (no preceding Response).
+  let resp: DocResponse | null = null
+  if (patch.respondedTo) {
+    resp = state.responses[patch.respondedTo]
+    if (!resp) return { ok: false, status: 404, reason: 'unknown response' }
+    if (resp.flagId !== flag.id) {
+      return { ok: false, status: 400, reason: 'response does not belong to flag' }
+    }
+    if (resp.status !== 'pending') {
+      return { ok: false, status: 409, reason: 'response is not pending' }
+    }
+  } else if (flag.source !== 'user') {
+    // Scan flags require a Response to be the directive being answered.
+    return { ok: false, status: 400, reason: 'patch.respondedTo required for scan flags' }
   }
   // Sanity: the flag's anchor must still relocate. If the source has drifted
   // since the agent fetched, the anchor still being valid is what matters.
@@ -145,28 +171,23 @@ function applyPatch(
   flag.anchor = { ...flag.anchor, start: r.start, end: r.end }
   flag.excerpt = pre
 
-  const suggestionId = `s-${crypto.randomUUID().slice(0, 8)}`
-  const sug: Suggestion = {
-    id: suggestionId,
-    flagId: flag.id,
-    pre,
-    post: patch.replacementText,
-    respondedTo: patch.respondedTo,
-    prompt: patch.prompt,
-    modelTag,
-    accepted: false,
-    createdAt: nowIso(),
-  }
-  state.suggestions[suggestionId] = sug
-  flag.status = 'awaiting-accept'
-
-  resp.status = 'resolved'
-  resp.respondedBy = 'agent'
-  resp.resolvedSuggestionId = suggestionId
-  resp.resolvedAt = nowIso()
-
-  events.push(
-    {
+  const newSuggestionIds: string[] = []
+  for (const replacementText of replacements) {
+    const suggestionId = `s-${crypto.randomUUID().slice(0, 8)}`
+    const sug: Suggestion = {
+      id: suggestionId,
+      flagId: flag.id,
+      pre,
+      post: replacementText,
+      respondedTo: patch.respondedTo,
+      prompt: patch.prompt,
+      modelTag,
+      accepted: false,
+      createdAt: nowIso(),
+    }
+    state.suggestions[suggestionId] = sug
+    newSuggestionIds.push(suggestionId)
+    events.push({
       cursor: bumpCursor(state),
       type: 'suggestion-added',
       payload: {
@@ -177,20 +198,29 @@ function applyPatch(
         respondedTo: patch.respondedTo,
       },
       ts: nowIso(),
-    },
-    {
-      cursor: bumpCursor(state),
-      type: 'flag-awaiting-accept',
-      payload: { flagId: flag.id, suggestionId },
-      ts: nowIso(),
-    },
-    {
+    })
+  }
+
+  flag.status = 'awaiting-accept'
+  events.push({
+    cursor: bumpCursor(state),
+    type: 'flag-awaiting-accept',
+    payload: { flagId: flag.id, suggestionIds: newSuggestionIds },
+    ts: nowIso(),
+  })
+
+  if (resp) {
+    resp.status = 'resolved'
+    resp.respondedBy = 'agent'
+    resp.resolvedSuggestionIds = newSuggestionIds
+    resp.resolvedAt = nowIso()
+    events.push({
       cursor: bumpCursor(state),
       type: 'response-resolved',
-      payload: { responseId: resp.id, flagId: flag.id, cause: 'agent', suggestionId },
+      payload: { responseId: resp.id, flagId: flag.id, cause: 'agent', suggestionIds: newSuggestionIds },
       ts: nowIso(),
-    },
-  )
+    })
+  }
   return { ok: true }
 }
 

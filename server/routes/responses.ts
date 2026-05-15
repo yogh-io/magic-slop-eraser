@@ -45,6 +45,12 @@ interface PostResponseBody {
   flagId: string
   body?: string
   kind: ResponseKind
+  /** Only meaningful for `kind: 'accept'` - picks a specific candidate when
+   *  the flag has multiple unaccepted suggestions (multi-candidate brush, or
+   *  multi-candidate scan). When omitted on a single-candidate flag, the lone
+   *  candidate is auto-picked (back-compat with old wire format). When the
+   *  flag has >1 unaccepted suggestions and this is omitted, 400. */
+  suggestionId?: string
 }
 
 export async function handleResponses(
@@ -77,6 +83,7 @@ export async function handleResponses(
       body: body.body ?? '',
       kind: body.kind,
       status: 'pending',
+      resolvedSuggestionIds: [],
       createdAt: nowIso(),
     }
     state.responses[id] = resp
@@ -117,7 +124,7 @@ export async function handleResponses(
       if (!result.ok) return fail(409, result.reason ?? 'patch rejected')
       resp.status = 'resolved'
       resp.respondedBy = 'self'
-      resp.resolvedSuggestionId = result.suggestionId
+      resp.resolvedSuggestionIds = [result.suggestionId]
       resp.resolvedAt = nowIso()
       events.push(
         {
@@ -151,8 +158,9 @@ export async function handleResponses(
       // Apply the flag's awaiting-accept candidate; mutates source, marks flag
       // resolved, reconciles other anchors. The browser hits this path; the
       // drafter never does (accept is user-side).
-      const candidate = pickAwaitingCandidate(state, flag.id)
-      if (!candidate) return fail(409, 'no candidate to accept')
+      const pick = pickAwaitingCandidate(state, flag.id, body.suggestionId)
+      if (pick.kind === 'error') return fail(pick.status, pick.reason)
+      const candidate = pick.candidate
       const result = applyAcceptedCandidate(state, flag, candidate)
       if (!result.ok) {
         // Anchor stale: emit the stale event so the timeline reflects it,
@@ -170,7 +178,7 @@ export async function handleResponses(
       }
       resp.status = 'resolved'
       resp.respondedBy = 'self'
-      resp.resolvedSuggestionId = candidate.id
+      resp.resolvedSuggestionIds = [candidate.id]
       resp.resolvedAt = nowIso()
       events.push(
         {
@@ -201,8 +209,9 @@ export async function handleResponses(
       events.push(...recon.events)
     } else if (body.kind === 'discard') {
       // Drop the awaiting-accept candidate; flag returns to open for redirection.
-      const candidate = pickAwaitingCandidate(state, flag.id)
-      if (!candidate) return fail(409, 'no candidate to discard')
+      const pick = pickAwaitingCandidate(state, flag.id, body.suggestionId)
+      if (pick.kind === 'error') return fail(pick.status, pick.reason)
+      const candidate = pick.candidate
       delete state.suggestions[candidate.id]
       flag.status = 'open'
       resp.status = 'resolved'
@@ -271,11 +280,9 @@ export async function handleResponses(
   return fail(405, 'method not allowed')
 }
 
-interface PerFlagPatchResult {
-  ok: boolean
-  reason?: string
-  suggestionId?: string
-}
+type PerFlagPatchResult =
+  | { ok: true; suggestionId: string }
+  | { ok: false; reason?: string }
 
 /**
  * Apply a per-flag patch: replace the flag's anchored span with `replacement`.
@@ -355,11 +362,48 @@ function applyAcceptedCandidate(
   return { ok: true, suggestionId: candidate.id }
 }
 
-function pickAwaitingCandidate(state: DocState, flagId: string): Suggestion | null {
-  const list = Object.values(state.suggestions)
-    .filter((s) => s.flagId === flagId && !s.accepted)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  return list[0] ?? null
+type PickResult =
+  | { kind: 'ok'; candidate: Suggestion }
+  | { kind: 'error'; status: number; reason: string }
+
+/**
+ * Resolve which candidate the user is accepting on a flag.
+ *
+ * Rules:
+ *  - If `suggestionId` is given: must belong to this flag and be unaccepted.
+ *  - If absent: the flag must have exactly one unaccepted candidate (back-compat
+ *    with single-candidate scan mode). >1 candidates with no explicit pick is
+ *    a 400 - making the silent newest-wins behaviour of the prior implementation
+ *    impossible.
+ *  - Sorting ties newest-first only matters for picking the "current" candidate
+ *    in carousel UIs; the server requires an explicit choice when there's
+ *    actually a choice to be made.
+ */
+function pickAwaitingCandidate(state: DocState, flagId: string, suggestionId?: string): PickResult {
+  if (suggestionId) {
+    const s = state.suggestions[suggestionId]
+    if (!s || s.flagId !== flagId) {
+      return { kind: 'error', status: 404, reason: 'suggestion does not belong to flag' }
+    }
+    if (s.accepted) {
+      return { kind: 'error', status: 409, reason: 'suggestion already accepted' }
+    }
+    return { kind: 'ok', candidate: s }
+  }
+  const unaccepted = Object.values(state.suggestions).filter(
+    (s) => s.flagId === flagId && !s.accepted,
+  )
+  if (unaccepted.length === 0) {
+    return { kind: 'error', status: 409, reason: 'no candidate to accept' }
+  }
+  if (unaccepted.length > 1) {
+    return {
+      kind: 'error',
+      status: 400,
+      reason: 'multiple candidates exist for this flag - specify suggestionId',
+    }
+  }
+  return { kind: 'ok', candidate: unaccepted[0] }
 }
 
 function filterResponses(state: DocState, url: URL): DocResponse[] {
@@ -381,9 +425,9 @@ function filterResponses(state: DocState, url: URL): DocResponse[] {
     const flag = state.flags[r.flagId]
     if (!flag) continue
     if (rungs && !rungs.includes((flag.rung ?? 1) as Rung)) continue
-    if (categories && !categories.includes(flag.category)) continue
+    if (categories && (!flag.category || !categories.includes(flag.category))) continue
     if (severities && !severities.includes(severityBucket(flag.severity))) continue
-    if (patternIds && !patternIds.includes(flag.patternId)) continue
+    if (patternIds && (!flag.patternId || !patternIds.includes(flag.patternId))) continue
     out.push(r)
     if (out.length >= limit) break
   }

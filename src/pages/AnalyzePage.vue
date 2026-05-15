@@ -7,7 +7,7 @@ import { addRecent } from '../state/recents'
 useOgHead(() => ({
   title: 'slopmop',
   description:
-    'Paste prose, get a session URL. Hand it to your agent (Claude Code, Codex, opencode) - they steer it through the deslop loop, you direct fixes from the browser.',
+    'Paste prose, get a session URL. Read it, highlight what bugs you, get candidate fixes from your agent. Run a full catalogue scan when you want one.',
   path: '/',
   ogType: 'website',
 }))
@@ -81,18 +81,19 @@ async function createSession(): Promise<void> {
       <p class="kicker">start a session</p>
       <h1>Paste an article. Get a steering URL.</h1>
       <p class="lede">
-        Drop prose in below. We mint a private session and hand back a URL. Open it
-        yourself, or hand it to an agent (Claude Code primarily) - it walks the catalogue
-        against your prose, posts flags, drafts candidates from your directives. You
-        sweep, redirect, accept. The document is the source of truth.
+        Drop prose in below. We mint a private session and hand back a URL. Open
+        it in the browser and start reading - highlight any passage that bothers
+        you and type a sentence about why. Your agent picks those up out-of-band
+        and drafts three candidate fixes you can pick from. Want a full catalogue
+        walk too? Ask the agent for a scan.
       </p>
     </header>
 
     <aside class="skill-notice">
       <div class="skill-notice-text">
-        <strong>First time?</strong> Your agent needs the slopmop skill installed
-        before it can drive a session. Have your Claude Code fetch it - one prompt
-        does it.
+        <strong>First time?</strong> The brush loop and the catalogue scan both
+        run through the slopmop skill on your agent. Have your Claude Code fetch
+        it - one prompt does it.
       </div>
       <RouterLink to="/skill" class="skill-cta">
         One prompt gets you started <span aria-hidden="true">&rarr;</span>

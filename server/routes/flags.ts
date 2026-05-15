@@ -41,14 +41,18 @@ export async function handleFlags(
   const state = await store.readState(docId)
   if (!state) return notFound()
 
-  // GET /docs/:id/flags?rung=N&status=open
+  // GET /docs/:id/flags?rung=N&status=open&source=user|llm
   if (segs.length === 0 && req.method === 'GET') {
     const url = new URL(req.url)
     const rung = url.searchParams.get('rung')
     const status = url.searchParams.get('status')
+    const sourceParam = url.searchParams.get('source')
     let flags = Object.values(state.flags)
     if (rung) flags = flags.filter((f) => String(f.rung ?? 1) === rung)
     if (status) flags = flags.filter((f) => (f.status ?? 'open') === status)
+    if (sourceParam === 'user' || sourceParam === 'llm') {
+      flags = flags.filter((f) => f.source === sourceParam)
+    }
     flags.sort((a, b) => a.anchor.start - b.anchor.start)
     return json({ flags })
   }
@@ -82,17 +86,9 @@ export async function handleFlags(
     const skipped: Array<{ reason: string; patternId?: string; text?: string }> = []
 
     for (const inp of body.flags) {
-      const meta = inp?.patternId ? patternMap.get(inp.patternId) : undefined
-      if (!meta) {
-        skipped.push({ reason: 'unknown patternId', patternId: inp?.patternId })
-        continue
-      }
-      if (typeof inp.text !== 'string' || inp.text.length === 0) {
-        skipped.push({ reason: 'text required', patternId: inp.patternId })
-        continue
-      }
-      if (typeof inp.rationale !== 'string' || inp.rationale.trim().length === 0) {
-        skipped.push({ reason: 'rationale required', patternId: inp.patternId })
+      // Common: text is required for both modes (the anchored span).
+      if (typeof inp?.text !== 'string' || inp.text.length === 0) {
+        skipped.push({ reason: 'text required', patternId: inp?.patternId })
         continue
       }
 
@@ -102,42 +98,84 @@ export async function handleFlags(
         continue
       }
       const anchor = makeAnchor(state.doc.source, located.start, located.end)
+      const flagPrefix = fSource === 'user' ? 'usr' : 'llm'
+      const flagId = `${flagPrefix}-${crypto.randomUUID().slice(0, 8)}`
 
-      const relatedPatterns = Array.isArray(inp.relatedPatterns)
-        ? inp.relatedPatterns.filter((id) => typeof id === 'string' && id !== inp.patternId && patternMap.has(id))
-        : undefined
+      let stored: Flag
+      if (fSource === 'user') {
+        // Brush flag - reader is venting, not classifying. Reject inputs that
+        // try to set catalogue fields (patternId/category/rung): the v2
+        // reflection loop is what maps brush flags back into the catalogue.
+        if (typeof inp.userNote !== 'string' || inp.userNote.trim().length === 0) {
+          skipped.push({ reason: 'userNote required for brush flag' })
+          continue
+        }
+        if (inp.patternId) {
+          skipped.push({ reason: 'brush flag must not set patternId' })
+          continue
+        }
+        stored = {
+          id: flagId,
+          source: 'user',
+          anchor,
+          rationale: inp.userNote.trim(),
+          excerpt: anchor.text,
+          severity: typeof inp.severity === 'number' ? inp.severity : 0.6,
+          userNote: inp.userNote.trim(),
+          status: 'open',
+          createdAt: nowIso(),
+        }
+      } else {
+        // Scan flag - catalogue-matched. patternId + rationale required;
+        // optional inline suggestion lands the flag in awaiting-accept.
+        const patternId = inp.patternId
+        const meta = patternId ? patternMap.get(patternId) : undefined
+        if (!meta || !patternId) {
+          skipped.push({ reason: 'unknown patternId', patternId })
+          continue
+        }
+        if (typeof inp.rationale !== 'string' || inp.rationale.trim().length === 0) {
+          skipped.push({ reason: 'rationale required', patternId })
+          continue
+        }
 
-      const relatedAnchors = Array.isArray(inp.relatedAnchors)
-        ? inp.relatedAnchors
-            .map((r) => {
-              if (!r || typeof r.text !== 'string' || r.text.length === 0) return null
-              const loc = locateAnchor(state.doc.source, { patternId: inp.patternId, text: r.text, rationale: '', start: r.start, end: r.end })
-              if (!loc) return null
-              return makeAnchor(state.doc.source, loc.start, loc.end)
-            })
-            .filter((a): a is TextAnchor => a !== null)
-        : undefined
+        const relatedPatterns = Array.isArray(inp.relatedPatterns)
+          ? inp.relatedPatterns.filter((id) => typeof id === 'string' && id !== patternId && patternMap.has(id))
+          : undefined
 
-      const flagId = `llm-${crypto.randomUUID().slice(0, 8)}`
-      const stored: Flag = {
-        id: flagId,
-        patternId: inp.patternId,
-        category: meta.category,
-        source: fSource,
-        anchor,
-        rationale: inp.rationale.trim(),
-        excerpt: anchor.text,
-        severity: typeof inp.severity === 'number' ? inp.severity : severityFor(inp.patternId),
-        rung: meta.rung,
-        status: 'open',
-        createdAt: nowIso(),
-        ...(relatedPatterns && relatedPatterns.length > 0 ? { relatedPatterns } : {}),
-        ...(relatedAnchors && relatedAnchors.length > 0 ? { relatedAnchors } : {}),
+        const relatedAnchors = Array.isArray(inp.relatedAnchors)
+          ? inp.relatedAnchors
+              .map((r) => {
+                if (!r || typeof r.text !== 'string' || r.text.length === 0) return null
+                const loc = locateAnchor(state.doc.source, { text: r.text, start: r.start, end: r.end })
+                if (!loc) return null
+                return makeAnchor(state.doc.source, loc.start, loc.end)
+              })
+              .filter((a): a is TextAnchor => a !== null)
+          : undefined
+
+        stored = {
+          id: flagId,
+          patternId,
+          category: meta.category,
+          source: 'llm',
+          anchor,
+          rationale: inp.rationale.trim(),
+          excerpt: anchor.text,
+          severity: typeof inp.severity === 'number' ? inp.severity : severityFor(patternId),
+          rung: meta.rung,
+          status: 'open',
+          createdAt: nowIso(),
+          ...(relatedPatterns && relatedPatterns.length > 0 ? { relatedPatterns } : {}),
+          ...(relatedAnchors && relatedAnchors.length > 0 ? { relatedAnchors } : {}),
+        }
       }
       state.flags[flagId] = stored
 
       let suggestionEvent: ResolutionEvent | null = null
-      if (typeof inp.suggestion === 'string' && inp.suggestion.length > 0) {
+      // Inline-suggestion path is scan-only - brush flags wait for the drafter
+      // to post candidate fixes via resolutions.
+      if (fSource === 'llm' && typeof inp.suggestion === 'string' && inp.suggestion.length > 0) {
         const suggId = `s-${crypto.randomUUID().slice(0, 8)}`
         const suggestion: Suggestion = {
           id: suggId,
@@ -213,12 +251,21 @@ export async function handleFlags(
 }
 
 interface AgentFlagInput {
-  patternId: string
+  /** Required for scan (`source: 'llm'`); rejected for brush (`source: 'user'`). */
+  patternId?: string
   start?: number
   end?: number
   text: string
-  rationale: string
+  /** Required for scan flags; ignored for brush (the user's complaint lives
+   *  in `userNote` instead). */
+  rationale?: string
+  /** Required for brush flags (`source: 'user'`); rejected for scan. The
+   *  reader's complaint about the anchored span. */
+  userNote?: string
   severity?: number
+  /** Scan-only. Optional inline candidate landed alongside detection - flag
+   *  goes straight to `awaiting-accept`. Brush flags wait for the drafter
+   *  to post candidates via resolutions. */
   suggestion?: string
   /** Other patternIds the drafter's synthesis pass merged into this flag at the
    *  same anchor. Server validates each against the catalogue; unknown ids are
@@ -236,7 +283,7 @@ interface AgentFlagInput {
  * window built around `text`. Returns null if the text can't be located
  * unambiguously.
  */
-function locateAnchor(source: string, inp: AgentFlagInput): { start: number; end: number } | null {
+function locateAnchor(source: string, inp: AgentFlagInput | { text: string; start?: number; end?: number }): { start: number; end: number } | null {
   const text = inp.text
   if (
     typeof inp.start === 'number' &&

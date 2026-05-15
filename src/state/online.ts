@@ -13,6 +13,7 @@ import type {
   ResponseKind,
   Suggestion,
 } from '../types'
+import { makeAnchor } from '../anchoring/textAnchor'
 
 interface DocSummary {
   id: string
@@ -79,18 +80,34 @@ export interface OnlineSession {
    *  the right-hand side for any `ms ago` display so per-note timestamps stay
    *  live without each consumer wiring its own setInterval. */
   nowMs: Ref<number>
-  /** Per-flag awaiting candidate, if one exists. */
+  /** Per-flag awaiting candidate, if one exists. Returns the newest unaccepted
+   *  suggestion (single-candidate flow). Use `candidatesByFlag` to access all
+   *  candidates when the flag has multiple (brush mode, multi-candidate scan). */
   candidateByFlag: ComputedRef<Record<string, Suggestion | undefined>>
+  /** All unaccepted candidates per flag, sorted newest-first. Brush flags
+   *  typically carry ~3; scan flags carry 1 unless the drafter posted
+   *  alternatives. */
+  candidatesByFlag: ComputedRef<Record<string, Suggestion[]>>
   /** Per-flag pending response, if one exists. */
   pendingResponseByFlag: ComputedRef<Record<string, DocResponse | undefined>>
   /** Counts of flags grouped by display state, used for the panel summary. */
   panelCounts: ComputedRef<{ open: number; pending: number; awaiting: number; stuck: number; closed: number }>
+  /** Live count of brush (user-sourced) flags. Surfaces in the panel header
+   *  separately from the catalogue score. */
+  readerConcernCount: ComputedRef<number>
   postResponse(flagId: string, kind: ResponseKind, body?: string): Promise<DocResponse | null>
   cancelResponse(responseId: string): Promise<void>
-  acceptFlag(flagId: string): Promise<void>
-  discardFlag(flagId: string): Promise<void>
+  /** Accept a flag's awaiting candidate, mutating source. When the flag has
+   *  multiple unaccepted candidates, `suggestionId` must specify which one;
+   *  the server rejects with 400 otherwise. */
+  acceptFlag(flagId: string, suggestionId?: string): Promise<void>
+  discardFlag(flagId: string, suggestionId?: string): Promise<void>
   skipFlag(flagId: string): Promise<void>
   keepFlag(flagId: string): Promise<void>
+  /** Post a brush flag: reader highlighted a span and typed a complaint. */
+  postUserFlag(selection: { start: number; end: number; text: string }, userNote: string): Promise<Flag | null>
+  /** Delete a brush flag the user no longer wants to keep around. */
+  removeUserFlag(flagId: string): Promise<void>
   putAgentHints(hints: AgentHints): Promise<void>
   disconnect(): void
 }
@@ -116,20 +133,34 @@ export function createOnlineSession(id: string): OnlineSession {
   let eventSource: EventSource | null = null
   let nowTimer: ReturnType<typeof setInterval> | null = null
 
-  const candidateByFlag = computed<Record<string, Suggestion | undefined>>(() => {
-    // Latest unaccepted suggestion per flag is the running best (the
-    // awaiting-accept overlay).
-    const out: Record<string, Suggestion> = {}
+  const candidatesByFlag = computed<Record<string, Suggestion[]>>(() => {
+    const out: Record<string, Suggestion[]> = {}
     const sorted = [...suggestions.value].sort((a, b) =>
       a.createdAt < b.createdAt ? 1 : -1,
     )
     for (const s of sorted) {
       if (s.accepted) continue
-      if (out[s.flagId]) continue
-      out[s.flagId] = s
+      if (!out[s.flagId]) out[s.flagId] = []
+      out[s.flagId].push(s)
     }
     return out
   })
+
+  const candidateByFlag = computed<Record<string, Suggestion | undefined>>(() => {
+    // Latest unaccepted suggestion per flag (newest-first) - what single-
+    // candidate scan flows render in the gutter. Multi-candidate (brush, or
+    // scan with alternatives) uses `candidatesByFlag` instead and shows a
+    // carousel.
+    const out: Record<string, Suggestion> = {}
+    for (const [flagId, list] of Object.entries(candidatesByFlag.value)) {
+      if (list.length > 0) out[flagId] = list[0]
+    }
+    return out
+  })
+
+  const readerConcernCount = computed(() =>
+    flags.value.filter((f) => f.source === 'user' && (f.status ?? 'open') !== 'resolved' && (f.status ?? 'open') !== 'stale').length,
+  )
 
   const pendingResponseByFlag = computed<Record<string, DocResponse | undefined>>(() => {
     const out: Record<string, DocResponse> = {}
@@ -440,11 +471,13 @@ export function createOnlineSession(id: string): OnlineSession {
     flagId: string,
     kind: ResponseKind,
     body?: string,
+    extra?: Record<string, unknown>,
   ): Promise<DocResponse | null> {
     const out = await postJson<{ response: DocResponse }>(`/docs/${id}/responses`, {
       flagId,
       kind,
       body: body ?? '',
+      ...(extra ?? {}),
     })
     if (out?.response) responses.value = [...responses.value, out.response]
     return out?.response ?? null
@@ -457,12 +490,12 @@ export function createOnlineSession(id: string): OnlineSession {
   // Every user action on a flag is a Response with the matching kind. The
   // server self-resolves accept/discard/skip/keep without a roundtrip to the
   // drafter; SSE events drive the local refresh.
-  async function acceptFlag(flagId: string): Promise<void> {
-    await postResponse(flagId, 'accept')
+  async function acceptFlag(flagId: string, suggestionId?: string): Promise<void> {
+    await postResponse(flagId, 'accept', undefined, suggestionId ? { suggestionId } : undefined)
   }
 
-  async function discardFlag(flagId: string): Promise<void> {
-    await postResponse(flagId, 'discard')
+  async function discardFlag(flagId: string, suggestionId?: string): Promise<void> {
+    await postResponse(flagId, 'discard', undefined, suggestionId ? { suggestionId } : undefined)
   }
 
   async function skipFlag(flagId: string): Promise<void> {
@@ -471,6 +504,43 @@ export function createOnlineSession(id: string): OnlineSession {
 
   async function keepFlag(flagId: string): Promise<void> {
     await postResponse(flagId, 'keep')
+  }
+
+  async function postUserFlag(
+    selection: { start: number; end: number; text: string },
+    userNote: string,
+  ): Promise<Flag | null> {
+    const src = doc.value?.source
+    if (!src) return null
+    // Build an anchor with prefix/suffix context so the server can relocate
+    // through subsequent source edits - same shape the drafter uses.
+    const anchor = makeAnchor(src, selection.start, selection.end)
+    const out = await postJson<{ added: number; flags: Flag[] }>(`/docs/${id}/flags`, {
+      source: 'user',
+      modelTag: 'reader',
+      flags: [
+        {
+          text: anchor.text,
+          start: anchor.start,
+          end: anchor.end,
+          userNote,
+        },
+      ],
+    })
+    const created = out?.flags?.[0] ?? null
+    if (created) {
+      // Optimistic insert; SSE flag-added event will follow and refresh.
+      flags.value = [...flags.value, created]
+    }
+    return created
+  }
+
+  async function removeUserFlag(flagId: string): Promise<void> {
+    // Brush flags are just user concerns; treat removal as "skip" (no source
+    // change, marks the flag as no longer needing attention). The flag stays
+    // in storage as part of the session log so the reflection v2 layer can
+    // mine it later, but it drops out of the live "reader concerns" count.
+    await postResponse(flagId, 'skip')
   }
 
   async function putAgentHints(hints: AgentHints): Promise<void> {
@@ -520,14 +590,18 @@ export function createOnlineSession(id: string): OnlineSession {
     agentLastSeenAgo,
     nowMs: nowTick,
     candidateByFlag,
+    candidatesByFlag,
     pendingResponseByFlag,
     panelCounts,
+    readerConcernCount,
     postResponse,
     cancelResponse,
     acceptFlag,
     discardFlag,
     skipFlag,
     keepFlag,
+    postUserFlag,
+    removeUserFlag,
     putAgentHints,
     disconnect,
   }

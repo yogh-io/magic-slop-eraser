@@ -63,8 +63,26 @@ export async function cmdFlagPost(args: Args): Promise<void> {
 
 /* ---------------------------------- pull --------------------------------- */
 
+/**
+ * `pull` returns pending work for the drafter to act on.
+ *
+ *  - Default (no `--source`): pending **Responses** - scan-mode directives the
+ *    user issued ("more committal", "drop the qualifier", free text) on flags
+ *    the catalogue walk surfaced. The drafter generates a single candidate per
+ *    directive.
+ *  - `--source user`: open user-sourced **Flags** - brush-mode complaints the
+ *    reader posted by highlighting a span. The flag itself *is* the directive
+ *    (the userNote). The drafter generates ~3 candidate fixes per flag and
+ *    posts them via `resolve`.
+ *
+ * The drafter loop typically alternates: pull --source user for brush work,
+ * pull (default) for scan responses, until both queues are empty.
+ */
 export async function cmdPull(args: Args): Promise<void> {
   const c = await withClient(args)
+  const source = flagString(args, 'source')
+  if (source === 'user') return pullUserFlags(c, args)
+
   const params = new URLSearchParams()
   params.set('status', flagString(args, 'status') ?? 'pending')
   const rung = flagList(args, 'rung')
@@ -99,12 +117,55 @@ export async function cmdPull(args: Args): Promise<void> {
   }
 }
 
+interface UserFlagOut {
+  id: string
+  source?: string
+  status?: string
+  userNote?: string
+  excerpt?: string
+  anchor?: { text?: string }
+}
+
+async function pullUserFlags(c: Client, args: Args): Promise<void> {
+  const params = new URLSearchParams()
+  params.set('source', 'user')
+  params.set('status', flagString(args, 'status') ?? 'open')
+  const limit = flagString(args, 'limit')
+  if (limit) params.set('limit', limit)
+  const data = await c
+    .request<{ flags: UserFlagOut[] }>({
+      method: 'GET',
+      path: `/docs/${c.session.id}/flags?${params.toString()}`,
+    })
+    .catch(exitOnHttpError)
+  if (flagBool(args, 'json')) {
+    emit(data, true)
+    return
+  }
+  if (data.flags.length === 0) {
+    process.stdout.write('no brush flags pending\n')
+    return
+  }
+  for (const f of data.flags) {
+    const note = (f.userNote ?? '').replace(/\s+/g, ' ').trim()
+    const trimmedNote = note.length > 80 ? note.slice(0, 77) + '...' : note
+    const excerpt = (f.excerpt ?? f.anchor?.text ?? '').replace(/\s+/g, ' ').trim()
+    const trimmedExcerpt = excerpt.length > 60 ? excerpt.slice(0, 57) + '...' : excerpt
+    process.stdout.write(`${f.id}  "${trimmedExcerpt}"  note=${trimmedNote}\n`)
+  }
+}
+
 /* ----------------------- resolve / patch / fullsource ---------------------- */
 
 interface PatchInput {
-  respondedTo: string
   flagId: string
-  replacementText: string
+  /** Multi-candidate (brush always, scan optional). */
+  replacementTexts?: string[]
+  /** Legacy singular form - accepted by the server for back-compat. */
+  replacementText?: string
+  /** Optional. Scan-mode patches answer a Response; brush-mode patches
+   *  answer a user-sourced flag directly (no preceding Response). */
+  respondedTo?: string
   prompt?: string
 }
 

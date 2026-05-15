@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { createOnlineSession, type OnlineSession } from '../state/online'
 import ArticleView from '../components/ArticleView.vue'
+import BrushComposer from '../components/BrushComposer.vue'
 import { addRecent } from '../state/recents'
 import type { AgentNote, AgentTask, DocResponse, Flag, Suggestion } from '../types'
 
@@ -54,8 +55,10 @@ function barWidth(weighted: number): string {
   return `${pct}%`
 }
 const candidateByFlag = session?.candidateByFlag ?? computed(() => ({}) as Record<string, Suggestion | undefined>)
+const candidatesByFlag = session?.candidatesByFlag ?? computed(() => ({}) as Record<string, Suggestion[]>)
 const pendingResponseByFlag = session?.pendingResponseByFlag ?? computed(() => ({}) as Record<string, DocResponse | undefined>)
 const panelCounts = session?.panelCounts ?? computed(() => ({ open: 0, pending: 0, awaiting: 0, stuck: 0, closed: 0 }))
+const readerConcernCount = session?.readerConcernCount ?? computed(() => 0)
 const agentTasks = session?.agentTasks ?? computed(() => [] as AgentTask[])
 const agentNotes = session?.agentNotes ?? computed(() => [] as AgentNote[])
 const agentTaskCounts = session?.agentTaskCounts ?? computed(() => ({ open: 0, inProgress: 0, done: 0, total: 0 }))
@@ -113,7 +116,12 @@ type FlagState = 'open' | 'pending' | 'awaiting' | 'stuck' | 'closed'
 interface FlagView {
   flag: Flag
   state: FlagState
+  /** Newest unaccepted candidate; what single-candidate flows render. */
   candidate: Suggestion | null
+  /** All unaccepted candidates, newest-first. Length > 1 means the gutter
+   *  card switches to a carousel (brush mode posts ~3; scan can post >1
+   *  when the directive admits real alternatives). */
+  candidates: Suggestion[]
   pendingResponse: DocResponse | null
   stuckResponse: DocResponse | null
 }
@@ -122,7 +130,8 @@ const orderedFlags = computed<FlagView[]>(() => {
   const out: FlagView[] = []
   for (const flag of [...flags.value].sort((a, b) => a.anchor.start - b.anchor.start)) {
     const status = flag.status ?? 'open'
-    const candidate = candidateByFlag.value[flag.id] ?? null
+    const candidates = candidatesByFlag.value[flag.id] ?? []
+    const candidate = candidates[0] ?? null
     const pending = pendingResponseByFlag.value[flag.id] ?? null
     const stuck =
       responses.value.find((r) => r.flagId === flag.id && r.status === 'stuck') ?? null
@@ -133,10 +142,34 @@ const orderedFlags = computed<FlagView[]>(() => {
       else if (stuck) state = 'stuck'
       else state = 'open'
     } else state = 'closed'
-    out.push({ flag, state, candidate, pendingResponse: pending, stuckResponse: stuck })
+    out.push({ flag, state, candidate, candidates, pendingResponse: pending, stuckResponse: stuck })
   }
   return out
 })
+
+// Carousel selection state per flag: which candidate index is currently
+// shown. Defaults to 0 (newest) on each flag, persists across renders while
+// the user cycles through alternatives. Cleared when the flag resolves
+// (the data leaves `flags.value` but stale keys in the record are harmless).
+const carouselIndex = ref<Record<string, number>>({})
+
+function currentCandidate(v: FlagView): Suggestion | null {
+  if (v.candidates.length === 0) return null
+  const idx = Math.min(v.candidates.length - 1, Math.max(0, carouselIndex.value[v.flag.id] ?? 0))
+  return v.candidates[idx]
+}
+
+function cycleCandidate(flagId: string, delta: number, total: number): void {
+  if (total <= 1) return
+  const cur = carouselIndex.value[flagId] ?? 0
+  const next = ((cur + delta) % total + total) % total
+  carouselIndex.value = { ...carouselIndex.value, [flagId]: next }
+}
+
+function carouselPosition(flagId: string, total: number): number {
+  if (total === 0) return 0
+  return Math.min(total - 1, Math.max(0, carouselIndex.value[flagId] ?? 0)) + 1
+}
 
 /**
  * Two-phase workflow: in 'shape' pass we surface only Rung 3 (structural)
@@ -168,16 +201,25 @@ function isInPhase(rung: number | undefined): boolean {
   return phase.value === 'shape' ? r === 3 : r !== 3
 }
 
+/** Brush flags live outside the rung structure (no patternId, no rung) and
+ *  shouldn't be hidden by the shape/prose phase toggle - they're the reader's
+ *  own concerns and stay visible at every phase. */
+function showInPhase(flag: Flag): boolean {
+  if (flag.source === 'user') return true
+  return isInPhase(flag.rung)
+}
+
 function setPhase(p: 'shape' | 'prose'): void {
   userPhase.value = p
 }
 
 const visibleFlags = computed(() =>
-  orderedFlags.value.filter((v) => v.state !== 'closed' && isInPhase(v.flag.rung)),
+  orderedFlags.value.filter((v) => v.state !== 'closed' && showInPhase(v.flag)),
 )
 
-/** Flags passed to ArticleView; out-of-phase marks are suppressed entirely. */
-const articleFlags = computed(() => flags.value.filter((f) => isInPhase(f.rung)))
+/** Flags passed to ArticleView; out-of-phase scan marks are suppressed.
+ *  Brush flags are always visible regardless of phase. */
+const articleFlags = computed(() => flags.value.filter((f) => showInPhase(f)))
 
 /**
  * A bundle of one or more visible flag-views whose anchors overlap. The gutter
@@ -272,8 +314,8 @@ async function submitLetMeTry(flagId: string): Promise<void> {
   letMeTryOpen.value[flagId] = false
 }
 
-async function accept(flagId: string): Promise<void> {
-  await session?.acceptFlag(flagId)
+async function accept(flagId: string, suggestionId?: string): Promise<void> {
+  await session?.acceptFlag(flagId, suggestionId)
   if (selectedFlagId.value === flagId) selectedFlagId.value = null
   if (expandedFlagIds.value.has(flagId)) {
     const next = new Set(expandedFlagIds.value)
@@ -282,8 +324,8 @@ async function accept(flagId: string): Promise<void> {
   }
 }
 
-async function discard(flagId: string): Promise<void> {
-  await session?.discardFlag(flagId)
+async function discard(flagId: string, suggestionId?: string): Promise<void> {
+  await session?.discardFlag(flagId, suggestionId)
 }
 
 async function skip(flagId: string): Promise<void> {
@@ -296,6 +338,56 @@ async function keep(flagId: string): Promise<void> {
 
 async function cancelPending(rid: string): Promise<void> {
   await session?.cancelResponse(rid)
+}
+
+// ---- brush mode: reader highlights a span + types a complaint ---------------
+//
+// Default mode for any session: the reader can flag passages on their own
+// without waiting for a drafter to walk the catalogue. ArticleView emits
+// `selection-change` on mouseup; we open BrushComposer near the selection's
+// bounding rect, capture a note, post a user-sourced flag.
+
+interface BrushSelection { start: number; end: number; text: string }
+const brushSelection = ref<BrushSelection | null>(null)
+const brushAnchorRect = ref<DOMRect | null>(null)
+const brushOpen = ref(false)
+
+function onSelectionChange(sel: BrushSelection | null): void {
+  if (!sel || sel.text.trim().length === 0) {
+    // Empty / cleared selection: don't tear down an open composer the user
+    // is in the middle of typing in. Composer manages its own dismissal.
+    return
+  }
+  // Snapshot the current viewport rect of the selection so the composer can
+  // anchor to it even after the selection caret is gone.
+  brushAnchorRect.value = captureSelectionRect()
+  brushSelection.value = sel
+  brushOpen.value = true
+}
+
+function captureSelectionRect(): DOMRect | null {
+  if (typeof window === 'undefined') return null
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return null
+  const range = sel.getRangeAt(0)
+  const rects = range.getClientRects()
+  if (rects.length === 0) return range.getBoundingClientRect()
+  return rects[rects.length - 1]
+}
+
+async function onBrushSubmit(payload: { note: string }): Promise<void> {
+  if (!session || !brushSelection.value) return
+  await session.postUserFlag(brushSelection.value, payload.note)
+  closeBrush()
+}
+
+function closeBrush(): void {
+  brushOpen.value = false
+  brushSelection.value = null
+  brushAnchorRect.value = null
+  if (typeof window !== 'undefined') {
+    window.getSelection()?.removeAllRanges()
+  }
 }
 
 function hoverCard(flagId: string): void {
@@ -701,6 +793,12 @@ function dismissShare(): void {
               <span v-if="score.byRung[3].count > 0" class="r r-3">R3·{{ score.byRung[3].count }}</span>
             </span>
           </button>
+          <span v-if="readerConcernCount > 0" class="dot" />
+          <span
+            v-if="readerConcernCount > 0"
+            class="reader-concerns"
+            title="flags you've raised yourself (brush mode)"
+          ><b>{{ readerConcernCount }}</b> reader concern{{ readerConcernCount === 1 ? '' : 's' }}</span>
           <span class="dot" />
           <span title="open"><b>{{ panelCounts.open }}</b> open</span>
           <span class="dot" />
@@ -803,6 +901,7 @@ function dismissShare(): void {
             :density="density"
             @flag-click="onFlagClick"
             @layout-ready="onLayoutReady"
+            @selection-change="onSelectionChange"
           />
         </section>
 
@@ -825,7 +924,7 @@ function dismissShare(): void {
           </svg>
 
           <p v-if="visibleFlags.length === 0" class="empty">
-            No open flags. The document is clean (or the agent hasn't run detectors yet).
+            No flags yet. Highlight a passage in the article to raise one, or attach a drafter to walk the catalogue.
           </p>
 
           <article
@@ -876,21 +975,26 @@ function dismissShare(): void {
                   :class="{ open: isExpanded(v.flag.id) }"
                   aria-hidden="true"
                 >▸</span>
-                <span :class="['rung-pill', `rung-${v.flag.rung ?? 1}`]" :title="rungName(v.flag.rung)">
-                  {{ rungLabel(v.flag.rung) }}
-                </span>
-                <span class="pattern" :title="v.flag.patternId">{{ v.flag.patternId }}</span>
-                <span
-                  v-for="rp in v.flag.relatedPatterns"
-                  :key="rp"
-                  class="related-pattern"
-                  :title="`also matches: ${rp}`"
-                >+{{ rp }}</span>
-                <span
-                  v-if="(v.flag.relatedAnchors?.length ?? 0) > 0"
-                  class="recurrence"
-                  :title="`same construction recurs in ${v.flag.relatedAnchors?.length} more place${v.flag.relatedAnchors?.length === 1 ? '' : 's'}`"
-                >×{{ (v.flag.relatedAnchors?.length ?? 0) + 1 }}</span>
+                <template v-if="v.flag.source === 'user'">
+                  <span class="reader-pill" title="flagged by you (reader concern)">brush</span>
+                </template>
+                <template v-else>
+                  <span :class="['rung-pill', `rung-${v.flag.rung ?? 1}`]" :title="rungName(v.flag.rung)">
+                    {{ rungLabel(v.flag.rung) }}
+                  </span>
+                  <span class="pattern" :title="v.flag.patternId">{{ v.flag.patternId }}</span>
+                  <span
+                    v-for="rp in v.flag.relatedPatterns"
+                    :key="rp"
+                    class="related-pattern"
+                    :title="`also matches: ${rp}`"
+                  >+{{ rp }}</span>
+                  <span
+                    v-if="(v.flag.relatedAnchors?.length ?? 0) > 0"
+                    class="recurrence"
+                    :title="`same construction recurs in ${v.flag.relatedAnchors?.length} more place${v.flag.relatedAnchors?.length === 1 ? '' : 's'}`"
+                  >×{{ (v.flag.relatedAnchors?.length ?? 0) + 1 }}</span>
+                </template>
                 <span :class="['state-badge', `state-${v.state}`]">{{ v.state }}</span>
               </header>
 
@@ -899,8 +1003,9 @@ function dismissShare(): void {
               <p v-if="v.flag.rationale" class="rationale">{{ v.flag.rationale }}</p>
 
               <!-- AWAITING-ACCEPT: visible candidate + accept/discard.
+                   Multi-candidate: prev/next carousel through alternatives.
                    Hovering the candidate text previews it inline in the article. -->
-              <div v-if="v.state === 'awaiting' && v.candidate" class="awaiting-block">
+              <div v-if="v.state === 'awaiting' && currentCandidate(v)" class="awaiting-block">
                 <div
                   class="candidate"
                   :class="{ 'is-previewing': previewFlagId === v.flag.id }"
@@ -908,17 +1013,36 @@ function dismissShare(): void {
                   @mouseenter.stop="startPreview(v.flag.id)"
                   @mouseleave.stop="endPreview(v.flag.id)"
                 >
-                  <span class="candidate-label">replacement</span>
-                  <span class="candidate-text">{{ v.candidate.post }}</span>
+                  <span class="candidate-label">{{ v.candidates.length > 1 ? 'candidate' : 'replacement' }}</span>
+                  <span class="candidate-text">{{ currentCandidate(v)?.post }}</span>
+                </div>
+                <div v-if="v.candidates.length > 1" class="carousel">
+                  <button
+                    type="button"
+                    class="quiet small"
+                    @click.stop="cycleCandidate(v.flag.id, -1, v.candidates.length)"
+                    aria-label="previous candidate"
+                  >‹</button>
+                  <span class="carousel-pos">{{ carouselPosition(v.flag.id, v.candidates.length) }} of {{ v.candidates.length }}</span>
+                  <button
+                    type="button"
+                    class="quiet small"
+                    @click.stop="cycleCandidate(v.flag.id, 1, v.candidates.length)"
+                    aria-label="next candidate"
+                  >›</button>
                 </div>
                 <div class="awaiting-row">
                   <button
                     type="button"
                     class="primary"
-                    @click.stop="accept(v.flag.id)"
+                    @click.stop="accept(v.flag.id, currentCandidate(v)?.id)"
                   >accept</button>
-                  <button type="button" class="quiet" @click.stop="discard(v.flag.id)">discard</button>
-                  <span v-if="v.candidate.modelTag" class="model-tag">via {{ v.candidate.modelTag }}</span>
+                  <button
+                    type="button"
+                    class="quiet"
+                    @click.stop="discard(v.flag.id, currentCandidate(v)?.id)"
+                  >discard</button>
+                  <span v-if="currentCandidate(v)?.modelTag" class="model-tag">via {{ currentCandidate(v)?.modelTag }}</span>
                 </div>
               </div>
 
@@ -987,6 +1111,14 @@ function dismissShare(): void {
         </aside>
       </main>
     </template>
+
+    <BrushComposer
+      :open="brushOpen"
+      :selection="brushSelection"
+      :anchor-rect="brushAnchorRect"
+      @submit="onBrushSubmit"
+      @cancel="closeBrush"
+    />
   </div>
 </template>
 
@@ -1752,6 +1884,19 @@ function dismissShare(): void {
 .rung-1 { background: #2f8f6a; }
 .rung-2 { background: #b88f3e; }
 .rung-3 { background: #b8472d; }
+/* Reader-concerns (brush) pill - sits in the same slot as the rung pill but
+ * uses a softer hue to signal it's the reader speaking, not the catalogue. */
+.reader-pill {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  color: #fff;
+  font-weight: 700;
+  background: #4a6f9c;
+}
 .pattern {
   font-family: var(--font-mono);
   font-size: 0.78rem;
@@ -1862,6 +2007,39 @@ function dismissShare(): void {
   color: var(--muted);
   margin-left: auto;
 }
+/* Multi-candidate carousel - sits between the candidate body and the
+ * accept/discard row. Prev/next + "N of M" position label. */
+.carousel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.3rem 0;
+  font-family: var(--font-ui);
+}
+.carousel .carousel-pos {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 4em;
+  text-align: center;
+}
+.carousel button {
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.carousel button:hover { border-color: var(--text); }
+/* Reader-concerns count in the panel header - sits beside the panel counts
+ * with a softer hue so it reads as a sibling category, not a sub-bucket. */
+.reader-concerns {
+  color: #4a6f9c;
+}
+.reader-concerns b { color: #4a6f9c; }
 
 .pending-row {
   display: flex;

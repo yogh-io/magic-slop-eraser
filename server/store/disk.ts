@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile, rename, rm, access } from 'node:fs/promises
 import { join } from 'node:path'
 import type { DocState } from '../types'
 import type { DocStore } from './index'
+import { normaliseDocState } from './migrate'
 
 /**
  * One JSON blob per doc at `<root>/docs/<id>/state.json`. Events live inside
@@ -31,7 +32,7 @@ export class DiskStore implements DocStore {
   async readState(docId: string): Promise<DocState | null> {
     try {
       const raw = await readFile(this.statePath(docId), 'utf8')
-      return JSON.parse(raw) as DocState
+      return normaliseDocState(JSON.parse(raw) as DocState)
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw err

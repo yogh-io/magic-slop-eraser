@@ -6,13 +6,20 @@ This file is the framework definition. Read it before working on the catalogue, 
 
 ## What this project is
 
-Slopmop identifies AI-slop patterns in prose and walks the writer through fixing them one at a time. The catalogue is a generalisation of in-house deslop infrastructure first built for analytical-prose work, itself derived from the patterns one notices when one has read enough LLM output to be annoyed by it.
+Slopmop runs in two modes:
 
-The project organises every catalogued pattern into one of three **rungs**, ordered by *depth* (the *fix-shape* the pattern requires). Rung 1 is the bottom (lexical, word-and-phrase swap) and Rung 3 is the top (structural, whole-piece editorial rewrite). The rung governs the user-facing workflow.
+- **Brush (default).** The reader reads the article in the browser, highlights any passage that bothers them, and types a sentence about why. Each highlight becomes a user-sourced flag carrying the reader's complaint as `userNote`. The drafter discovers these flags, drafts ~3 candidate fixes per flag, and posts them back as a carousel. The reader picks one, accepts, source mutates. No catalogue walk required.
+- **Scan (opt-in).** The drafter walks the curated catalogue against the source, posts flags by `patternId`, and runs the paired writing loop the author drives with shape directives ("more committal", "punchline first"). Scan runs when the author invokes it - terminal prompt, agent hint, or a UI button - not automatically on every session.
 
-The numbering is **layer, not order**. An agent or author picks the entry rung based on the draft's stage: a structurally clean draft starts at Rung 1 and climbs up; a tangled draft starts at Rung 3 and works down so polish does not get spent on prose about to be cut.
+The two coexist on every doc; the panel surfaces brush flags ("reader concerns") separately from catalogue flags. The catalogue score is a *catalogue* score and does not reflect brush flags.
 
-**Detection is the drafter's job at every rung.** All slopmop patterns are LLM-detected. The catalogue is the spec; the drafter (a Claude Code session, primarily) walks it against the source, applies each pattern's `skipRule` for context, and posts flags via `POST /docs/:id/flags`. The server stores documents, flags, and the steering-loop state. It does not read prose.
+The catalogue is a generalisation of in-house deslop infrastructure first built for analytical-prose work, itself derived from the patterns one notices when one has read enough LLM output to be annoyed by it.
+
+The catalogue organises every pattern into one of three **rungs**, ordered by *depth* (the *fix-shape* the pattern requires). Rung 1 is the bottom (lexical, word-and-phrase swap) and Rung 3 is the top (structural, whole-piece editorial rewrite). The rung governs the user-facing scan workflow; brush flags live outside the rung structure (the reader doesn't classify).
+
+The numbering is **layer, not order**. In scan mode, an agent or author picks the entry rung based on the draft's stage: a structurally clean draft starts at Rung 1 and climbs up; a tangled draft starts at Rung 3 and works down so polish does not get spent on prose about to be cut.
+
+**Detection is the drafter's job at every rung in scan mode.** All slopmop *catalogue* patterns are LLM-detected. The catalogue is the spec; the drafter (a Claude Code session, primarily) walks it against the source, applies each pattern's `skipRule` for context, and posts flags via `POST /docs/:id/flags`. In brush mode, the *reader* is the detector - the drafter just drafts candidates that respond to the reader's complaint. The server stores documents, flags, and the steering-loop state. It does not read prose.
 
 ## The three rungs
 
@@ -72,11 +79,11 @@ Slopmop is **an online site, not a local app**. It stores prose, comments, sugge
 The shape:
 
 - **Site (server)** is the source of truth. It owns documents, flags, comment threads, suggestion candidates, resolution states, version history, and the queue of pending directives.
-- **Drafter** is an agentic coding tool (Claude Code primarily; Codex, opencode, your own scripts also qualify) carrying the slopmop skill. Two jobs: in analysis, it walks the catalogue against the source (often via subagents) and posts flags via `POST /docs/:id/flags`. In the steering loop, it dequeues author directives, drafts candidates, posts resolutions.
-- **Browser (steering surface)** is where the writing happens *as steering*. The author sweeps batches of flags, gives shape directives, reviews returning candidates, accepts or re-directs. Accept / reject / edit / mark-deliberate / sweep-batch / submit-directives all live here.
+- **Drafter** is an agentic coding tool (Claude Code primarily; Codex, opencode, your own scripts also qualify) carrying the slopmop skill. Two loops: a **brush loop** (pull user-sourced flags via `GET /flags?source=user&status=open`, draft ~3 candidates per flag, post via `POST /resolutions` with `replacementTexts: [...]` and no `respondedTo`), and a **scan loop** (catalogue analysis + author-directive resolution - what slopmop did before brush).
+- **Browser (steering surface)** is where the writing happens *as steering*. The reader brushes (highlight + complain) by default; the author also sweeps catalogue flags when scan has run, gives shape directives, reviews returning candidates, accepts or re-directs. Accept / reject / edit / mark-deliberate / sweep-batch / submit-directives all live here.
 - **Writer (human)** holds the wheel. They define shape, react to drafts, decide what ships. The work is theirs; the agent is the keyboard. The author can also drive from the terminal via the agent directly when convenient - the browser and the terminal are equivalent surfaces onto the same state.
 
-This is the only flow. There is no server-side detection - detection is the drafter's job. The browser without an agent attached gets you a session URL and an empty flag panel; the agent attached to that URL is what populates it.
+There is no server-side detection. Brush flags come from the reader; scan flags come from the drafter walking the catalogue. The browser without a drafter attached lets the reader brush all day - those flags queue at `status: 'open'` until a drafter shows up; the page communicates that neutrally ("queued - attach a drafter to draft fixes"). Scan happens only when invoked.
 
 The catalogue is intentionally portable: a curated list of pattern entries with `whyItsSlop` / `fix` / `examples` / `skipRule` plus the rung classification. Other prose tools can vendor it as a prompt-spec library; the implementation that matters is whatever drafter walks the catalogue against the source. Commercial / pricing model is not yet decided and is intentionally left out of this document; do not encode tier assumptions into the architecture.
 
@@ -85,9 +92,12 @@ The catalogue is intentionally portable: a curated list of pattern entries with 
 Source-of-truth entities the API exposes:
 
 - **Document**: source markdown, title, owner, word count, source hash (sha-256), version counter, created/updated timestamps. Source state has a small ring buffer of prior versions so revert is cheap.
-- **Flag**: an instance of a catalogued pattern at a specific anchor in a document. Carries `patternId`, `anchor` (start+end+prefix+suffix for relocation), `rung`, `severity`, `rationale`, current `status` (open / awaiting-accept / resolved / skipped / kept-deliberate / stale), and `source` (`llm` for drafter-detected via `POST /docs/:id/flags`, `user` for human-contributed).
-- **Response**: an author-issued directive on a flag (free text or a common-case shortcut: *more committal*, *drop the qualifier*, *punchline first*, *cut to the verb*, *let me try: <text>*, *skip*, *keep*). Each user choice persists immediately - no batch submit. Status: `pending` (waiting for agent) / `resolved` (agent posted a candidate) / `stuck` (agent gave up via punt) / `cancelled` (user rescinded). The trail of responses per flag is the steering history.
-- **Suggestion**: a candidate edit attached to a flag. Two origin paths: in response to a directive (`respondedTo` set), or as an inline candidate the agent bundles with a flag at detection time (`respondedTo` absent - the flag goes straight to `awaiting-accept`). Carries `pre` (the originally-anchored text), `post` (the candidate), the model tag, optional prompt context. Per-flag candidates do not mutate the source - the browser renders them as overlays over the anchor span. They land in the source only when the user explicitly clicks accept.
+- **Flag**: an anchored point of attention. Two shapes:
+  - *Scan flag* (`source: 'llm'`): an instance of a catalogued pattern. Carries `patternId`, `category`, `rung`, `severity`, `rationale`, `anchor` (start+end+prefix+suffix for relocation), `status`.
+  - *Brush flag* (`source: 'user'`): a reader-raised concern. Carries `anchor`, `userNote` (the complaint), `severity` (defaulted), `status`. `patternId`, `category`, `rung` are absent - brush flags live outside the catalogue.
+  - Common status values: open / awaiting-accept / resolved / skipped / kept-deliberate / stale.
+- **Response**: an author-issued directive on a flag (free text or a common-case shortcut: *more committal*, *drop the qualifier*, *punchline first*, *cut to the verb*, *let me try: <text>*, *skip*, *keep*, *accept*, *discard*). Each user choice persists immediately - no batch submit. Status: `pending` (waiting for agent) / `resolved` (agent posted candidate(s)) / `stuck` (agent gave up via punt) / `cancelled` (user rescinded). Carries `resolvedSuggestionIds: string[]` once resolved - multi-element when the drafter posted >1 candidate per flag. Scan flows always create a Response; brush flows skip Responses entirely (the flag's `userNote` *is* the directive) and the drafter resolves the flag directly via `POST /resolutions`.
+- **Suggestion**: a candidate edit attached to a flag. Multiple Suggestions per flag is normal (brush always; scan when the directive admits real alternatives). Two origin paths: in response to a directive (`respondedTo` set, scan mode), or attached directly to a brush flag (`respondedTo` absent). Carries `pre` (the originally-anchored text), `post` (the candidate), the model tag, optional prompt context. Per-flag candidates do not mutate the source - the browser renders them as a carousel over the anchor span. The reader accepts a specific one (`POST /responses { kind: 'accept', flagId, suggestionId }`), which mutates the source; sibling candidates stay as history.
 - **Comment**: free-form thread on a flag (or on a document). Used for human-to-agent coordination and for capturing why a flag was kept deliberately or why the agent punted.
 - **Resolution event**: append-only log of state transitions on flags, responses, and source. The companion document at session end is rendered from this log.
 
@@ -105,28 +115,43 @@ PUT    /docs/:id/source               { source }   # If-Match: <hash>; runs reco
 POST   /docs/:id/source/revert        { toVersion? }   # rolls back to a stored prior version
 DELETE /docs/:id
 
-# detection (drafter-side; BYOM)
-POST   /docs/:id/flags                { flags: [{ patternId, start?, end?, text,
-                                                  rationale, severity?,
-                                                  suggestion? }],
-                                        modelTag, source? }
-                                      # If-Match: <hash>; relocates anchors;
-                                      # dedupes; flags with `suggestion` go
-                                      # straight to awaiting-accept.
+# flag creation - two shapes via `source` discriminator
+# scan (drafter posts catalogue-matched flags, BYOM detection):
+POST   /docs/:id/flags                { source: 'llm', modelTag, flags: [{
+                                          patternId, text, start?, end?,
+                                          rationale, severity?, suggestion? }] }
+# brush (reader posts a complaint about a highlighted passage):
+POST   /docs/:id/flags                { source: 'user', modelTag: 'reader', flags: [{
+                                          text, start?, end?,
+                                          userNote, severity? }] }
+                                      # If-Match: <hash>; relocates anchors.
+                                      # Scan: patternId required, validated against
+                                      # catalogue. Optional `suggestion` lands flag
+                                      # in awaiting-accept.
+                                      # Brush: patternId rejected, userNote required.
+                                      # Flag goes to status:open; drafter responds
+                                      # later via /resolutions.
+
+# flag discovery
+GET    /docs/:id/flags                # filters: rung, status, source=user|llm
 
 # user side: every choice is a Response, fired immediately
-POST   /docs/:id/responses            { flagId, body, kind: 'shortcut'|'free'|'let-me-try'|'skip'|'keep' }
-                                      -> Response (status=pending). Server self-resolves
-                                      skip/keep/let-me-try without agent involvement.
-POST   /docs/:id/responses/:rid/cancel
-GET    /docs/:id/responses            # agent pulls work, with catalogue filters
+POST   /docs/:id/responses            { flagId, body, kind, suggestionId? }
+                                      # kind: 'shortcut' | 'free' | 'let-me-try' |
+                                      #       'skip' | 'keep' | 'accept' | 'discard'
+                                      # Server self-resolves skip/keep/let-me-try/
+                                      # accept/discard without agent involvement.
+                                      # suggestionId: required on `accept`/`discard`
+                                      # when flag has >1 unaccepted candidates;
+                                      # optional otherwise (single-candidate auto-picks).
+POST   /docs/:id/responses/:rid/transition  { to: 'stuck' | 'cancelled', reason? }
+GET    /docs/:id/responses            # agent pulls scan work; filters:
                                       ?status=pending
                                       &rung=1[,2,3]
                                       &category=lexical[,structural,argumentative]
                                       &severity=primary[,high,medium,low]
                                       &patternId=tier1-lexicon[,...]
                                       &limit=N
-POST   /docs/:id/responses/:rid/punt  { reason }     # agent gave up; status=stuck
 
 # user-set agent direction (advisory; agent honours by convention)
 GET    /docs/:id/agent-hints          -> { rungs?, categories?, severities?, patternIds?, paused? }
@@ -135,19 +160,21 @@ PUT    /docs/:id/agent-hints          { rungs?, categories?, severities?, patter
 # agent side: post resolutions (one of the two paths per fix)
 POST   /docs/:id/resolutions          { patches: [...], fullSource?: {...}, modelTag, notes? }
                                       # If-Match: <hash>; transactional batch.
-                                      # Per-flag patch fields: { respondedTo, flagId,
-                                      #   anchor: {start, end, replacementText} }.
-                                      # FullSource fields: { respondedTo: [rid,...], source }.
-                                      # Single fullSource per batch (multiples redundant).
-                                      # Patches must lie within their flag's anchor window
-                                      # or the call rejects 422.
+                                      # Per-flag patch fields: { flagId, replacementTexts: string[],
+                                      #   respondedTo?, prompt? }.
+                                      # `replacementTexts` length >= 1 (brush always ~3,
+                                      # scan typically 1, sometimes more). Legacy
+                                      # `replacementText: string` is accepted and
+                                      # normalised to a one-element array.
+                                      # `respondedTo` is required for scan flags
+                                      # (answers a Response), absent for brush flags
+                                      # (no preceding Response).
+                                      # FullSource fields: { source, respondedTo: [rid,...] }.
+                                      # Single fullSource per batch.
 
-# user side: act on awaiting-accept candidates
-POST   /docs/:id/flags/:fid/accept    # apply the per-flag patch, mutate source, close flag
-POST   /docs/:id/flags/:fid/discard   # drop the awaiting-accept candidate, flag stays open
-POST   /docs/:id/flags/:fid/skip
-POST   /docs/:id/flags/:fid/keep-deliberate
-POST   /docs/:id/flags/:fid/comments  { body, author? }
+POST   /docs/:id/flags/:fid/comments  { body, author? }  # only flag-scoped verb that remains
+                                      # accept/discard/skip/keep moved to POST /responses with
+                                      # the matching `kind`; legacy per-flag verbs return 405.
 
 # read-only / context
 GET    /docs/:id/voice-samples?n=20   # derived from accepted suggestions; agent fetches as
@@ -177,7 +204,9 @@ The API is the contract; the browser UI and any agent skill (Claude Code, Codex,
 
 ## The score
 
-The 0-10 score is computed from **all live flags across all three rungs** (open + awaiting-accept). Per-flag `severity` is the load-bearing input - the drafter sets it at flag-detection time, weighted subjectively per instance and informed by the voice memo (a deliberate move scores low even if it matches a catalogued pattern). The server aggregates: density-based math, with pattern-specific ceilings for the worst offenders.
+The 0-10 score is computed from **all live catalogue flags across all three rungs** (`source: 'llm'`, status open + awaiting-accept). Brush flags don't feed the score - it's a *catalogue* score, not a "stuff readers dislike" tally. The panel header surfaces brush flag count separately as "N reader concerns".
+
+Per-flag `severity` is the load-bearing input - the drafter sets it at flag-detection time, weighted subjectively per instance and informed by the voice memo (a deliberate move scores low even if it matches a catalogued pattern). The server aggregates: density-based math, with pattern-specific ceilings for the worst offenders.
 
 `scoreFromFlags` in `src/detectors/index.ts` returns:
 - `value` - the 0-10 number
@@ -240,9 +269,9 @@ src/
     AboutPage.vue       # how to use, what lives where
     NotFoundPage.vue
   components/
-    ArticleView.vue     # markdown render + highlight overlay
-    FlagsPanel.vue      # right-side panel grouped by category
-    UserHighlightDialog.vue
+    ArticleView.vue     # markdown render + highlight overlay; emits @selection-change for brush
+    BrushComposer.vue   # floating composer that appears near the reader's selection - captures a userNote and posts a brush flag
+    FlagsPanel.vue      # (legacy / unused) category-grouped flag list; OnlineDocPage renders flags in its own gutter
     ThemePicker.vue
   state/
     doc.ts              # source + flags reactive store

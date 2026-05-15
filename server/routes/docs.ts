@@ -84,13 +84,17 @@ export async function handleDocs(
       const s = f.status ?? 'open'
       return s === 'open' || s === 'awaiting-accept'
     })
+    // Brush flags (source: 'user') sit outside the catalogue score by design -
+    // it's a *catalogue* score, not a "stuff readers dislike" tally. They show
+    // as a separate "reader concerns" count in the UI.
+    const scannedLive = live.filter((f) => f.source !== 'user')
     const wordCount = approximateProseWordCount(state.doc.source, extractSkipZones(state.doc.source))
-    const score = scoreFromFlags(live, wordCount)
+    const score = scoreFromFlags(scannedLive, wordCount)
     const paragraphs = computeParagraphInfo(state.doc.source)
     return json({
       doc: state.doc,
       sourceHash: state.doc.sourceHash,
-      counts: countsByRung(live),
+      counts: countsByRung(scannedLive),
       score,
       flags,
       agentHints: state.agentHints,
@@ -261,6 +265,9 @@ function collectVoiceSamples(state: DocState, n: number): VoiceSample[] {
   for (const s of accepted) {
     const flag = state.flags[s.flagId]
     if (!flag) continue
+    // Voice memory feeds the catalogue-scoring drafter; brush flags have no
+    // patternId and aren't useful here.
+    if (!flag.patternId) continue
     const directive = s.respondedTo ? state.responses[s.respondedTo]?.body ?? '' : ''
     out.push({
       pre: s.pre,

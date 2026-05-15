@@ -25,7 +25,8 @@ const grouped = computed(() => {
   return out
 })
 
-function patternName(id: string): string {
+function patternName(id: string | undefined): string {
+  if (!id) return 'reader concern'
   return getPattern(id)?.shortName ?? getPattern(id)?.name ?? id
 }
 </script>

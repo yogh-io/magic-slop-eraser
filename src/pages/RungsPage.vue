@@ -88,6 +88,13 @@ const counts = computed(() => {
         Rung 2, section for Rung 3 - and the cycle gets slower as you climb, but the pairing
         is constant: the work is the writer's, the agent is the keyboard.
       </p>
+      <p class="lede">
+        Brush flags live outside this structure. A reader who highlights a passage and types
+        "this is too vague" hasn't classified the slop against the catalogue - they've just said
+        what bothers them. The drafter responds with candidate fixes regardless of whether
+        the complaint maps to a known pattern. The rungs are the scan-mode skeleton; brush mode
+        bypasses them.
+      </p>
     </header>
 
     <section v-for="r in rungs" :key="r.id" class="rung" :class="`rung-${r.id}`">

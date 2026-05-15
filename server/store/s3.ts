@@ -1,6 +1,7 @@
 import { S3Client } from 'bun'
 import type { DocState } from '../types'
 import type { DocStore } from './index'
+import { normaliseDocState } from './migrate'
 
 /**
  * Stateless persistence against any S3-compatible object store: DigitalOcean
@@ -53,7 +54,7 @@ export class S3Store implements DocStore {
     const file = this.client.file(this.key(docId))
     try {
       const text = await file.text()
-      return JSON.parse(text) as DocState
+      return normaliseDocState(JSON.parse(text) as DocState)
     } catch (err: unknown) {
       // Bun's S3 file throws on 404 / NoSuchKey; treat that as "doesn't exist".
       if (isNotFound(err)) return null

@@ -74,8 +74,12 @@ export type FlagStatus =
 
 export interface Flag {
   id: string
-  patternId: string
-  category: CategoryId
+  /** Absent for brush flags (`source: 'user'`) - the reader is venting, not
+   *  classifying. Required for scan flags (`source: 'llm'`) where the drafter
+   *  matched against the catalogue. */
+  patternId?: string
+  /** Absent for brush flags for the same reason as `patternId`. */
+  category?: CategoryId
   source: FlagSource
   anchor: TextAnchor
   rationale: string
@@ -140,8 +144,11 @@ export interface DocResponse {
   body: string
   kind: ResponseKind
   status: ResponseStatus
-  /** Resulting suggestion ID once status flips to 'resolved' via agent path. */
-  resolvedSuggestionId?: string
+  /** Resulting suggestion IDs once status flips to 'resolved' via agent path.
+   *  Multi-element when the drafter posts >1 candidate per flag (brush mode
+   *  always; scan mode optionally). Legacy single-candidate records normalise
+   *  to a one-element array on read. */
+  resolvedSuggestionIds: string[]
   /** Free-form reason if status is 'stuck' (agent punted). */
   stuckReason?: string
   /** When auto-resolved by a source mutation (user paste-edit, full-source push

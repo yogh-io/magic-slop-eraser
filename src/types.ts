@@ -2,6 +2,7 @@ export type CategoryId =
   | 'lexical'
   | 'structural'
   | 'argumentative'
+  | 'craft'
 
 export interface CategoryMeta {
   id: CategoryId

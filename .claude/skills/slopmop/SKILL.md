@@ -1,6 +1,6 @@
 ---
 description: Walk a markdown document through the slopmop deslop loop - serve brush-mode reader concerns first; scan the catalogue with subagents when the author asks for it
-skillVersion: 2026-05-15.1
+skillVersion: 2026-06-01.1
 allowed-tools: Bash, Read, Edit, Write, Monitor
 ---
 
@@ -44,7 +44,7 @@ After either, `.slopmop/session.json` exists in cwd and every other command "jus
 
 ## skill version
 
-This file declares `skillVersion: 2026-05-15.1` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
+This file declares `skillVersion: 2026-06-01.1` in its frontmatter. The CLI's bundled version must match - the install script keeps them in lockstep, but if you've copied SKILL.md by hand, run the install one-liner above to refresh the binary.
 
 The CLI sends `X-Skill-Version` on every call. The server flags two failure modes via response headers:
 
@@ -194,6 +194,18 @@ Your brush loop:
 
 A brush flag whose reader complaint matches a catalogue pattern (e.g. "this is too vague" → vague-gravitas) is *still* posted as a brush flag in v1. The v2 reflection layer is what later proposes catalogue refinements; v1 just stores cleanly.
 
+## the craft lens (applies to every candidate you draft)
+
+Detection is only half your job. The other half is writing - and the prose *you* produce in a candidate has to clear the same bar you hold the source to. The catalogue's `craft` category is not only a thing to flag in the source; it is a checklist for your own drafting. Before you post any candidate, brush or scan, run it past the five plain-English principles:
+
+- **Economy.** Say it in the fewest words it takes, then stop. Cut anything the reader already has.
+- **Plain words.** Never the Latinate where the Anglo-Saxon will do - "use," not "utilise."
+- **Active voice.** Name the doer and put them in front of the verb. If you can't name them, you may be papering over an absent-actor.
+- **Completeness.** A candidate is a sentence, not a fragment - unless the fragment is genuinely earning its full stop.
+- **A clean close.** End on the strong word, not a stray preposition.
+
+A candidate that fixes the flagged pattern but commits three craft faults of its own is not a fix - the author will feel it even if they can't name it. This is also why brush leans hardest on the lens: most reader complaints ("this is clunky," "too wordy," "who's *they*?", "this dangles") are craft faults the reader felt without the vocabulary. The lens *is* the vocabulary - reach for the matching `craft` pattern's `fix` when you draft the candidate, and name it in your resolution `notes` so the author learns the move too.
+
 ## the shape of scan work (supplementary, opt-in)
 
 Scan is the catalogue-walk mode. **Run it only when the author asks for it** - "run a scan", "walk the catalogue", "give me a punch-list" - or when an agent hint pre-pins specific rungs/patterns. Don't auto-run scan on every session; brush is the default surface, scan is the supplementary catalogue track that runs alongside it.
@@ -302,16 +314,17 @@ One Task subagent per *cluster* of structurally kindred patterns. ~6 detection d
 
 The clusters group patterns that share a detection skill - a subagent looking at sentence openers is also the right reader for sentence closers; a subagent reading for dead vocabulary is the right reader for inflated vocabulary. Within a cluster the subagent's intra-pattern reasoning is fine (the patterns are kindred). Across clusters, no agent has visibility - which is what prevents the "section X is protocol shape, skip everything in it" cross-pattern shielding move.
 
-Default cluster table for the current catalogue (16 patterns → 6 subagents):
+Default cluster table for the current catalogue (21 patterns → 7 subagents):
 
 | Cluster | Patterns | What this agent is hunting |
 |---|---|---|
 | dead-vocabulary | tier1-lexicon, enthusiasm-inflation, vague-gravitas | Words and phrases that are inflated, abstract, or LLM-typical |
 | openers-closers | throat-clearing, closers | Sentence-position empties at paragraph head and tail |
-| stacked-constructions | antithesis, suffocation | Mirror constructs and stacked hedges |
-| actor-reference | absent-actor, allusive-construct | Passages where the agent is hidden or the referent doesn't earn itself |
+| sentence-shape | antithesis, suffocation, staccato | Mirror constructs, stacked hedges, and the clipped asyndetic rhythm (dropped conjunctions, fragment-punches) |
+| actor-reference | absent-actor, allusive-construct | Passages where the agent is hidden (incl. agentless passive) or the referent doesn't earn itself (incl. bare demonstratives) |
 | argument-position | hedged-confidence, performative-balance, synthesis-of-nothing | Authorial stance that avoids commitment, and paragraphs that synthesise nothing |
 | editorial-piece-level | frame-stacking, kicker-paraphrase, redundant-abstraction, lens-fits-everything | Rung 3 piece-level reads on the whole composition |
+| craft | redundancy, latinate, passive-voice, terminal-preposition | Plain-English faults that aren't AI tells but a human editor still cuts: padding, fancy words, passive voice, limp closes |
 
 When new patterns land in the catalogue, slot them into the closest existing cluster, or create a new one if no existing cluster captures the detection skill. Don't let the table go stale - a pattern that isn't in any cluster won't get walked.
 
@@ -617,7 +630,7 @@ For the full command list run `slopmop --help`. Body conventions for write comma
 
 ## appendix: raw HTTP
 
-The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-05-15.1`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
+The CLI is a thin layer over the HTTP API. If you can't install Bun (Codex, opencode, custom scripts), drive it directly. The doc id from the URL is the capability - no separate auth header. Every state-changing call requires `X-Skill-Version: 2026-06-01.1`; source-mutating calls (`POST /flags`, `POST /resolutions`, `PUT /source`, `POST /source/revert`) require `If-Match: <currentHash>` and return the new `sourceHash` in the response. 412 means the source moved - re-fetch and retry.
 
 Routes (full schemas: read the CLI source at `cli/client.ts` + `cli/commands/*.ts`, or `slopmop --help`):
 
@@ -654,3 +667,9 @@ Changes in skill v2026-05-14.1 (from v2026-05-12.1; not breaking on the wire):
 Changes in skill v2026-05-15.1 (from v2026-05-14.1):
 - **Brush is the canonical opening**. New "starting a session" section codifies the bootstrap flow: push doc → heartbeat → read source yourself → post a brief framing `observation` note → invite the author to brush. Scan is explicitly supplementary, run only when the author asks.
 - **Voice memo / voice samples removed.** The `voice-memo` detection subagent is gone; the synthesis subagent no longer folds a memo into severity (each detection subagent already scores per instance). `GET /docs/:id/voice-samples` and `slopmop voice` are dropped. The `voice` density axis is dropped from the canonical default set. Drafters that pulled voice samples or scored a `voice` axis should stop; old samples on disk are ignored.
+
+Changes in skill v2026-06-01.1 (from v2026-05-15.1; not breaking on the wire):
+- **Catalogue grew to 21 patterns.** New `craft` category - plain-English faults that aren't AI tells but a human editor still cuts: `redundancy`, `latinate`, `passive-voice`, `terminal-preposition`. New structural pattern `staccato` (dropped conjunctions + fragment-punch, the clipped asyndetic rhythm). `absent-actor` gained an agentless-passive mechanism ("mistakes were made"); `allusive-construct` gained the bare-demonstrative sub-shape ("This is not about X" with no referent). The catalogue is served live via `GET /catalogue`, so no client change is needed to pick these up.
+- **New "craft lens" drafter guidance.** Apply the five plain-English principles (economy, plain words, active voice, completeness, clean close) to every candidate you draft, not only to detection - the `craft` category doubles as a checklist for your own prose.
+- **Detection cluster table now 7 subagents.** `staccato` joins the renamed `sentence-shape` cluster; a new `craft` cluster walks the four craft patterns. When you regroup, keep the invariant: no detection subagent sees the whole catalogue.
+- **Craft patterns feed the catalogue score** at modest weights; `staccato` is weighted as a strong tell. `terminal-preposition` is deliberately low.

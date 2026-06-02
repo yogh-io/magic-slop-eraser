@@ -195,15 +195,17 @@ The trick of the form is that it gestures at meaning without committing any. The
     scope: 'sentence',
     rung: 2,
     blurb:
-      'Load-bearing claims that hide the actor - either by negation over an unnamed population, or by replacing the actor with an abstract noun.',
+      'Load-bearing claims that hide the actor - by negation over an unnamed population, by replacing the actor with an abstract noun, or by going agentless-passive.',
     essay: `The kicker no agent catches, no editor quite flags, and no detector ever knows how to name - the move depends on a population the line itself has refused to enumerate. "The deal no mediator can broker." "The framework no administration has built." "The plan whose authors have never put their names to it."
 
 It feels devastating because it sounds like the writer has gone past the available evidence to a conclusion so universal that no mere person could carry it. In fact the writer has named no mediators, listed no administrations, declined to specify any aims. The line is loadbearing on a population the line itself has refused to enumerate. Works as mood. Collapses if you ask, gently, "which mediators?" The reader who knows the trick reads the line the way a mechanic listens to a misfire.
 
-The same trick plays in a second key: instead of negating the actor, replace them with an abstract noun. "The architecture rewards short-term thinking." "The system tolerates the shortfall." "The dynamic produces this outcome." Each sentence has a subject that registers as systems thinking, but no actor has been named. The writer has not had to say who built the architecture, who tolerates the shortfall, or whose interest the dynamic serves. The literary equivalent of "mistakes were made" - true at some level of abstraction, useless at the level where the question lives.`,
+The same trick plays in a second key: instead of negating the actor, replace them with an abstract noun. "The architecture rewards short-term thinking." "The system tolerates the shortfall." "The dynamic produces this outcome." Each sentence has a subject that registers as systems thinking, but no actor has been named. The writer has not had to say who built the architecture, who tolerates the shortfall, or whose interest the dynamic serves.
+
+And the third key, the bluntest one: the agentless passive. "Mistakes were made." "A decision was reached." "There has been a delay; leaves were on the track." The verb happens, the doer never arrives. This is the politician's voice and the train company's voice - the construction you reach for precisely when naming the actor would cost you something. Ask the question the sentence is built to suppress, *who did this*, and the prose either answers or admits it never could.`,
     whyItsSlop:
-      'Two mechanisms, one harm: the actor has been disappeared. (1) Universal negation over an unnamed population - "the deal no mediator can broker," "the framework no administration has built." (2) Abstract noun as agent - "the architecture rewards X," "the system tolerates Y." Both read as systems-level analysis without committing to anyone in particular. The author\'s exasperation at a conspicuous absence gets smuggled in as the claim itself. Especially reflexive as a closing or kicker device.',
-    fix: 'Name the actor. For negation-shapes: reframe affirmatively, state what IS, not what is not. For abstract-noun-as-agent: ask who built the architecture, who runs the system, whose interest the dynamic serves, and put that there. Swapping "no one" for "no President," or "the system" for "the regime" - that is the same shape with a label, not a fix.',
+      'Three mechanisms, one harm: the actor has been disappeared. (1) Universal negation over an unnamed population - "the deal no mediator can broker," "the framework no administration has built." (2) Abstract noun as agent - "the architecture rewards X," "the system tolerates Y." (3) Agentless passive - "mistakes were made," "a decision was reached." All three read as analysis or candour while committing to no one in particular. The author\'s exasperation at a conspicuous absence gets smuggled in as the claim itself. Especially reflexive as a closing or kicker device.',
+    fix: 'Name the actor. For negation-shapes: reframe affirmatively, state what IS, not what is not. For abstract-noun-as-agent: ask who built the architecture, who runs the system, whose interest the dynamic serves, and put that there. For agentless passive: find the subject the sentence dropped and put them in front of the verb - "mistakes were made" becomes "I made a mistake." Swapping "no one" for "no President," or "the system" for "the regime" - that is the same shape with a label, not a fix.',
     subShapes: [
       'Impossibility-via-negation: "X that no Y can Z"',
       'Silent-room reveal: "the conclusion no administration will say out loud"',
@@ -211,6 +213,7 @@ The same trick plays in a second key: instead of negating the actor, replace the
       'Cascading-absence list (reflexive): "No X, no Y, no Z" as mood music',
       'Never-variant: "a goal no administration has stated"',
       'Abstract noun as agent: "the architecture rewards X," "the system tolerates Y," "the dynamic produces Z"',
+      'Agentless passive: "mistakes were made," "a decision was reached," "there has been a delay"',
     ],
     examples: [
       {
@@ -237,9 +240,13 @@ The same trick plays in a second key: instead of negating the actor, replace the
         sloppy: 'The system tolerates the shortfall.',
         better: 'The board has tolerated the shortfall for three quarters.',
       },
+      {
+        sloppy: 'There has been a delay; leaves were on the track.',
+        better: 'We cancelled the 7:40 because the crew never showed.',
+      },
     ],
     skipRule:
-      'Enumerated-against-template absences are legitimate ("The 2008 collapse produced the Dodd-Frank reforms. This crisis: no commission, no resignations, no new rules") - the rhetorical weight comes from the gap against a known expected sequence, and each clause is independently testable. Specific factual absences about named instruments ("no claw-back clause in the current contract") are also legitimate. For the abstract-noun-as-agent shape: legitimate when the surrounding piece has named the actors and the abstraction is a productive shorthand for a system the writer has populated, or in technical/architectural prose where the noun is literally the system being discussed.',
+      'Enumerated-against-template absences are legitimate ("The 2008 collapse produced the Dodd-Frank reforms. This crisis: no commission, no resignations, no new rules") - the rhetorical weight comes from the gap against a known expected sequence, and each clause is independently testable. Specific factual absences about named instruments ("no claw-back clause in the current contract") are also legitimate. For the abstract-noun-as-agent shape: legitimate when the surrounding piece has named the actors and the abstraction is a productive shorthand for a system the writer has populated, or in technical/architectural prose where the noun is literally the system being discussed. For agentless passive: legitimate when the doer is genuinely unknown, irrelevant, or less important than the thing acted on ("the bridge was built in 1890") - that is the ordinary craft case the passive-voice entry covers, not this. The flag is the passive that hides a doer worth naming on purpose.',
   },
   {
     id: 'allusive-construct',
@@ -260,6 +267,7 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
       'Metaphor on the verb side: "The bill arrives at..."',
       'Back-reference on the object side: "...the position the spending itself is hollowing out"',
       'Both at once: the canonical form',
+      'Bare demonstrative: "This is not about X. It is about Y." where "this" points at nothing the text has named - the sentence leans entirely on a referent the reader is left to guess',
     ],
     examples: [
       {
@@ -278,9 +286,13 @@ Read it twice and you cannot tell who wrote it. It does not mean nothing - but i
         sloppy: 'The arrangement does not collapse, and each cycle produces a fresh round of commitments.',
         better: 'The contract auto-renews every quarter, with new commitments stacking each time.',
       },
+      {
+        sloppy: 'This is not about the tool. It is about the people who reach for it.',
+        better: 'Spreadsheets did not cause the fraud; the three managers who cooked them did.',
+      },
     ],
     skipRule:
-      'Survives only if the body literally and consistently uses the same vocabulary as a structural through-line, AND both ends point at specific recently-named referents. Both conditions must hold. Almost never do.',
+      'Survives only if the body literally and consistently uses the same vocabulary as a structural through-line, AND both ends point at specific recently-named referents. Both conditions must hold. Almost never do. For the bare-demonstrative shape: a "this" is fine when its referent is unambiguous from the immediately preceding sentence; the flag is the "this"/"that"/"these" floating free, where a reader would have to guess what it points at.',
   },
   {
     id: 'antithesis',
@@ -321,6 +333,39 @@ This isn't subtle craft - it's a reflex. The cadence is unmistakable: a beat, a 
     ],
     skipRule:
       'Legitimate when the X position is a real, named position the piece is rebutting and the antithesis lands the rebuttal. "Management called this a quarterly miss. It was a strategic defeat." That is contrast doing argumentative work.',
+  },
+  {
+    id: 'staccato',
+    category: 'structural',
+    name: 'Staccato',
+    severity: 'high',
+    scope: 'sentence',
+    rung: 2,
+    blurb:
+      'Short declaratives with the joins ripped out - dropped conjunctions and one-beat fragments where the thought wanted to flow.',
+    essay: `Two short sentences walk up, state a thing each, and sit down - and the logic that should have linked them has been quietly deleted. "Companies don't want good writing. They're fine with slop." The relationship is causal; the *because* that carried it is gone, and the reader is left assembling the join the writer dropped. Do this for a whole paragraph and the prose reads like a deck of index cards shuffled into order: every card true, no card touching the next.
+
+The other half of the tic is the fragment thrown down for drama - "Not good." "A reckoning." "The final blow." - a noun or an adjective standing where a sentence should be, hoping the full stop will lend it weight. Sometimes it earns the weight. Mostly it is a writer mistaking a clipped rhythm for a confident one. The model defaults to both because short, parallel, declarative sentences were safe in training: rarely wrong, reliably punchy, and never requiring it to commit to how two ideas actually relate. Restore the conjunction; fold the fragment back into the clause it broke off from. The prose gets longer and stops sounding like a robot reading a list.`,
+    whyItsSlop:
+      'Modern LLM prose defaults to short, equal-weight declaratives with the subordinating conjunctions stripped out - asyndeton as a house style. It scans as punchy and lets the model avoid committing to how its clauses relate. A reader who has seen enough of it clocks the index-card rhythm at a glance.',
+    fix: 'Restore the join. Where two clipped sentences are causally or logically linked, subordinate one to the other with the conjunction the model dropped - because, so, since, while. Fold a dramatic fragment back into its parent sentence unless it has genuinely earned the full stop.',
+    subShapes: [
+      'Dropped conjunction: two declaratives where a because / so / since was cut',
+      'Fragment-punch: a noun or adjective alone with a full stop ("Not good." "A reckoning.")',
+      'Equal-length march: a run of same-shape short sentences, no subordination anywhere',
+    ],
+    examples: [
+      {
+        sloppy: 'The budget was cut. Morale collapsed.',
+        better: 'Morale collapsed after the budget was cut.',
+      },
+      {
+        sloppy: 'Sales missed the quarter. Again. A pattern now.',
+        better: 'Sales missed the quarter again, and it is becoming a pattern.',
+      },
+    ],
+    skipRule:
+      'Asyndeton and fragments are real, powerful devices when chosen - a fragment can land a punch, a run of short sentences can carry urgency or panic. The flag is the *default* clipped rhythm across a whole passage, and especially a dropped conjunction that leaves the reader supplying a logical link the writer should have made. One deliberate fragment is craft; a paragraph of them is the model.',
   },
   {
     id: 'frame-stacking',
@@ -546,6 +591,127 @@ The model loves named lenses for the same reason a freshman essay loves the word
           'Three named senators changed their public position last year - two of them after a primary challenger. That is the entire shift.',
       },
     ],
+  },
+
+  // ---- CRAFT ----
+  {
+    id: 'redundancy',
+    category: 'craft',
+    name: 'Redundancy',
+    severity: 'medium',
+    scope: 'phrase',
+    rung: 1,
+    blurb:
+      'Words that repeat what their neighbours already carried - "out loud in public," or a whole sentence that re-states the one before it in fresh clothes.',
+    essay: `"He said it out loud in public." If he said it, it was out loud; if he posted it, it was already in public. The phrase pays twice for one idea. Redundancy is the cheapest fault to commit and the cheapest to fix: the reader is already holding the meaning, and the spare words just make them hold it again. It runs from the small doubled phrase - "past history," "free gift," "actual fact" - up to the whole sentence that restates its predecessor in a new coat of paint: "The truth is, a lot of it is bad. And I am sorry to say it, but it is true." The second sentence is the first one waving.
+
+The model pads because length read as effort in training, and because restating is safer than advancing - a paraphrase cannot be wrong about anything new. Economy is the antidote and the whole of it: say the thing once, in the fewest words it takes, and trust the reader to have heard you the first time.`,
+    whyItsSlop:
+      'The same idea stated twice - a doubled phrase, or a sentence that re-says the one before it. The model defaults to padding because length correlated with effort in its training and because re-stating risks nothing the way a new claim does. A human editor cuts it on sight.',
+    fix: 'Cut the half that repeats. For a doubled phrase, keep one word. For a restating sentence, delete it - the reader already has the idea from the sentence before.',
+    examples: [
+      {
+        sloppy: 'He came to eat his words out loud in public.',
+        better: 'He came to eat his words.',
+      },
+      {
+        sloppy: 'The truth is, a lot of it is bad. And I am sorry to say it, but it is true.',
+        better: 'The truth is, a lot of it is bad.',
+      },
+      {
+        sloppy: 'a free gift offered to each and every new customer',
+        better: 'a gift for every new customer',
+      },
+    ],
+    skipRule:
+      'Deliberate repetition for rhythm or emphasis - anaphora, a refrain, a callback - is a device, not a fault. The flag is repetition that adds nothing: the reader would lose no meaning if you cut it.',
+  },
+  {
+    id: 'latinate',
+    category: 'craft',
+    name: 'Latinate Inflation',
+    shortName: 'Latinate',
+    severity: 'medium',
+    scope: 'word',
+    rung: 1,
+    blurb:
+      'Reaching for the long Latin word when the short Anglo-Saxon one is sitting right there.',
+    essay: `There is an Anglo-Saxon word right there - "use," "help," "show," "try" - and the writer reaches past it for the Latinate one, because the long word feels like a diploma on the wall. It is not. "Your points are largely pusillanimous" does not make you sound clever; it makes the reader stop and wonder whether you can even say the word. Plain English is a service: the everyday word lets ninety-nine readers in a hundred take your meaning at a glance, instead of one in a hundred admiring your vocabulary while the rest reach for a dictionary.
+
+This is the one craft fault that runs opposite to the model's lexical tics - not the dead metaphor "delve" but the genuinely fancy word picked for status. The corpus rewarded it: academic and corporate prose treat the Latinate register as the very sound of seriousness. Orwell's rule still holds - never use a long word where a short one will do - and the short one is almost always the more honest.`,
+    whyItsSlop:
+      'Reaching for the Latinate or jargon word where a plain Anglo-Saxon one carries the same meaning. The high register reads as "serious" in academic and corporate corpora, so the model defaults to it. The reader pays in friction for the writer\'s borrowed status.',
+    fix: 'Swap in the plain word. "Utilise" is "use." "Facilitate" is "help." "Endeavour" is "try." If the precise word genuinely has no plain equivalent - a real term of art - keep it; if it is only dressed up, undress it.',
+    examples: [
+      {
+        sloppy: 'We will endeavour to facilitate the utilisation of these resources.',
+        better: 'We will help you use these.',
+      },
+      {
+        sloppy: 'Your argument is largely pusillanimous.',
+        better: 'Your argument is mostly cowardly.',
+      },
+    ],
+    skipRule:
+      'Terms of art with no plain equivalent ("plaintiff," "covariance," "ischaemia") are precision, not inflation. The flag is the fancy word chosen over an available plain one, where the plain one loses nothing but the costume. Distinct from tier1-lexicon, which is the dead-metaphor vocabulary ("delve," "tapestry") rather than genuinely high-register words.',
+  },
+  {
+    id: 'passive-voice',
+    category: 'craft',
+    name: 'Passive Voice',
+    shortName: 'Passive',
+    severity: 'medium',
+    scope: 'sentence',
+    rung: 2,
+    blurb:
+      'Passive constructions that demote the doer to an afterthought, or drop them entirely, where the active voice would be shorter and braver.',
+    essay: `"The ball was kicked by the boy." Six words, and the doer arrives last, dragged in on a "by." "The boy kicks the ball." Four words, and you watch it happen. The active voice puts the doer in front and lets the verb do the work; the passive demotes the doer to an afterthought or loses them altogether. The sciences and social sciences taught a generation to write this way as a costume of objectivity - "it was observed that" - and the habit leaked into everything. The cost is vigour: passive prose reads as if it is being recited rather than said.
+
+Ask of every sentence: who is the doer? When the sentence will not tell you, that is sometimes deliberate - the agentless passive is how a politician says "mistakes were made" without saying whose (that sharper case is the absent-actor construct, one rung up). But most passive is just habit, and flipping it to active makes the sentence shorter, clearer, and more willing to stand behind itself.`,
+    whyItsSlop:
+      'Passive voice demotes or deletes the doer, costing the sentence its directness. The model inherits the reflex from the academic and bureaucratic prose that prizes the "objective" register. Flipping to active is almost always shorter and always clearer.',
+    fix: 'Name the doer and put them in front of the verb. "A decision was reached by the committee" becomes "the committee decided." If going active exposes that you do not know or will not say who the doer is, that is absent-actor - the load-bearing case, handled there.',
+    examples: [
+      {
+        sloppy: 'The proposal was rejected by the board after concerns were raised.',
+        better: 'The board rejected the proposal after two members raised concerns.',
+      },
+      {
+        sloppy: 'It was decided that the launch would be delayed.',
+        better: 'The director delayed the launch.',
+      },
+    ],
+    skipRule:
+      'Passive is the right call when the doer is genuinely unknown, irrelevant, or less important than the thing acted on - "the bridge was built in 1890," "the patient was discharged." The flag is passive that buries a doer worth naming, or that the writer reached for out of habit. When the passive hides the doer on purpose, that is absent-actor, not this.',
+  },
+  {
+    id: 'terminal-preposition',
+    category: 'craft',
+    name: 'Terminal Preposition',
+    shortName: 'Terminal prep.',
+    severity: 'low',
+    scope: 'sentence',
+    rung: 1,
+    blurb:
+      'A sentence that limps to a stop on a weak preposition, spending its most emphatic position on a function word.',
+    essay: `This is the fussiest entry in the catalogue and it knows it. The old rule - never end a sentence on a preposition - is half myth; Churchill is supposed to have mocked it, and "the thing I will not put up with" is better English than any knot tied to dodge the "with." So treat this not as a rule but as a small chance for a better ending. A sentence ends on its last word, and the reader's ear holds that word a beat longer than the rest. End on "of," "in," "to," "with," and the beat has been spent on a function word - the line sets its weight down on nothing.
+
+The fix, when there is one, is to find the strong word the sentence was carrying and let it land last - not by contorting the sentence to avoid the preposition, but by reshaping so the flourish falls at the end. When the preposition genuinely belongs there, leave it: a forced rewrite is the worse fault, every time.`,
+    whyItsSlop:
+      'A sentence ending on a weak preposition spends its most emphatic position - the last word - on a function word, so the line lands without a flourish. Low severity by design: ending on a preposition is often perfectly idiomatic. The flag is the limp close where a stronger word was available.',
+    fix: 'Reshape so a strong, concrete word lands last, smuggling the preposition into the middle - but only when it reads naturally. "The problem I keep coming up against" is fine; if the rewrite would knot the sentence, leave the preposition where it sits.',
+    examples: [
+      {
+        sloppy: 'That is the outcome the whole strategy was designed to bring about.',
+        better: 'The whole strategy was designed to bring about that outcome.',
+      },
+      {
+        sloppy: 'It is the sort of sloppy prose a tired model is most prone to.',
+        better: 'A tired model is most prone to exactly this sort of sloppy prose.',
+      },
+    ],
+    skipRule:
+      'Ending on a preposition is frequently the most natural English available - "something worth fighting for," "the mess I got us into." Flag only when the close goes limp AND a graceful rewrite ends on a stronger word. Never reward a contorted sentence for avoiding a terminal preposition; the contortion is the worse fault.',
   },
 ]
 

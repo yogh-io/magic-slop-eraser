@@ -17,6 +17,8 @@ export function severityFor(patternId: string): number {
     case 'allusive-construct':
     case 'suffocation':
       return 0.95
+    case 'staccato':
+      return 0.85
     case 'tier1-lexicon':
     case 'closers':
     case 'throat-clearing':
@@ -25,7 +27,12 @@ export function severityFor(patternId: string): number {
     case 'redundant-abstraction':
       return 0.8
     case 'enthusiasm-inflation':
-      return 0.6
+    case 'redundancy':
+    case 'latinate':
+    case 'passive-voice':
+      return 0.55
+    case 'terminal-preposition':
+      return 0.35
     default:
       return 0.6
   }

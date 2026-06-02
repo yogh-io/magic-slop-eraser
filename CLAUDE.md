@@ -28,21 +28,21 @@ The numbering is **layer, not order**. In scan mode, an agent or author picks th
 - **Scope**: word and phrase. The dead AI vocabulary, throat-clearing openers, vague-gravitas closers, the mirror construct as a syntactic shape.
 - **Fix**: substitution or cut. Most fixes are one or two characters. The pattern says what to do; the drafter proposes the substitution; the author takes it, edits it, or rejects it.
 - **Workflow**: the simplest form of the steering loop. The drafter surfaces a batch of flags with substitutions proposed for each (inline `suggestion` field on the flag); the author sweeps with yes / cut / edit / skip / keep, often resolving most in a single pass. Lexical patterns rarely need re-direction - the substitution either lands or it does not.
-- **Patterns currently here**: `tier1-lexicon`, `tier2-lexicon`, `throat-clearing`, `closers`, `enthusiasm-inflation`, `vague-gravitas`, `antithesis` (mirror construct), `suffocation` (stacked hedges), `em-dash-density`, `false-precision`, `approval-seeking`.
+- **Patterns currently here**: `tier1-lexicon`, `throat-clearing`, `closers`, `enthusiasm-inflation`, `vague-gravitas`, `suffocation` (stacked hedges), `antithesis` (mirror construct), plus the Rung 1 `craft` patterns `redundancy`, `latinate`, `terminal-preposition`.
 
 ### Rung 2 - passage-level judgment (middle)
 
 - **Scope**: a sentence, or a small cluster of two or three sentences, in paragraph context. The patterns here are structural, not lexical: a passage whose subject is unnamed, a closer that synthesises nothing, a paragraph that walks across both sides without committing.
 - **Fix**: rewriting the passage with one or more candidate forms. Sometimes a single word changes, sometimes the whole sentence is reshaped, sometimes a small cluster is rebuilt. Author picks one, customises, or rejects. Always reversible.
 - **Workflow**: a *steering loop*, batched. The drafter posts one or more candidates per flag (one when the directive is unambiguous, two or three when it admits real alternatives); the author sweeps with shape directives ("more committal", "drop the qualifier", "punchline first", "cut to the verb"); the drafter re-attempts each in the background; the author re-engages and re-directs until the sentence lands. BETTER / WORSE / CLOSE is fuel for the next iteration, not a final ranking. No batch auto-fix - every accept is the author's.
-- **Patterns currently here**: `absent-actor`, `allusive-construct`, `staccato`, `bidirectional-summary`, `hedged-confidence`, `pivot-to-balance`, `restating-question`, `synthesis-of-nothing`, `performative-humility`, `bullets-where-prose`.
+- **Patterns currently here**: `absent-actor`, `allusive-construct`, `staccato` (clipped asyndeton - dropped conjunctions and fragment-punches), `hedged-confidence`, `synthesis-of-nothing`, `performative-balance`, plus the Rung 2 `craft` pattern `passive-voice`.
 
 ### Rung 3 - presentation / editorial (top)
 
 - **Scope**: the piece as a piece. The question is whether its substance - the actual arguments, values, internal merits of what is being said - is coming through to the reader. Frame stacking buries the thesis under preamble; performative balance dilutes the position into nothing; header inflation pads scaffolding where the argument should carry weight. These are the moves a chief editor catches on the second read.
 - **Fix**: substantial rewrite focused on what the piece is *saying*, not just where it sits on the page. Outside the scope of an autonomous fixer. Slopmop flags positions where the presentation of the content needs reworking and gets out of the way.
 - **Workflow**: the same batched steering loop, applied to larger units (a section, a transition, the opening, the close). Slower cycles - the drafter reads the surrounding piece between turns - but the shape is identical: the author defines what the section is supposed to *do*, the drafter drafts the prose, the author re-directs. Rung 3 in slopmop is positioned as the entry point to that kind of workflow (interactive multi-pass diagnostics + author-driven rewriting; a separate chief-edit / ship-gate pass for the close and the preamble).
-- **Patterns currently here**: `frame-stacking`, `kicker-paraphrase`, `redundant-abstraction`, `lens-fits-everything`, `header-inflation`.
+- **Patterns currently here**: `frame-stacking`, `kicker-paraphrase`, `redundant-abstraction`, `lens-fits-everything`.
 
 ## The loop: paired writing in batched turns
 
@@ -221,7 +221,7 @@ Every pattern carries four super-category tags. They are independent axes; a pat
 |---|---|---|
 | `rung` | 1 / 2 / 3 | Depth of the fix (lexical / sentence / structural). Drives the workflow. |
 | `scope` | word / phrase / sentence / paragraph / piece | Operating scope on the prose. |
-| `category` | lexical / structural / argumentative / tonal / format | The five high-level categories from the original DESLOP-GUIDE. |
+| `category` | lexical / structural / argumentative / craft | The first three are AI tells (the original DESLOP-GUIDE axes). `craft` is the one relaxed-bar category: plain-English faults that aren't distinctly-AI but a human editor still cuts (padding, fancy words, passive voice, limp closes). |
 | `severity` | primary / high / medium / low | A nominal weight; overridable per-flag at detection time by drafter judgement. |
 
 The catalogue UI (`/categories`) lets users filter on all four.
@@ -249,8 +249,8 @@ The reference voice lives in the DESLOP-GUIDE this project generalises from. Whe
 ```
 src/
   catalog/
-    categories.ts       # 5 categories with essays
-    patterns.ts         # 24 patterns with full metadata + essays
+    categories.ts       # 4 categories with essays (lexical, structural, argumentative, craft)
+    patterns.ts         # 21 patterns with full metadata + essays
   detectors/
     index.ts            # scoring helpers (severityFor, scoreFromFlags); detection itself is drafter-side
     skipZones.ts        # code-block / blockquote exclusions (used for word-count and as drafter context)
@@ -304,6 +304,11 @@ server/                 # Bun-based API. Imports src/anchoring + src/detectors d
   SKILL.md              # protocol document
   README.md             # install/use
 
+fixtures/
+  deslop-demo/          # a worked example - the slopmop loop performed by hand
+    source.md           # anonymised slop specimen (the "before")
+    walkthrough.md      # the brush loop: each flag's complaint -> pattern -> rewrite, plus the "after"
+
 .do/app.yaml            # DigitalOcean App Platform spec (basic-xxs)
 Dockerfile              # multi-stage: Node frontend build + Bun runtime
 ```
@@ -311,7 +316,7 @@ Dockerfile              # multi-stage: Node frontend build + Bun runtime
 ## Adding a pattern
 
 1. Decide the rung. Use fix-shape: if the fix is "substitute or cut a word/phrase", it's Rung 1. If the fix is "rewrite the sentence with options", Rung 2. If the fix touches the whole piece, Rung 3.
-2. Pick a category from the existing five. If a pattern doesn't fit, push back rather than create a sixth.
+2. Pick a category from the existing four (`lexical`, `structural`, `argumentative`, `craft`). If an AI tell doesn't fit the first three, push back rather than create a new one; a pure-craft fault goes in `craft`.
 3. Add the entry to `src/catalog/patterns.ts` with all required fields: `id`, `category`, `name`, `severity`, `scope`, `rung`, `blurb`, `whyItsSlop`, `fix`, `examples`. Optional: `essay`, `subShapes`, `skipRule`, `shortName`. Make `whyItsSlop` and `skipRule` strong - those are what the drafter reads as its detection spec.
 4. Add a severity weight in `src/detectors/index.ts:severityFor` if the pattern is severe enough to deserve more than the 0.6 default. Consider whether the pattern deserves a score ceiling in `scoreFromFlags`.
 5. Verify in the browser: navigate to `/patterns/<id>` and check the page renders. Check the catalogue grid. Check the filter chips count correctly.
@@ -321,6 +326,8 @@ Dockerfile              # multi-stage: Node frontend build + Bun runtime
 The catalogue is curated, not exhaustive. A pattern earns its place by being **distinctly produced by current LLM training** and **distinctly annoying** when it appears. Real human rhetorical devices that the model overuses (tricolons, anaphora, orphan punchlines, tables of contents) do not belong here even though the model abuses them. The criterion is "would a hostile reader clock this as AI?", not "is this bad writing?".
 
 When in doubt: cut.
+
+**The one exception is the `craft` category.** It deliberately relaxes the AI-clockable bar to house plain-English faults - padding, fancy words, passive voice, a limp close - the things a human editor cuts whoever wrote the draft. The bar there is "would a plain-English editor cross this out?", and the category essay says so out loud. Keep the relaxation quarantined: a new pattern that is just "bad writing" belongs in `craft` or nowhere. The other three categories stay pure AI tells. If a fault is *both* a craft fault and a distinct AI tell (e.g. `staccato`), file it by its sharper edge - `staccato` is a structural AI tell, not craft, because the clipped asyndetic rhythm is itself a giveaway.
 
 ## Inspirations
 
